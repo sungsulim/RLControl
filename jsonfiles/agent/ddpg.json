@@ -1,0 +1,22 @@
+{
+    "agent": "DDPG",
+
+    "sweeps":{
+
+        "norm": ["layer"],
+        "exploration_policy": ["ou_noise"],
+
+        "ou_theta": [0.15],
+        "ou_mu": [0.0],
+        "ou_sigma": [0.2],
+
+        "actor_l1_dim": [64],
+        "actor_l2_dim": [64],
+
+        "critic_l1_dim": [64],
+        "critic_l2_dim": [64],
+        
+        "actor_lr": [1e-3],
+        "critic_lr": [1e-2]
+    }
+}

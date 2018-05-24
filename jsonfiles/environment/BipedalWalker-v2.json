@@ -1,0 +1,9 @@
+{
+    "environment": "BipedalWalker-v2",
+
+    "TotalMilSteps": 2.0,
+    "EpisodeSteps": -1,
+
+    "EvalIntervalMilSteps": 0.02,
+    "EvalEpisodes": 50
+}

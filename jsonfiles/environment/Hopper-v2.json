@@ -1,0 +1,9 @@
+{
+    "environment": "Hopper-v2",
+
+    "TotalMilSteps": 1.0,
+    "EpisodeSteps": -1,
+
+    "EvalIntervalMilSteps": 0.01,
+    "EvalEpisodes": 10
+}
