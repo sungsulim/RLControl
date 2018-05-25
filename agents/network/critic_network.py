@@ -7,12 +7,6 @@ import matplotlib.pyplot as plt
 
 
 
-# used in the original DDPG paper, but not being used here
-def fanin_initializer(fanin_size):
-    value = 1.0/np.sqrt(fanin_size)
-    return tf.random_uniform_initializer(minval = -value, maxval = value)
-
-
 class CriticNetwork(BaseNetwork):
 
     def __init__(self, sess, input_norm, layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, learning_rate, tau, norm_type):
@@ -83,34 +77,29 @@ class CriticNetwork(BaseNetwork):
 
             inputs = tf.placeholder(tf.float32, shape=(None,self.state_dim))
             phase = tf.placeholder(tf.bool)
-
             action = tf.placeholder(tf.float32, [None, self.action_dim])
+
+            # normalize state inputs if using "input_norm" or "layer" or "batch"
+            if self.norm_type == 'input_norm' or self.norm_type == 'layer':
+                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
 
             if self.norm_type == 'layer':
                 outputs = self.layer_norm_network(inputs, action, phase)
             elif self.norm_type == 'batch':
-                assert (self.input_norm is None)
                 outputs = self.batch_norm_network(inputs, action, phase)
-            elif self.norm_type == 'none':
-                assert (self.input_norm is None)
+            elif self.norm_type == 'none' or self.norm_type == 'input_norm':
                 outputs = self.no_norm_network(inputs, action, phase)
-            elif self.norm_type == 'input_norm':
-                outputs = self.input_norm_network(inputs, action, phase)
+
             else:
                 raise Exception('WRONG NORM TYPE!!')
-
-
-            
 
         return inputs, phase, action, outputs
 
 
     def layer_norm_network(self, inputs, action, phase):
-        normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
-
         # 1st fc
-        net = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=None, \
+        net = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
                                         weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
                                         biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
@@ -135,7 +124,7 @@ class CriticNetwork(BaseNetwork):
 
 
     def batch_norm_network(self, inputs, action, phase):
-        # state input -> bn
+        # state input -> bn (According to paper)
         net = tf.contrib.layers.batch_norm(inputs, fused=True, center=True, scale=True, activation_fn=None,
                                             is_training=phase, scope='batchnorm_0')
         # 1st fc

@@ -19,6 +19,7 @@ class BaseAgent(object):
         self.action_max = env.action_max
 
         self.seed = None
+        self.network = None
 
         if config.exploration_policy == 'ou_noise':
             from utils.exploration_policy import OrnsteinUhlenbeckProcess
@@ -48,31 +49,30 @@ class BaseAgent(object):
         self.warmup_steps = config.warmup_steps
         self.gamma = config.gamma 
 
+    def start(self, state):
+        raise NotImplementedError
 
-    # This should follow the agent's policy and return an action that will be used by the environment
-    def step(self, obs):
-        return 0
+    def step(self, state):
+        raise NotImplementedError
 
-    def getValue(self, s, a):
+    def get_value(self, s, a):
         raise NotImplementedError
     
-    # This should update the agent's parameters using S, A, R, Sp tuple received from environment
-    def update(self, obs, obs_n, r, a):
+    def update(self, state, next_state, reward, action, is_terminal):
         raise NotImplementedError
 
 
     # Sets the random seed for the agent
-    def setSeed(self, seed):
+    def set_seed(self, seed):
         raise NotImplementedError
 
     # Resets the agent between episodes. Should primarily be used to clear traces or other temporally linked parameters
     def reset(self):
-        return None
+        raise NotImplementedError
 
-    # This should return a dictionary with the meta-parameters used by the agent.
-    # Currently this information is used by the logger to make orginization of experiment files easier to navigate
-    def params(self):
-        raise Exception('Uh oh. The agent should have a params() function that returns a dictionary with all params for instance: agent.params() => {gamma: 0.1, alpha: 0.5}')
+    # set writer (to log useful stuff in tensorboard)
+    def set_writer(self, writer):
+        self.network.writer = writer
 
-    def start(self, obs):
-        return self.getAction(obs)
+
+

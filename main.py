@@ -1,7 +1,7 @@
 # -*- encoding:utf8 -*-
 import gym
 
-from utils.rl_exp import Experiment
+from experiment import Experiment
 import environments.environments as envs
 from utils.main_utils import *
 from utils.config import Config

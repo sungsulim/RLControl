@@ -2,11 +2,6 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 
-# used in the original DDPG paper, but not being used here
-def fanin_initializer(fanin_size):
-    value = 1.0/np.sqrt(fanin_size)
-    return tf.random_uniform_initializer(minval = -value, maxval = value)
-
 class ActorNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, learning_rate, tau, norm_type):
         super(ActorNetwork, self).__init__(sess, state_dim, action_dim, learning_rate, tau)
@@ -55,7 +50,7 @@ class ActorNetwork(BaseNetwork):
                                                 if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0') or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
 
         else:
-            assert (self.norm_type == 'none' or self.norm_type == 'layer')
+            assert (self.norm_type == 'none' or self.norm_type == 'layer' or self.norm_type == 'input_norm')
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
@@ -71,12 +66,16 @@ class ActorNetwork(BaseNetwork):
             inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
             phase = tf.placeholder(tf.bool)
 
+            # normalize state inputs if using "input_norm" or "layer" or "batch"
+            if self.norm_type == 'input_norm' or self.norm_type == 'layer':
+                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+
             if self.norm_type == 'layer':
                 outputs = self.layer_norm_network(inputs, phase)
             elif self.norm_type == 'batch':
                 assert (self.input_norm is None)
                 outputs = self.batch_norm_network(inputs, phase)
-            elif self.norm_type == 'none':
+            elif self.norm_type == 'none' or self.norm_type == 'input_norm':
                 assert (self.input_norm is None)
                 outputs = self.no_norm_network(inputs, phase)
             else:
@@ -91,9 +90,8 @@ class ActorNetwork(BaseNetwork):
 
     def layer_norm_network(self, inputs, phase):
 
-        normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
         # 1st fc
-        net = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=None, \
+        net = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
                                             weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
                                             weights_regularizer=None, #]tf.contrib.layers.l2_regularizer(0.001), \
                                             biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))

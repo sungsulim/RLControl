@@ -3,7 +3,7 @@ import sys
 import time
 
 from agents.base_agent import BaseAgent # for python3
-#from agents import Agent # for python2
+#from base_agent import BaseAgent # for python2
 
 import random
 import numpy as np
@@ -13,17 +13,18 @@ import tensorflow.contrib.slim as slim
 from agents.network.actor_network import ActorNetwork
 from agents.network.critic_network import CriticNetwork
 from utils.running_mean_std import RunningMeanStd
-from utils.rl_exp import write_summary
+from utils.main_utils import write_summary
 
 class DDPG_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
         
-        # type of normalization: 'none', 'batch', 'layer'
+        # type of normalization: 'none', 'batch', 'layer', 'input_norm'
         self.norm_type = config.norm
 
-        if self.norm_type == 'layer':
+        if self.norm_type == 'input_norm' or self.norm_type == 'layer' or self.norm_type == 'batch':
             self.input_norm = RunningMeanStd(state_dim)
         else:
+            assert(self.norm_type == 'none')
             self.input_norm = None
 
         self.episode_ave_max_q = 0.0
@@ -49,9 +50,6 @@ class DDPG_Network(object):
 
     def take_action(self, state, is_train):
         action = self.actor_network.predict(np.expand_dims(state, 0), False)[0]
-        # print(self.global_count, state, action)
-        # self.global_count+=1
-
         return action
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
@@ -108,10 +106,8 @@ class DDPG(BaseAgent):
     def start(self, state, is_train):
         return self.take_action(state, is_train)
 
-
     def step(self, state, is_train):
         return self.take_action(state, is_train)
-        
 
     def take_action(self, state, is_train):
 
@@ -128,15 +124,16 @@ class DDPG(BaseAgent):
                 # if using an external exploration policy
                 if self.exploration_policy:
                     action = self.exploration_policy.generate(action, self.cum_steps)
+                
                 # only increment during training, not evaluation
-                self.cum_steps +=1
+                self.cum_steps += 1
 
             action = np.clip(action, self.action_min, self.action_max) 
         return action
 
-    def update(self, state, next_state, reward, action, episodeEnd):
+    def update(self, state, next_state, reward, action, is_terminal):
 
-        if not episodeEnd:
+        if not is_terminal:
             self.replay_buffer.add(state, action, reward, next_state, self.gamma)        
         else:
             self.replay_buffer.add(state, action, reward, next_state, 0.0)
@@ -153,17 +150,14 @@ class DDPG(BaseAgent):
         else:
             return
 
-
-
     # not implemented
     def get_Qfunction(self, state):
-        return None
+        raise NotImplementedError
 
     def reset(self):
         self.network.reset()
-        self.exploration_policy.reset()
+        if self.exploration_policy:
+            self.exploration_policy.reset()
 
-    # set writer
-    def set_writer(self, writer):
-        self.network.writer = writer
+
 
