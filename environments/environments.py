@@ -98,19 +98,22 @@ class ContinuousEnvironment(object):
     # Reset the environment for a new episode. return the initial state
     def reset(self):
         state = self.instance.reset()
+        '''
         if self.state_bounded:
             # normalize to [-1,1]
             scaled_state = 2.*(state - self.state_min)/self.state_range - 1.
             return scaled_state
+        '''
         return state
 
     def step(self, action):
         state, reward, done, info = self.instance.step(action)
 
+        '''
         if self.state_bounded:
-            #print 'use bounded', self.stateRange
             scaled_state = 2.*(state - self.state_min)/self.state_range - 1.
             return (scaled_state, reward, done, info)
+        '''
         return (state, reward, done, info)
 
     def get_state_dim(self):

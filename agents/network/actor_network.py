@@ -73,10 +73,8 @@ class ActorNetwork(BaseNetwork):
             if self.norm_type == 'layer':
                 outputs = self.layer_norm_network(inputs, phase)
             elif self.norm_type == 'batch':
-                assert (self.input_norm is None)
                 outputs = self.batch_norm_network(inputs, phase)
             elif self.norm_type == 'none' or self.norm_type == 'input_norm':
-                assert (self.input_norm is None)
                 outputs = self.no_norm_network(inputs, phase)
             else:
                 raise Exception('WRONG NORM TYPE!!')

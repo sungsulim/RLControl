@@ -83,7 +83,6 @@ class CriticNetwork(BaseNetwork):
             if self.norm_type == 'input_norm' or self.norm_type == 'layer':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
-
             if self.norm_type == 'layer':
                 outputs = self.layer_norm_network(inputs, action, phase)
             elif self.norm_type == 'batch':
