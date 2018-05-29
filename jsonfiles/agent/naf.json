@@ -1,0 +1,15 @@
+{
+    "agent": "NAF",
+
+
+    "sweeps": {
+        "norm": ["batch"],
+        "exploration_policy": ["none"],
+        "noise_scale":[1.0],
+
+        "learning_rate":[1e-3],
+
+        "l1_dim": [200],
+        "l2_dim": [200]
+    }
+}

@@ -1,0 +1,22 @@
+{
+    "agent": "AE_CCEM",
+
+    "sweeps": {
+
+        "norm": ["layer"],
+
+        "exploration_policy": ["none"],
+
+        "shared_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "expert_l2_dim": [200],
+
+
+        "actor_lr": [1e-4],
+        "expert_lr": [1e-2],
+
+        "rho": [0.5],
+        "num_samples": [10],
+        "num_modal": [2]
+    }
+}

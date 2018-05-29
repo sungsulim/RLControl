@@ -18,9 +18,9 @@ def create_agent(agent_string, env, config, seed):
         from agents.ICNN import ICNN
         return ICNN(env, config, seed)
 
-    elif agent_string == "CEM_hydra_multimodal":
-        from agents.CEM_hydra_multimodal import CEM_hydra_multimodal
-        return CEM_hydra_multimodal(env, config, seed)
+    elif agent_string == "AE_CCEM":
+        from agents.AE_CCEM import AE_CCEM
+        return AE_CCEM(env, config, seed)
     elif agent_string == "CriticAssistant_hydra":
         from agents.CriticAssistant_hydra import CriticAssistant_hydra
         return CriticAssistant_hydra(env, config, seed)

@@ -193,16 +193,6 @@ class CriticNetwork(BaseNetwork):
 
         return outputs
 
-        
-    def train(self, *args):
-        # args (inputs, action, predicted_q_value, phase)
-        return self.sess.run([self.outputs, self.optimize], feed_dict={
-            self.inputs: args[0],
-            self.action: args[1],
-            self.predicted_q_value: args[2],
-            self.phase: True
-        })
-
     def predict(self, *args):
         # args  (inputs, action, phase)    
         inputs = args[0]
@@ -295,6 +285,17 @@ class CriticNetwork(BaseNetwork):
             self.target_phase: is_training
         })
 
+
+    def train(self, *args):
+        # args (inputs, action, predicted_q_value, phase)
+        return self.sess.run([self.outputs, self.optimize], feed_dict={
+            self.inputs: args[0],
+            self.action: args[1],
+            self.predicted_q_value: args[2],
+            self.phase: True
+        })
+
+        
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 

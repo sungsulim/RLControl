@@ -80,11 +80,8 @@ class DDPG_Network(object):
     def get_sum_maxQ(self): # Returns sum of max Q values
         return self.episode_ave_max_q
 
-
     def reset(self):
         self.episode_ave_max_q = 0.0
-        
-
 
 
 class DDPG(BaseAgent):
@@ -138,7 +135,7 @@ class DDPG(BaseAgent):
         else:
             self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-        if self.network.norm_type == 'layer':
+        if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':
             self.network.input_norm.update(np.array([state]))
         self.learn()
     
