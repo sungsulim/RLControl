@@ -7,7 +7,7 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 
 from utils.running_mean_std import RunningMeanStd
-from utils.main_utils import write_summary
+from experiment import write_summary
 
 class NAF_Network:
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):

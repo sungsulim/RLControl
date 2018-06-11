@@ -34,6 +34,8 @@ def create_environment(env_params):
     ####
 
     #### Mujoco ENV
+    elif env_name == 'InvertedPendulum-v2':
+        return ContinuousEnvironment(env_params)
     elif env_name == 'HalfCheetah-v2':
         return ContinuousEnvironment(env_params)
     elif env_name == 'Hopper-v2':

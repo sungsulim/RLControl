@@ -1,7 +1,6 @@
 # -*- encoding:utf8 -*-
 import gym
 
-from experiment import Experiment
 import environments.environments as envs
 from utils.main_utils import *
 from utils.config import Config
@@ -83,7 +82,8 @@ def main():
         
 
 
-
+    from experiment import Experiment
+    
     # initialize experiment
     experiment = Experiment(agent=agent, train_environment=train_env, test_environment= test_env, seed=RANDOM_SEED, summary_dir=summary_dir)
     

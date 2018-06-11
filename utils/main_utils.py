@@ -44,12 +44,7 @@ def get_sweep_parameters(parameters, index):
     return (out, accum)
 
 
-# write to tf Summary
-def write_summary(writer, increment, stuff_to_log, tag):
-    summary = tf.Summary() 
-    summary.value.add(simple_value=stuff_to_log, tag=tag)
-    writer.add_summary(summary, increment)
-    writer.flush()
+
 
 
 

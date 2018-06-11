@@ -5,7 +5,6 @@ from datetime import datetime
 import time
 import copy
 import tensorflow as tf
-from utils.main_utils import write_summary
 
 #import cProfile, pstats, StringIO
 #pr = cProfile.Profile()
@@ -148,6 +147,14 @@ class Experiment(object):
             episode_step_count += 1
 
         return (episode_reward, episode_step_count)
+
+
+# write to tf Summary
+def write_summary(writer, increment, stuff_to_log, tag):
+    summary = tf.Summary() 
+    summary.value.add(simple_value=stuff_to_log, tag=tag)
+    writer.add_summary(summary, increment)
+    writer.flush()
 
 
 
