@@ -7,7 +7,6 @@ from agents.base_agent import BaseAgent # for python3
 import random
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 import utils.exploration_policy #import OrnsteinUhlenbeckProcess
 from utils.replaybuffer import ReplayBuffer
 from agents.network import ae_ccem_network

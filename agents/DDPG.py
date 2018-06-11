@@ -8,7 +8,6 @@ from agents.base_agent import BaseAgent # for python3
 import random
 import numpy as np
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
 
 from agents.network.actor_network import ActorNetwork
 from agents.network.critic_network import CriticNetwork

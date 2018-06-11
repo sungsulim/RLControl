@@ -2,7 +2,6 @@
 import gym
 
 import environments.environments as envs
-from utils.main_utils import *
 from utils.config import Config
 
 import numpy as np
@@ -40,7 +39,7 @@ def main():
     train_env =  envs.create_environment(env_json)
     test_env = envs.create_environment(env_json)
 
-
+    from utils.main_utils import *
     agent_params, total_num_sweeps = get_sweep_parameters(agent_json['sweeps'], args.index)    
     
     # init config and merge custom config settings from json

@@ -1,5 +1,4 @@
 from collections import OrderedDict
-import tensorflow as tf
 
 # Takes a string and returns and instance of an agent
 # [env] is an instance of an environment
