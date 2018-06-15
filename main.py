@@ -39,7 +39,7 @@ def main():
     train_env =  envs.create_environment(env_json)
     test_env = envs.create_environment(env_json)
 
-    from utils.main_utils import *
+    from utils.main_utils import get_sweep_parameters, create_agent
     agent_params, total_num_sweeps = get_sweep_parameters(agent_json['sweeps'], args.index)    
     
     # init config and merge custom config settings from json
