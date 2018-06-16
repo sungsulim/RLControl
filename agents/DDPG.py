@@ -27,24 +27,24 @@ class DDPG_Network(object):
             self.input_norm = None
 
         self.episode_ave_max_q = 0.0
-        #self.graph = tf.Graph()
+        self.graph = tf.Graph()
 
-        #with self.graph.as_default():
-        tf.set_random_seed(random_seed)
-        self.sess = tf.Session() 
+        with self.graph.as_default():
+            tf.set_random_seed(random_seed)
+            self.sess = tf.Session() 
 
-        actor_layer_dim = [config.actor_l1_dim, config.actor_l2_dim]
-        critic_layer_dim = [config.critic_l1_dim, config.critic_l2_dim]
+            actor_layer_dim = [config.actor_l1_dim, config.actor_l2_dim]
+            critic_layer_dim = [config.critic_l1_dim, config.critic_l2_dim]
 
-        self.actor_network = ActorNetwork(self.sess, self.input_norm, actor_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
-                                                        config.actor_lr, config.tau, norm_type = self.norm_type)
-        self.critic_network = CriticNetwork(self.sess, self.input_norm, critic_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
-                                                        config.critic_lr, config.tau, norm_type = self.norm_type)            
+            self.actor_network = ActorNetwork(self.sess, self.input_norm, actor_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
+                                                            config.actor_lr, config.tau, norm_type = self.norm_type)
+            self.critic_network = CriticNetwork(self.sess, self.input_norm, critic_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
+                                                            config.critic_lr, config.tau, norm_type = self.norm_type)            
 
-        self.sess.run(tf.global_variables_initializer())
+            self.sess.run(tf.global_variables_initializer())
 
-        self.actor_network.update_target_network()
-        self.critic_network.update_target_network()  
+            self.actor_network.update_target_network()
+            self.critic_network.update_target_network()  
 
 
     def take_action(self, state, is_train):

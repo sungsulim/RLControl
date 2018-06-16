@@ -33,8 +33,6 @@ def main():
         agent_json = json.load(agent_dat, object_pairs_hook=OrderedDict)
 
 
-
-
     # initialize env
     train_env =  envs.create_environment(env_json)
     test_env = envs.create_environment(env_json)
