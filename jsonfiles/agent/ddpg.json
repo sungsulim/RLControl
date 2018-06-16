@@ -3,7 +3,7 @@
 
     "sweeps":{
 
-        "norm": ["layer"],
+        "norm": ["layer", "input_norm"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],
@@ -16,7 +16,7 @@
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
         
-        "actor_lr": [1e-3],
-        "critic_lr": [1e-2]
+        "actor_lr": [1e-3, 1e-4],
+        "critic_lr": [1e-2, 1e-3]
     }
 }
