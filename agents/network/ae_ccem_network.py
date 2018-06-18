@@ -104,11 +104,7 @@ class AE_CCEM_Network(BaseNetwork):
 
             else:
                 assert( self.norm_type == 'none' or self.norm_type == 'input_norm')
-                assert (self.input_norm is None)
-                raise NotImplementedError
                 action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.no_norm_network(inputs, action, phase)
-
-            
 
         return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
 
@@ -212,14 +208,55 @@ class AE_CCEM_Network(BaseNetwork):
                                         weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
+        
+        # action_outputs = tf.contrib.layers.fully_connected(action_net, self.actor_output_dim, activation_fn=tf.tanh, \
+        #                                 weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
+        #                                 weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
+        #                                 biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        action_prediction = tf.contrib.layers.fully_connected(action_net, self.action_dim, activation_fn=tf.tanh, \
+        # # mean, sigma, coeff
+        # action_prediction_mean, action_prediction_sigma, action_prediction_alpha = tf.split(action_outputs, [self.num_modal * self.action_dim, self.num_modal * self.action_dim, self.num_modal], 1)
+        
+        action_prediction_mean = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=tf.tanh, \
+                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),#tf.random_uniform_initializer(-3e-3, 3e-3), \
+                                        weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
+                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True)) #tf.random_uniform_initializer(-3e-3, 3e-3))
+
+        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=tf.tanh, \
                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        action_prediction = tf.multiply(action_prediction, self.action_max)
+        action_prediction_alpha = tf.contrib.layers.fully_connected(action_net, self.num_modal, activation_fn=tf.tanh, \
+                                        weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
+                                        weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
+                                        biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
+        # reshape output
+        action_prediction_mean = tf.reshape(action_prediction_mean, [-1, self.num_modal, self.action_dim])
+        action_prediction_sigma = tf.reshape(action_prediction_sigma, [-1, self.num_modal, self.action_dim])
+        action_prediction_alpha = tf.reshape(action_prediction_alpha, [-1, self.num_modal, 1])
+
+        # scale mean to env. action domain
+        action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
+
+        # exp. sigma
+        action_prediction_sigma = tf.exp(action_prediction_sigma)
+
+        
+        # mean: [None, num_modal, action_dim]  : [None, 1]
+        # sigma: [None, num_modal, action_dim] : [None, 1]
+        # alpha: [None, num_modal, 1]              : [None, 1]
+
+        # compute softmax prob. of alpha
+        max_alpha = tf.reduce_max(action_prediction_alpha, axis=1, keep_dims=True)
+        action_prediction_alpha = tf.subtract(action_prediction_alpha, max_alpha)
+        action_prediction_alpha = tf.exp(action_prediction_alpha)
+
+        normalize_alpha = tf.reciprocal(tf.reduce_sum(action_prediction_alpha, axis=1, keep_dims=True))
+        action_prediction_alpha = tf.multiply(normalize_alpha, action_prediction_alpha)
+
+        
         # Q branch
         q_net = tf.contrib.layers.fully_connected(tf.concat([shared_net, action], 1), self.expert_layer_dim, activation_fn=tf.nn.relu, \
                                         weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
@@ -231,7 +268,7 @@ class AE_CCEM_Network(BaseNetwork):
                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        return action_prediction, q_prediction
+        return action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
 
     
     def tf_normal(self, y, mu, sigma):
