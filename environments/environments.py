@@ -54,15 +54,16 @@ class ContinuousEnvironment(object):
 
 
         #DEBUG
-        # print('stateDim:',self.stateDim)
-        # print('stateRange:', self.stateRange)
-        # print('stateMin:', self.stateMin)
-        # print("stateBounded :: ", self.stateBounded)
+        # print('state_dim:',self.state_dim)
+        # print('state_range:', self.state_range)
+        # print('state_min:', self.state_min)
+        # print('state_max:', self.state_max)
+        # print("state_bounded :: ", self.state_bounded)
 
-        # print("actionDim", self.actionDim)
-        # print('actRange', self.actRange)
-        # print("actionBound :: ", self.actionBound)
-        # print('actMin', self.actMin)
+        # print("action_dim:", self.action_dim)
+        # print('action_range:', self.action_range)
+        # print("action_min:", self.action_min)
+        # print('action_max', self.action_max)
         # exit()
 
     def seed(self, seed):
