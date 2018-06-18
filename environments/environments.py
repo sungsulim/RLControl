@@ -11,38 +11,10 @@ import math
 def create_environment(env_params):
     env_name = env_params['environment']
 
-    if env_name == 'MountainCarContinuous-v0':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'Pendulum-v0':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'BipedalWalker-v2':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'LunarLanderContinuous-v2':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'BimodalEnv':
+    if env_name == 'BimodalEnv':
         return BimodalEnvironment(env_params)
-
-    #### PYBULLET ENV
-    # elif env_name == 'HalfCheetahBulletEnv-v0':
-    #     return ContinuousEnvironment(env_params)
-    # elif env_name == 'AntBulletEnv-v0':
-    #     return ContinuousEnvironment(env_params)
-    # elif env_name == 'HopperBulletEnv-v0':
-    #     return ContinuousEnvironment(env_params)
-    # elif env_name == 'Walker2DBulletEnv-v0':
-    #     return ContinuousEnvironment(env_params)
-    ####
-
-    #### Mujoco ENV
-    elif env_name == 'InvertedPendulum-v2':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'HalfCheetah-v2':
-        return ContinuousEnvironment(env_params)
-    elif env_name == 'Hopper-v2':
-        return ContinuousEnvironment(env_params)
     else:
-        print('Environment not found!!!!!')
-    return None
+        return ContinuousEnvironment(env_params)
 
 #This file provide environments to interact with, consider actions as continuous, need to rewrite otherwise
 class ContinuousEnvironment(object):
