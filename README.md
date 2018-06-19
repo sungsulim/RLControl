@@ -13,7 +13,7 @@ Implementation of Continuous Control RL Algorithms
 ## Usage
 Settings for available environments and agents are provided in `jsonfiles/` directory
 
-Example:
+**Example:**
 
 ENV=Pendulum-v0
 
@@ -21,10 +21,11 @@ AGENT=ddpg
 
 INDEX=0 (useful for running sweeps over different settings and doing multiple runs)
 
+
 Run: `python3 main.py --env_json jsonfiles/environment/$ENV.json --agent_json jsonfiles/agent/$AGENT.json --index $INDEX --render --monitor`
 
 
-`--render` and `--monitor` is optional, to visualize the agents' training
+(`--render` and `--monitor` is optional, to visualize/monitor the agents' training)
 
 * ENV.json is used to specify evaluation settings:
   * TotalMilSteps: Total training steps to be run (in million)
