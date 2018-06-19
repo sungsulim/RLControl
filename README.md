@@ -22,7 +22,7 @@ AGENT=ddpg
 INDEX=0 (useful for running sweeps over different settings and doing multiple runs)
 
 
-Run: `python3 main.py --env_json jsonfiles/environment/$ENV.json --agent_json jsonfiles/agent/$AGENT.json --index $INDEX --render --monitor`
+**Run:** `python3 main.py --env_json jsonfiles/environment/$ENV.json --agent_json jsonfiles/agent/$AGENT.json --index $INDEX --render --monitor`
 
 
 (`--render` and `--monitor` is optional, to visualize/monitor the agents' training)
