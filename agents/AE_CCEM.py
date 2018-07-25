@@ -258,7 +258,7 @@ class AE_CCEM(BaseAgent):
     def take_action(self, state, is_train):
 
         if self.cum_steps < self.warmup_steps:
-            action = [np.random.uniform(self.action_min, self.action_max)]
+            action = np.random.uniform(self.action_min, self.action_max)
 
         else:
             action = self.network.take_action(state, is_train)

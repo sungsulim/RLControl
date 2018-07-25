@@ -306,7 +306,7 @@ class NAF(BaseAgent):
 
         # random action during warmup
         if self.cum_steps < self.warmup_steps:
-            action = [np.random.uniform(self.action_min, self.action_max)]
+            action = np.random.uniform(self.action_min, self.action_max)
 
         else:
             action = self.network.take_action(state, is_train)
