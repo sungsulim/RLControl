@@ -11,6 +11,7 @@ import utils.exploration_policy #import OrnsteinUhlenbeckProcess
 from utils.replaybuffer import ReplayBuffer
 from agents.network import ae_ccem_network
 from utils.running_mean_std import RunningMeanStd
+from experiment import write_summary
 
 class AE_CCEM_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
@@ -71,8 +72,10 @@ class AE_CCEM_Network(object):
 
 
             ######## LOGGING #########
-            # self.train_global_steps += 1
-            # writeSummary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
+            if self.write_log:
+                self.train_global_steps += 1
+                write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
+                for i in range(self.num_modal):
 
             # alpha1 = self.hydra_network.getAlpha1()
             # mean1 = self.hydra_network.getMean1()
