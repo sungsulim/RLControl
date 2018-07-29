@@ -162,17 +162,19 @@ class AE_CCEM_Network(BaseNetwork):
         # exp. sigma
         action_prediction_sigma = tf.exp(action_prediction_sigma)
 
+        # clip sigma
+        # action_prediction_sigma = tf.clip_by_value(action_prediction_sigma, tf.fill(tf.shape(action_prediction_sigma), 0.0), tf.fill(tf.shape(action_prediction_sigma), 3.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
         # alpha: [None, num_modal, 1]              : [None, 1]
 
         # compute softmax prob. of alpha
-        max_alpha = tf.reduce_max(action_prediction_alpha, axis=1, keep_dims=True)
+        max_alpha = tf.reduce_max(action_prediction_alpha, axis=1, keepdims=True)
         action_prediction_alpha = tf.subtract(action_prediction_alpha, max_alpha)
         action_prediction_alpha = tf.exp(action_prediction_alpha)
 
-        normalize_alpha = tf.reciprocal(tf.reduce_sum(action_prediction_alpha, axis=1, keep_dims=True))
+        normalize_alpha = tf.reciprocal(tf.reduce_sum(action_prediction_alpha, axis=1, keepdims=True))
         action_prediction_alpha = tf.multiply(normalize_alpha, action_prediction_alpha)
 
         
@@ -272,7 +274,6 @@ class AE_CCEM_Network(BaseNetwork):
 
     
     def tf_normal(self, y, mu, sigma):
-        oneDivSqrtTwoPI = 1 / math.sqrt(2*math.pi) # normalisation factor for gaussian
 
         # y: batch x action_dim 
         # mu: batch x num_modal x action_dim
@@ -282,10 +283,8 @@ class AE_CCEM_Network(BaseNetwork):
         stacked_y = tf.expand_dims(y, 1)
         stacked_y = tf.tile(stacked_y, [1,self.num_modal,1])
 
-        result = tf.subtract(stacked_y, mu)
-        result = tf.multiply(result,tf.reciprocal(sigma))
-        result = -tf.square(result)/2
-        return tf.multiply(tf.exp(result),tf.reciprocal(sigma))*oneDivSqrtTwoPI
+        return tf.reduce_prod(tf.sqrt(1.0 / (2 * np.pi * tf.square(sigma))) * tf.exp(-tf.square(stacked_y - mu) / (2 * tf.square(sigma))), axis=2)
+
 
     def get_lossfunc(self, alpha, sigma, mu, y):
         # alpha: batch x num_modal x 1
@@ -294,8 +293,9 @@ class AE_CCEM_Network(BaseNetwork):
         # y: batch x action_dim
         # print(np.shape(y), np.shape(mu), np.shape(sigma))
         result = self.tf_normal(y, mu, sigma)
-        # print(np.shape(result))
-        result = tf.multiply(result, alpha)
+        # print(np.shape(result), np.shape(alpha))
+
+        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
         # print('get_lossfunc1',np.shape(result))
         result = tf.reduce_sum(result, 1, keep_dims=True)
         # print('get_lossfunc2',np.shape(result))
@@ -344,15 +344,6 @@ class AE_CCEM_Network(BaseNetwork):
             self.target_action: action,
             self.target_phase: phase
         })
-
-    # def predict_action_func(self, alpha, mean):
-    #     # alpha: batch_size x num_modal x 1
-    #     # mean: batch_size x num_modal x action_dim
-    #     max_idx = tf.argmax(alpha, axis=1)
-    #     return mean[max_idx]
-
-    # def predict_action_target_func(self, ):  
-    #     pass
 
 
     def predict_action(self, *args):
@@ -430,30 +421,13 @@ class AE_CCEM_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        # print('sample action')
-        # print('alpha', np.mean(alpha,axis=0), np.shape(alpha))
-        # print("mean", np.mean(mean, axis=0), np.shape(mean))
-        # print("sigma", np.mean(sigma,axis=0), np.shape(sigma))
 
+        self.setModalStats(alpha[0], mean[0], sigma[0])
+        # print('alpha', alpha[0], np.shape(alpha[0]))
+        # print('mean', mean[0], np.shape(mean[0]))
+        # print('sigma', sigma[0], np.shape(sigma[0]))
         # input()
 
-        # log_alpha = np.mean(alpha, axis=0)
-        # log_mean = np.mean(mean, axis=0)
-        # log_sigma = np.mean(sigma, axis=0)
-
-        # self.setAlpha1(log_alpha[0])
-        # self.setMean1(log_mean[0][0])
-        # self.setSigma1(log_sigma[0][0])
-
-        # self.setAlpha2(log_alpha[1])
-        # self.setMean2(log_mean[1][0])
-        # self.setSigma2(log_sigma[1][0])
-
-        # self.setAlpha3(log_alpha[2])
-        # self.setMean3(log_mean[2][0])
-        # self.setSigma3(log_sigma[2][0])
-
-        # assert(self.num_modal == np.shape(alpha)[1])
 
         # for each transition in batch
         sampled_actions = []
@@ -563,58 +537,11 @@ class AE_CCEM_Network(BaseNetwork):
             plt.close()
 
 
-    def setMean1(self, mean):
-        self.temp_mean1 = mean
+    def setModalStats(self, alpha, mean, sigma):
+        self.temp_alpha = alpha
+        self.temp_mean = mean
+        self.temp_sigma = sigma
 
-    def getMean1(self):
-        return self.temp_mean1
+    def getModalStats(self):
+        return self.temp_alpha, self.temp_mean, self.temp_sigma
 
-    def setMean2(self, mean):
-        self.temp_mean2 = mean
-
-    def getMean2(self):
-        return self.temp_mean2
-
-    def setMean3(self, mean):
-        self.temp_mean3 = mean
-
-    def getMean3(self):
-        return self.temp_mean3
-
-    # set sigma (for tf Summary)
-    def setSigma1(self, sigma):
-        self.temp_sigma1 = sigma
-
-    def getSigma1(self):
-        return self.temp_sigma1
-
-    def setSigma2(self, sigma):
-        self.temp_sigma2 = sigma
-
-    def getSigma2(self):
-        return self.temp_sigma2
-
-    def setSigma3(self, sigma):
-        self.temp_sigma3 = sigma
-
-    def getSigma3(self):
-        return self.temp_sigma3
-
-    # set sigma (for tf Summary)
-    def setAlpha1(self, alpha):
-        self.temp_alpha1 = alpha
-
-    def getAlpha1(self):
-        return self.temp_alpha1
-
-    def setAlpha2(self, alpha):
-        self.temp_alpha2 = alpha
-
-    def getAlpha2(self):
-        return self.temp_alpha2
-
-    def setAlpha3(self, alpha):
-        self.temp_alpha3 = alpha
-
-    def getAlpha3(self):
-        return self.temp_alpha3

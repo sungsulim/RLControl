@@ -16,6 +16,8 @@ from experiment import write_summary
 class AE_CCEM_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
 
+        self.write_log = config.write_log
+
         #record step n for tf Summary
         self.train_global_steps = 0
         self.eval_global_steps = 0
@@ -37,6 +39,7 @@ class AE_CCEM_Network(object):
         # Cross Entropy Method Params
         self.rho = config.rho
         self.num_samples = config.num_samples
+
 
         with self.graph.as_default():
             tf.set_random_seed(random_seed)
@@ -75,34 +78,17 @@ class AE_CCEM_Network(object):
             if self.write_log:
                 self.train_global_steps += 1
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
-                for i in range(self.num_modal):
-
-            # alpha1 = self.hydra_network.getAlpha1()
-            # mean1 = self.hydra_network.getMean1()
-            # sigma1 = self.hydra_network.getSigma1()
-
-            # alpha2 = self.hydra_network.getAlpha2()
-            # mean2 = self.hydra_network.getMean2()
-            # sigma2 = self.hydra_network.getSigma2()
-
-
-            # alpha3 = self.hydra_network.getAlpha3()
-            # mean3 = self.hydra_network.getMean3()
-            # sigma3 = self.hydra_network.getSigma3()
-
-            # writeSummary(self.writer, self.train_global_steps, alpha1, tag='train/alpha1')
-            # writeSummary(self.writer, self.train_global_steps, mean1, tag='train/mean1')
-            # writeSummary(self.writer, self.train_global_steps, sigma1, tag='train/sigma1')
-
-            # writeSummary(self.writer, self.train_global_steps, alpha2, tag='train/alpha2')
-            # writeSummary(self.writer, self.train_global_steps, mean2, tag='train/mean2')
-            # writeSummary(self.writer, self.train_global_steps, sigma2, tag='train/sigma2')
-
-            # writeSummary(self.writer, self.train_global_steps, alpha3, tag='train/alpha3')
-            # writeSummary(self.writer, self.train_global_steps, mean3, tag='train/mean3')
-            # writeSummary(self.writer, self.train_global_steps, sigma3, tag='train/sigma3')
             
-            ###########################
+
+                alpha, mean, sigma = self.hydra_network.getModalStats()
+                for i in range(len(alpha)):
+                    # print('get alpha', alpha[i])
+                    # print('get mean', mean[i])
+                    # print('get sigma', sigma[i])
+                    # input()
+                    write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
+                    write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
+                    write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
 
             ### Plot Q Func
@@ -113,8 +99,11 @@ class AE_CCEM_Network(object):
             chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
             chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
-            # self.eval_global_steps += 1
-            # writeSummary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+            if self.write_log:
+
+                self.eval_global_steps += 1
+
+                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
             #####################
             # # Take best action among n actions
@@ -140,8 +129,6 @@ class AE_CCEM_Network(object):
         return chosen_action
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
-
-        ## TODO: @@@@@  
 
         ###### Expert Update #####
                 

@@ -17,7 +17,7 @@ plot_maxA_fq = -1 # plot maxA after this many episodes
 
         
 class Experiment(object):
-    def __init__(self, agent, train_environment, test_environment, seed, summary_dir):
+    def __init__(self, agent, train_environment, test_environment, seed, summary_dir, write_log):
         self.agent = agent
         self.train_environment = train_environment
         self.train_environment.seed(seed)
@@ -35,6 +35,9 @@ class Experiment(object):
         
         # set writer in agent too so we can log useful stuff
         self.agent.set_writer(self.writer)
+
+        # boolean to log result for tensorboard
+        self.write_log = write_log
 
     def run(self):
 
@@ -59,7 +62,8 @@ class Experiment(object):
             # write tf summary
             if not self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT:
                 self.train_rewards_per_episode.append(episode_reward)
-                write_summary(self.writer, episode_count, episode_reward, "train/episode_reward")
+                if self.write_log:
+                    write_summary(self.writer, episode_count, episode_reward, "train/episode_reward")
 
         
             episode_count += 1
@@ -119,7 +123,8 @@ class Experiment(object):
         self.eval_mean_rewards_per_episode.append(mean)
         self.eval_std_rewards_per_episode.append(np.std(temp_rewards_per_episode))
 
-        write_summary(self.writer, self.total_step_count, mean, "eval/episode_reward/no_noise")
+        if self.write_log:
+            write_summary(self.writer, self.total_step_count, mean, "eval/episode_reward/no_noise")
 
 
     # Runs a single episode (EVAL)
