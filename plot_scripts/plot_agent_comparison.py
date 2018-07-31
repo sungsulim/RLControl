@@ -9,9 +9,9 @@ import json
 ############## USAGE
 # You should be in actiongeneral/python/results when running the script
 
-# python3 ../plot_scripts/plot_comparison_lc.py DIR_of_npy ../jsonfiles/environment/Pendulum-v0.json
+# python3 ../plot_scripts/plot_agent_comparison.py ../jsonfiles/environment/Pendulum-v0.json DIR_of_npy 
 
-# example: python3 ../plot_scripts/plot_comparison_lc.py mergedPendulum-v0results ../jsonfiles/environment/Pendulum-v0.json
+# example: python3 ../plot_scripts/plot_agent_comparison.py../jsonfiles/environment/Pendulum-v0.json  mergedPendulum-v0results 
 
 # This plot_script is used for comparing different agents (using the saved .npy from plot_custom_new.py)
 # You should place the .npy of different agents in one directory (DIR_of_npy)
@@ -39,9 +39,9 @@ display_idx = 1 # IDX to determine whether to plot train_episode or eval_episode
 
 
 # Stored Directory
-DIR = str(sys.argv[1])+'/'
+DIR = str(sys.argv[2])+'/'
 
-env_filename = str(sys.argv[2])
+env_filename = str(sys.argv[1])
 with open(env_filename, 'r') as env_dat:
     env_json = json.load(env_dat)
 

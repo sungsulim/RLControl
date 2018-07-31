@@ -8,9 +8,9 @@ import json
 ############## USAGE
 # You should be in actiongeneral/python/results when running the script
 
-# python3 ../plot_scripts/plot_custom_new.py    mergedDIR    NUM_SETTINGS    Agent_name   ../jsonfiles/environment/Pendulum-v0.json
+# python3 ../plot_scripts/plot_agent.py  ../jsonfiles/environment/Pendulum-v0.json  mergedDIR    NUM_SETTINGS    Agent_name   
 
-#example: python3 ../plot_scripts/plot_custom_new.py mergedPendulum-v0results 2 CriticAssistant ../jsonfiles/environment/Pendulum-v0.json
+#example: python3 ../plot_scripts/plot_agent.py ../jsonfiles/environment/Pendulum-v0.json mergedPendulum-v0results 2 CriticAssistant 
 
 # This will generate the plots of the best setting among the merged results for TRAIN and EVAL.
 # Note that the best setting for TRAIN could be different for best setting for EVAL.
@@ -29,9 +29,10 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-selected_idx= [1]
+selected_idx= [5, 14]
 selected_type = selected_idx[:] # This will be the labels for those idx.
-selected_type = ['1e-3, 1e-2']
+selected_type = ['unimodal', 'bimodal']
+
 # Example: selected_type = ['NAF', 'Wire_fitting']
 ##############################
 
@@ -44,21 +45,21 @@ if len(sys.argv)!=5:
     exit(0)
 
 # Stored Directory
-storedir = str(sys.argv[1])+'/'
+storedir = str(sys.argv[2])+'/'
 
 # Environment Name
 envname = storedir.replace('merged','').replace('results/','')
 print('Environment: ' + envname)
 
 # Num Runs
-num_runs = int(sys.argv[2])
+num_runs = int(sys.argv[3])
 
 # Agent
-agent = str(sys.argv[3])
+agent = str(sys.argv[4])
 print('Agent: ' + agent)
 
 # Num Episode, Num Steps per episode
-env_filename = str(sys.argv[4])
+env_filename = str(sys.argv[1])
 with open(env_filename, 'r') as env_dat:
     env_json = json.load(env_dat)
 
@@ -85,6 +86,11 @@ elif envname == 'HalfCheetahBulletEnv-v0':
 elif envname == 'Pendulum-v0':
     ymin = [-1600, -1600]
     ymax = [0, 0]
+
+elif envname == 'InvertedPendulum-v2':
+    ymin = [0, 0]
+    ymax = [1200, 1200]
+
 else:
     print("Environment plot setting not found!")
     exit()
@@ -170,7 +176,7 @@ for result_idx, result in enumerate(result_type):
                 draw_lc = lc[item,:xmax]
                 draw_lcse = lcstd[item,:xmax] /np.sqrt(num_samples)
 
-            print('drawing.. '+ agent + ' setting: '+str(item), np.sum(draw_lc))
+            print('drawing.. '+ agent + ' setting: '+str(item), np.nansum(draw_lc))
 
             plt.fill_between(opt_range, draw_lc - draw_lcse, draw_lc + draw_lcse, alpha = 0.2)#, facecolor=colors[idx])
             #handle, = plt.plot(opt_range, draw_lc, colors[idx], linewidth=1.0) 
