@@ -46,9 +46,13 @@ class Experiment(object):
         print("Start run at: " + str(datetime.now())+'\n')
         self.start_time = time.time()
         # pr.enable()
+
+        # evaluate once at beginning
+        self.eval()
+        
         while self.total_step_count < self.train_environment.TOTAL_STEPS_LIMIT:
             # runs a single episode and returns the accumulated reward for that episode
-            episode_reward, num_steps = self.run_episode_train(is_train=True)
+            episode_reward, num_steps, force_terminated = self.run_episode_train(is_train=True)
 
             if output_ep_result_fq != -1 and episode_count % output_ep_result_fq == 0:
 
@@ -59,9 +63,12 @@ class Experiment(object):
 
                 print("Train:: ep: "+ str(episode_count) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
+            if not force_terminated: 
+                self.train_rewards_per_episode.append(episode_reward)
+
             # write tf summary
             if not self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT:
-                self.train_rewards_per_episode.append(episode_reward)
+                
                 if self.write_log:
                     write_summary(self.writer, episode_count, episode_reward, "train/episode_reward")
 
@@ -83,8 +90,11 @@ class Experiment(object):
         Aold = self.agent.start(obs, is_train)
 
         episode_step_count = 0
+
         while not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT or self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT):
+
             
+
             obs_n, reward, done, info = self.train_environment.step(Aold)
             episode_reward += reward            
             self.agent.update(obs, obs_n, float(reward), Aold, done)
@@ -99,7 +109,13 @@ class Experiment(object):
 
             if self.total_step_count % self.train_environment.eval_interval == 0:
                 self.eval()
-        return (episode_reward, episode_step_count)
+
+        # check if this episode is finished because of Total Training Step Limit
+        if not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT):
+            force_terminated = True
+        else:
+            force_terminated = False
+        return (episode_reward, episode_step_count, force_terminated)
 
     def eval(self):
         temp_rewards_per_episode = []

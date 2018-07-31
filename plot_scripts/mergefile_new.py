@@ -63,7 +63,7 @@ params = []
 params_fn = None
 
 
-eval_lc_length = int(TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS)
+eval_lc_length = int(TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS) + 1
 
 max_median_length = 1
 
