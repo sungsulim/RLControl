@@ -1,0 +1,9 @@
+{
+    "environment": "InvertedDoublePendulum-v2",
+
+    "TotalMilSteps": 0.000001,
+    "EpisodeSteps": -1,
+
+    "EvalIntervalMilSteps": 0.000001,
+    "EvalEpisodes": 1
+}
