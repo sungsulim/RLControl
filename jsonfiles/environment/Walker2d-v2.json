@@ -1,9 +1,9 @@
 {
     "environment": "Walker2d-v2",
 
-    "TotalMilSteps": 0.000001,
+    "TotalMilSteps": 1.0,
     "EpisodeSteps": -1,
 
-    "EvalIntervalMilSteps": 0.000001,
-    "EvalEpisodes": 1
+    "EvalIntervalMilSteps": 0.005,
+    "EvalEpisodes": 10
 }
