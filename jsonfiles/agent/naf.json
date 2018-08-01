@@ -4,7 +4,12 @@
 
     "sweeps": {
         "norm": ["batch", "input_norm"],
-        "exploration_policy": ["none"],
+        "exploration_policy": ["none", "ou_noise"],
+
+        "ou_theta": [0.15],
+        "ou_mu": [0.0],
+        "ou_sigma": [0.2],
+        
         "noise_scale":[0.1, 0.3, 1.0],
 
         "learning_rate":[1e-2, 1e-3, 1e-4],

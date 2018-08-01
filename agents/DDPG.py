@@ -115,10 +115,10 @@ class DDPG(BaseAgent):
             action = self.network.take_action(state, is_train)
 
             # Train
-            if is_train == True:
+            if is_train:
 
                 # if using an external exploration policy
-                if self.exploration_policy:
+                if self.use_external_exploration:
                     action = self.exploration_policy.generate(action, self.cum_steps)
                 
                 # only increment during training, not evaluation

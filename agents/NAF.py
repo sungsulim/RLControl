@@ -10,7 +10,7 @@ from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 class NAF_Network:
-    def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
+    def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
    
 
         self.state_dim = state_dim
@@ -21,6 +21,7 @@ class NAF_Network:
         self.action_min = action_min
         self.action_max = action_max
 
+        self.use_external_exploration = use_external_exploration
         # type of normalization: 'none', 'batch', 'layer', 'input_norm'
         self.norm_type = config.norm
 
@@ -231,31 +232,40 @@ class NAF_Network:
 
         best_action, Lmat_columns = self.sess.run([self.best_action,self.Lmat_columns], {self.state_input: state.reshape(-1, self.state_dim), self.phase: False})
         
-
+        # train
         if is_train:
-            #compute covariance matrix
-            Lmat = np.zeros((self.action_dim, self.action_dim))
-            #print 'the Lmat columns are --------------------------------------------- '
-            for i in range(self.action_dim):
-                #print Lmat_columns[i]
-                Lmat[i:,i] = np.squeeze(Lmat_columns[i])
-            covmat = self.noise_scale * np.linalg.pinv(Lmat.dot(Lmat.T))
 
-            self.train_global_steps += 1
-            write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat')
+            # just return the best action
+            if self.use_external_exploration:
+                chosen_action = np.clip(best_action.reshape(-1), self.action_min, self.action_max)
 
-            sampled_act = np.random.multivariate_normal(best_action.reshape(-1), covmat)
-            #print 'sampled act is ------------------ ', sampled_act
-            
-            # if self.n % 1000 == 0:
-            #     print 'covmat is :: '
-            #     print covmat
-            #     print 'Lmat is :: '
-            #     print Lmat
-            # print('train', sampled_act)
-            chosen_action = np.clip(sampled_act, self.action_min, self.action_max)
+            else:
+                #compute covariance matrix
+                Lmat = np.zeros((self.action_dim, self.action_dim))
+                #print 'the Lmat columns are --------------------------------------------- '
+                for i in range(self.action_dim):
+                    #print Lmat_columns[i]
+                    Lmat[i:,i] = np.squeeze(Lmat_columns[i])
+                covmat = self.noise_scale * np.linalg.pinv(Lmat.dot(Lmat.T))
+
+                self.train_global_steps += 1
+                write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat')
+
+                sampled_act = np.random.multivariate_normal(best_action.reshape(-1), covmat)
+                #print 'sampled act is ------------------ ', sampled_act
+                
+                # if self.n % 1000 == 0:
+                #     print 'covmat is :: '
+                #     print covmat
+                #     print 'Lmat is :: '
+                #     print Lmat
+                # print('train', sampled_act)
+                chosen_action = np.clip(sampled_act, self.action_min, self.action_max)
+
             write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
             return chosen_action
+
+        # eval
         else:
             self.eval_global_steps += 1
             chosen_action = np.clip(best_action.reshape(-1), self.action_min, self.action_max)
@@ -291,8 +301,8 @@ class NAF(BaseAgent):
 
 
         self.network = NAF_Network(self.state_dim, self.state_min, self.state_max,
-                                    self.action_dim, self.action_min, self.action_max,
-                                    config, random_seed = random_seed)
+                                    self.action_dim, self.action_min, self.action_max, 
+                                    self.use_external_exploration, config, random_seed = random_seed)
 
         self.cum_steps = 0 # cumulative steps across episodes    
     
@@ -312,10 +322,10 @@ class NAF(BaseAgent):
             action = self.network.take_action(state, is_train)
 
             # Train
-            if is_train == True:
+            if is_train:
 
                 # if using an external exploration policy
-                if self.exploration_policy:
+                if self.use_external_exploration:
                     action = self.exploration_policy.generate(action, self.cum_steps)
 
                 # only increment during training, not evaluation

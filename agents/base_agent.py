@@ -26,6 +26,7 @@ class BaseAgent(object):
 
         if config.exploration_policy == 'ou_noise':
             from utils.exploration_policy import OrnsteinUhlenbeckProcess
+            self.use_external_exploration = True
             self.exploration_policy = OrnsteinUhlenbeckProcess(self.action_dim, self.action_min, self.action_max,
                                                              theta = config.ou_theta,
                                                              mu = config.ou_mu,
@@ -33,15 +34,18 @@ class BaseAgent(object):
 
         elif config.exploration_policy == 'epsilon_greedy':
             from utils.exploration_policy import EpsilonGreedy
+            self.use_external_exploration = True
             self.exploration_policy = EpsilonGreedy(self.action_min, self.action_max, config.annealing_steps,
                                                     config.min_epsilon, config.max_epsilon, 
                                                     is_continuous=True)
 
         elif config.exploration_policy == 'random_uniform':
             from utils.exploration_policy import RandomUniform
+            self.use_external_exploration = True
             self.exploration_policy = RandomUniform(self.action_min, self.action_max, is_continuous=True)
 
         elif config.exploration_policy == 'none':
+            self.use_external_exploration = False
             self.exploration_policy = None
 
         else:
