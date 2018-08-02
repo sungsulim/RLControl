@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+
 # Takes a string and returns and instance of an agent
 # [env] is an instance of an environment
 # [p] is a dictionary of agent parameters
@@ -10,9 +11,9 @@ def create_agent(agent_string, env, config, seed):
     elif agent_string == "NAF":
         from agents.NAF import NAF
         return NAF(env, config, seed)
-    elif agent_string == "Wire_fitting":
-        from agents.WireFitting import Wire_fitting
-        return Wire_fitting(env, config, seed)
+    elif agent_string == "WireFitting":
+        from agents.WireFitting import WireFitting
+        return WireFitting(env, config, seed)
     elif agent_string == "ICNN":
         from agents.ICNN import ICNN
         return ICNN(env, config, seed)
@@ -28,6 +29,7 @@ def create_agent(agent_string, env, config, seed):
     else:
         print("Don't know this agent")
         exit(0)
+
 
 # takes a dictionary where each key maps to a list of different parameter choices for that key
 # also takes an index where 0 < index < combinations(parameters)

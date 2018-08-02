@@ -4,12 +4,11 @@ from __future__ import print_function
 import random
 import numpy as np
 import tensorflow as tf
-
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 from agents.base_agent import BaseAgent # for python3
-# from agents import BaseAgent  # for python2
+# from base_agent import BaseAgent  # for python2
 from agents.network import entropy_network # for python3
 # from network import entropy_network # for python2
 
@@ -178,4 +177,6 @@ class ICNN(BaseAgent):
         if self.use_external_exploration:
             self.exploration_policy.reset()
 
-
+    # set writer
+    def set_writer(self, writer):
+        self.network.writer = writer
