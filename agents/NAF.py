@@ -297,14 +297,13 @@ class NAF(BaseAgent):
         super(NAF, self).__init__(env, config)
 
         np.random.seed(random_seed)
-        random.seed(random_seed) 
-
+        random.seed(random_seed)
 
         self.network = NAF_Network(self.state_dim, self.state_min, self.state_max,
-                                    self.action_dim, self.action_min, self.action_max, 
-                                    self.use_external_exploration, config, random_seed = random_seed)
+                                   self.action_dim, self.action_min, self.action_max,
+                                   self.use_external_exploration, config, random_seed=random_seed)
 
-        self.cum_steps = 0 # cumulative steps across episodes    
+        self.cum_steps = 0  # cumulative steps across episodes
     
     def start(self, state, is_train):
         return self.take_action(state, is_train)

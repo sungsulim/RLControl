@@ -14,6 +14,7 @@ from agents.network.critic_network import CriticNetwork
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
+
 class DDPG_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
         
