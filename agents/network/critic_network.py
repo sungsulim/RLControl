@@ -6,7 +6,6 @@ import copy
 import matplotlib.pyplot as plt
 
 
-
 class CriticNetwork(BaseNetwork):
 
     def __init__(self, sess, input_norm, layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, learning_rate, tau, norm_type):
@@ -169,7 +168,6 @@ class CriticNetwork(BaseNetwork):
                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
         return outputs
-
 
     def input_norm_network(self, inputs, action, phase):
         normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)

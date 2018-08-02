@@ -1,10 +1,5 @@
-import numpy as np
-from random import randint
-import random
-import datetime
-import tensorflow as tf
-
 from utils.replaybuffer import ReplayBuffer
+
 
 # Agent interface
 # Takes an environment (just so we can get some details from the environment like the number of observables and actions)
@@ -28,9 +23,9 @@ class BaseAgent(object):
             from utils.exploration_policy import OrnsteinUhlenbeckProcess
             self.use_external_exploration = True
             self.exploration_policy = OrnsteinUhlenbeckProcess(self.action_dim, self.action_min, self.action_max,
-                                                             theta = config.ou_theta,
-                                                             mu = config.ou_mu,
-                                                             sigma = config.ou_sigma)
+                                                               theta=config.ou_theta,
+                                                               mu=config.ou_mu,
+                                                               sigma=config.ou_sigma)
 
         elif config.exploration_policy == 'epsilon_greedy':
             from utils.exploration_policy import EpsilonGreedy
@@ -56,10 +51,10 @@ class BaseAgent(object):
         self.warmup_steps = config.warmup_steps
         self.gamma = config.gamma 
 
-    def start(self, state):
+    def start(self, state, is_train):
         raise NotImplementedError
 
-    def step(self, state):
+    def step(self, state, is_train):
         raise NotImplementedError
 
     def get_value(self, s, a):
@@ -67,7 +62,6 @@ class BaseAgent(object):
     
     def update(self, state, next_state, reward, action, is_terminal):
         raise NotImplementedError
-
 
     # Sets the random seed for the agent
     def set_seed(self, seed):

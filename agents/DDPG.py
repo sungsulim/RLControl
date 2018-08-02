@@ -37,20 +37,18 @@ class DDPG_Network(object):
             actor_layer_dim = [config.actor_l1_dim, config.actor_l2_dim]
             critic_layer_dim = [config.critic_l1_dim, config.critic_l2_dim]
 
-            self.actor_network = ActorNetwork(self.sess, self.input_norm, actor_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
-                                                            config.actor_lr, config.tau, norm_type = self.norm_type)
-            self.critic_network = CriticNetwork(self.sess, self.input_norm, critic_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, \
-                                                            config.critic_lr, config.tau, norm_type = self.norm_type)            
+            self.actor_network = ActorNetwork(self.sess, self.input_norm, actor_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max,
+                                              config.actor_lr, config.tau, norm_type = self.norm_type)
+            self.critic_network = CriticNetwork(self.sess, self.input_norm, critic_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max,
+                                                config.critic_lr, config.tau, norm_type = self.norm_type)
 
             self.sess.run(tf.global_variables_initializer())
 
             self.actor_network.update_target_network()
-            self.critic_network.update_target_network()  
-
+            self.critic_network.update_target_network()
 
     def take_action(self, state, is_train):
-        action = self.actor_network.predict(np.expand_dims(state, 0), False)[0]
-        return action
+        return self.actor_network.predict(np.expand_dims(state, 0), False)[0]
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
@@ -95,10 +93,8 @@ class DDPG(BaseAgent):
         self.network = DDPG_Network(self.state_dim, self.state_min, self.state_max, 
                                     self.action_dim, self.action_min, self.action_max,
                                     config, random_seed = random_seed)
-        
 
         self.cum_steps = 0 # cumulative steps across episodes
-
 
     def start(self, state, is_train):
         return self.take_action(state, is_train)
@@ -137,6 +133,7 @@ class DDPG(BaseAgent):
 
         if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':
             self.network.input_norm.update(np.array([state]))
+
         self.learn()
     
     def learn(self):
