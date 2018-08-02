@@ -11,7 +11,7 @@
         "l1_dim":[200],
         "l2_dim":[200],
 
-        "interplt_lr":[1e-3],
+        "interplt_lr":[1e-2, 1e-3, 1e-4],
         "lr_decay_rate":[1.0],
         "lr_decay_step":[2000],
         "app_points":[50]
