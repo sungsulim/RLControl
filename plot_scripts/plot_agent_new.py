@@ -29,10 +29,12 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-selected_idx= []
+selected_idx= [] #range(0, 18) #[]
 selected_type = selected_idx[:] # This will be the labels for those idx.
 # selected_type = ['unimodal', 'bimodal']
 
+
+truncate_train_ep = 2000
 # Example: selected_type = ['NAF', 'Wire_fitting']
 ##############################
 
@@ -67,9 +69,19 @@ TOTAL_MIL_STEPS = env_json['TotalMilSteps']
 EVAL_INTERVAL_MIL_STEPS = env_json['EvalIntervalMilSteps']
 EVAL_EPISODES = env_json['EvalEpisodes']
 
+
+
 if envname == 'HalfCheetah-v2':
     ymin = [-500, -500]
-    ymax = [4000, 4000]
+    ymax = [5000, 5000]
+
+elif envname == 'Ant-v2':
+    ymin = [-500, 0]
+    ymax = [2000, 2000]
+
+elif envname == 'Swimmer-v2':
+    ymin = [0, 0]
+    ymax = [150, 150]
 
 elif envname == 'LunarLanderContinuous-v2':
     ymin = [-250, -250]
@@ -121,12 +133,17 @@ for result_idx, result in enumerate(result_type):
     files = glob.glob(paramfile)
     params = np.loadtxt(files[0], delimiter=',', dtype='str')
 
-    xmax = np.shape(lc)[-1] #len(lc)#len(lc[0])
+
+    xmax = np.shape(lc)[-1]
+
+    if xmax > truncate_train_ep:
+        xmax = truncate_train_ep
     print(xmax)
 
-    #title = result+": " + agent + ', ' + str(num_runs) + ' runs'
+    title = "result: %s, %d runs" %(agent, num_runs)
+
     plt.figure(figsize=(12,6))
-    #plt.title(title)
+    plt.title(title)
     
     
     plt.legend(loc="best")
@@ -149,7 +166,7 @@ for result_idx, result in enumerate(result_type):
         # np.append(2.0, np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)) [4::5])
         # )
 
-        plt.xticks(opt_range, np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1))
+        plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
         num_samples = num_runs # * EVAL_EPISODES
 
         #print(range(int(EVAL_INTERVAL_MIL_STEPS * 1000), int(EVAL_INTERVAL_MIL_STEPS * 1000 * (xmax+1)), int(EVAL_INTERVAL_MIL_STEPS *1000)))
@@ -165,7 +182,7 @@ for result_idx, result in enumerate(result_type):
 
     # Plot selected idx
     if len(selected_idx) != 0 :
-
+        print("\n\n###### Plotting specific idx ########\n\n")
         handle_arr=[]
         for idx, item in enumerate(selected_idx):
 

@@ -175,6 +175,7 @@ for idx, item in enumerate(train_mean_rewards):
         train_mean_rewards[idx] = np.append(train_mean_rewards[idx], np.zeros(pad_length) + np.nan)
         train_std_rewards[idx] = np.append(train_std_rewards[idx], np.zeros(pad_length) + np.nan)
 
+print("max train median length: ", max_median_length)
 # print(train_mean_rewards[0])
 # print(eval_mean_rewards[0])
 # print(np.shape(train_mean_rewards), np.shape(eval_mean_rewards))

@@ -11,7 +11,8 @@ from experiment import write_summary
 
 class NAF_Network:
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
-   
+
+        self.write_log = config.write_log
 
         self.state_dim = state_dim
         self.state_min = state_min
@@ -62,10 +63,10 @@ class NAF_Network:
                 self.batchnorm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='naf/batchnorm')
                 self.target_batchnorm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='target_naf/batchnorm')
 
-                self.update_target_batchnorm_params = [tf.assign(self.target_batchnorm_vars[idx], \
-                                                    self.batchnorm_vars[idx]) for idx in range(len(self.target_batchnorm_vars)) \
-                                                    if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0') or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
-
+                self.update_target_batchnorm_params = [tf.assign(self.target_batchnorm_vars[idx],
+                                                       self.batchnorm_vars[idx]) for idx in range(len(self.target_batchnorm_vars))
+                                                       if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0')
+                                                       or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
 
             else:
                 assert (self.norm_type == 'none' or self.norm_type == 'layer' or self.norm_type == 'input_norm')
@@ -79,7 +80,7 @@ class NAF_Network:
                 self.loss = tf.reduce_sum(tf.square(self.target_q_input - tf.squeeze(self.q_val)))
                 self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
-            #update target network
+            # update target network
             self.init_target = [tf.assign(self.target_tvars[idx], self.tvars[idx]) for idx in range(len(self.target_tvars))]
             self.update_target = [tf.assign_add(self.target_tvars[idx], self.tau * (self.tvars[idx] - self.target_tvars[idx])) for idx in range(len(self.tvars))]
             
@@ -87,7 +88,6 @@ class NAF_Network:
             self.sess = tf.Session()
             self.sess.run(tf.global_variables_initializer())
             self.sess.run(self.init_target)
-
 
     def build_network(self, scopename):
         with self.g.as_default():
@@ -112,42 +112,40 @@ class NAF_Network:
                     assert(self.norm_type == 'none' or self.norm_type == 'input_norm')
                     q_value, max_q, action, Lmat_columns = self.no_norm_network(state_input, action_input)
 
-
-            #get variables
+            # get variables
             tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scopename)
             return state_input, action_input, q_value, max_q, action, Lmat_columns, tvars
-
 
     def layer_norm_network(self, state_input, action_input):
 
         state_hidden1 = slim.fully_connected(state_input, self.network_layer_dim[0], activation_fn = None)
         state_hidden1_layernorm1 = tf.contrib.layers.layer_norm(state_hidden1, center=True, scale=True, activation_fn=tf.nn.relu)
 
-        #three branch: first output action
+        # three branch: first output action
         action_hidden2 = slim.fully_connected(state_hidden1_layernorm1, self.network_layer_dim[1], activation_fn = None)
         action_hidden2_layernorm1 = tf.contrib.layers.layer_norm(action_hidden2, center=True, scale=True, activation_fn=tf.nn.relu)
 
         action = slim.fully_connected(action_hidden2_layernorm1, self.action_dim, activation_fn = tf.nn.tanh)*self.action_max
 
 
-        #value branch
+        # value branch
         value_hidden = slim.fully_connected(state_hidden1_layernorm1, self.network_layer_dim[1], activation_fn = None)
         value_hidden_layernorm1 = tf.contrib.layers.layer_norm(value_hidden, center=True, scale=True, activation_fn=tf.nn.relu)
 
-        value = slim.fully_connected(value_hidden_layernorm1, 1, activation_fn = None, \
-                                                        weights_initializer=tf.random_uniform_initializer(minval=-0.003, maxval=0.003))
+        value = slim.fully_connected(value_hidden_layernorm1, 1, activation_fn = None,
+                                     weights_initializer=tf.random_uniform_initializer(minval=-0.003, maxval=0.003))
         
-        #Lmat branch
+        # Lmat branch
         act_mu_diff = action_input - action
         
-        #Lmat_flattened = slim.fully_connected(state_hidden1_layernorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
+        # Lmat_flattened = slim.fully_connected(state_hidden1_layernorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
         Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
         Lmat_nondiag = [slim.fully_connected(state_hidden1_layernorm1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
 
-        #in Lmat_columns, if actdim = 1, first part is empty
+        # in Lmat_columns, if actdim = 1, first part is empty
         Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]),axis=1) for id in range(len(Lmat_nondiag))] + [Lmat_diag[-1]]
         act_mu_diff_Lmat_prod = [tf.reduce_sum(tf.slice(act_mu_diff,[0,cid],[-1,-1])*Lmat_columns[cid], axis=1, keep_dims=True) for cid in range(len(Lmat_columns))]
-        #prod_tensor should be dim: batchsize*action_dim
+        # prod_tensor should be dim: batchsize*action_dim
         prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis = 1)
         # print 'prod tensor shape is :: ', prod_tensor.shape
         adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis = 1, keep_dims=True)
@@ -164,7 +162,7 @@ class NAF_Network:
                                             is_training=self.phase, scope='batchnorm_1')
 
 
-        #three branch: first output action
+        # three branch: first output action
         action_hidden2 = slim.fully_connected(state_hidden1_batchnorm1, self.network_layer_dim[1], activation_fn = None)
         action_hidden2_batchnorm1 = tf.contrib.layers.batch_norm(action_hidden2, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
                                             is_training=self.phase, scope='batchnorm_2')
@@ -172,15 +170,15 @@ class NAF_Network:
         action = slim.fully_connected(action_hidden2_batchnorm1, self.action_dim, activation_fn = tf.nn.tanh)*self.action_max
 
 
-        #value branch
+        # value branch
         value_hidden = slim.fully_connected(state_hidden1_batchnorm1, self.network_layer_dim[1], activation_fn = None)
         value_hidden_batchnorm1 = tf.contrib.layers.batch_norm(value_hidden, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
                                             is_training=self.phase, scope='batchnorm_3')
 
-        value = slim.fully_connected(value_hidden_batchnorm1, 1, activation_fn = None, \
+        value = slim.fully_connected(value_hidden_batchnorm1, 1, activation_fn = None,
                                                         weights_initializer=tf.random_uniform_initializer(minval=-0.003, maxval=0.003))
         
-        #Lmat branch
+        # Lmat branch
         act_mu_diff = action_input - action
         
         #Lmat_flattened = slim.fully_connected(state_hidden1_batchnorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
@@ -230,7 +228,7 @@ class NAF_Network:
     '''return an action to take for each state'''
     def take_action(self, state, is_train):
 
-        best_action, Lmat_columns = self.sess.run([self.best_action,self.Lmat_columns], {self.state_input: state.reshape(-1, self.state_dim), self.phase: False})
+        best_action, Lmat_columns = self.sess.run([self.best_action, self.Lmat_columns], {self.state_input: state.reshape(-1, self.state_dim), self.phase: False})
         
         # train
         if is_train:
@@ -245,11 +243,13 @@ class NAF_Network:
                 #print 'the Lmat columns are --------------------------------------------- '
                 for i in range(self.action_dim):
                     #print Lmat_columns[i]
-                    Lmat[i:,i] = np.squeeze(Lmat_columns[i])
-                covmat = self.noise_scale * np.linalg.pinv(Lmat.dot(Lmat.T))
-
-                self.train_global_steps += 1
-                write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat')
+                    Lmat[i:, i] = np.squeeze(Lmat_columns[i])
+                try:
+                    covmat = self.noise_scale * np.linalg.pinv(Lmat.dot(Lmat.T))
+                except:
+                    print('Lmat', Lmat)
+                    print('\nLmat^2', Lmat.dot(Lmat.T))
+                    exit()
 
                 sampled_act = np.random.multivariate_normal(best_action.reshape(-1), covmat)
                 #print 'sampled act is ------------------ ', sampled_act
@@ -262,14 +262,24 @@ class NAF_Network:
                 # print('train', sampled_act)
                 chosen_action = np.clip(sampled_act, self.action_min, self.action_max)
 
-            write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
+                if self.write_log:
+                    self.train_global_steps += 1
+                    write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat00') # logging only top-left element!
+
+            if self.write_log:
+                write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
+
             return chosen_action
 
         # eval
         else:
-            self.eval_global_steps += 1
+
             chosen_action = np.clip(best_action.reshape(-1), self.action_min, self.action_max)
-            write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+            if self.write_log:
+                self.eval_global_steps += 1
+                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
             return chosen_action
 
     # similar to take_action(), except this is for targets, returns QVal instead, and calculates in batches
