@@ -141,7 +141,7 @@ class AE_CCEM_Network(BaseNetwork):
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True)) #tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=tf.tanh, \
+        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=None, \
                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
@@ -160,10 +160,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(action_prediction_sigma)
-
-        # clip sigma
-        # action_prediction_sigma = tf.clip_by_value(action_prediction_sigma, tf.fill(tf.shape(action_prediction_sigma), 0.0), tf.fill(tf.shape(action_prediction_sigma), 3.0))
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -5.0, 5.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -224,7 +221,7 @@ class AE_CCEM_Network(BaseNetwork):
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True)) #tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=tf.tanh, \
+        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim, activation_fn=None, \
                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
                                         weights_regularizer=None, #tf.contrib.layers.l2_regularizer(0.001), \
                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
@@ -243,8 +240,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(action_prediction_sigma)
-
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -5.0, 5.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
