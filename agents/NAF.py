@@ -139,7 +139,9 @@ class NAF_Network:
         act_mu_diff = action_input - action
         
         # Lmat_flattened = slim.fully_connected(state_hidden1_layernorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-        Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
+        # Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
+
+        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn=None), -5.0, 5.0)) for _ in range(self.action_dim)]  # clipping to prevent blowup
         Lmat_nondiag = [slim.fully_connected(state_hidden1_layernorm1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
 
         # in Lmat_columns, if actdim = 1, first part is empty
@@ -182,7 +184,9 @@ class NAF_Network:
         act_mu_diff = action_input - action
         
         #Lmat_flattened = slim.fully_connected(state_hidden1_batchnorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-        Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_batchnorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
+
+        # Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_batchnorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
+        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1_batchnorm1, 1, activation_fn=None), -5.0, 5.0)) for _ in range(self.action_dim)]  # clipping to prevent blowup
         Lmat_nondiag = [slim.fully_connected(state_hidden1_batchnorm1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
 
         #in Lmat_columns, if actdim = 1, first part is empty
@@ -211,7 +215,9 @@ class NAF_Network:
         #Lmat branch
         act_mu_diff = action_input - action
         #Lmat_flattened = slim.fully_connected(state_hidden1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-        Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1, 1, activation_fn = None)) for _ in range(self.action_dim)]
+
+
+        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1, 1, activation_fn = None), -5.0, 5.0)) for _ in range(self.action_dim)] # clipping to prevent blowup
         Lmat_nondiag = [slim.fully_connected(state_hidden1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
         #in Lmat_columns, if actdim = 1, first part is empty
         Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]),axis=1) for id in range(len(Lmat_nondiag))] + [Lmat_diag[-1]]
@@ -249,6 +255,8 @@ class NAF_Network:
                 except:
                     print('Lmat', Lmat)
                     print('\nLmat^2', Lmat.dot(Lmat.T))
+                    print('\n')
+                    print("error occurred!")
                     exit()
 
                 sampled_act = np.random.multivariate_normal(best_action.reshape(-1), covmat)
