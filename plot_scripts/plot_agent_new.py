@@ -29,9 +29,9 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-selected_idx= [] #range(0, 18) #[]
+selected_idx= [23, 38]# range(0, 54) #[] [18, 20, 36, 38, 45]
 selected_type = selected_idx[:] # This will be the labels for those idx.
-# selected_type = ['unimodal', 'bimodal']
+selected_type = [str(selected_idx[0])+": ou_noise", str(selected_idx[1])+": own_expl"]
 
 
 truncate_train_ep = 2000
@@ -82,6 +82,10 @@ elif envname == 'Ant-v2':
 elif envname == 'Swimmer-v2':
     ymin = [0, 0]
     ymax = [150, 150]
+
+elif envname == 'Reacher-v2':
+    ymin = [-50, -20]
+    ymax = [0, 0]
 
 elif envname == 'LunarLanderContinuous-v2':
     ymin = [-250, -250]
@@ -180,9 +184,12 @@ for result_idx, result in enumerate(result_type):
     plt.ylim(ylimt)
     plt.xlim(xlimt)
 
+
     # Plot selected idx
     if len(selected_idx) != 0 :
         print("\n\n###### Plotting specific idx ########\n\n")
+        sort_performance_arr = []
+
         handle_arr=[]
         for idx, item in enumerate(selected_idx):
 
@@ -195,11 +202,14 @@ for result_idx, result in enumerate(result_type):
                 draw_lcse = lcstd[item,:xmax] /np.sqrt(num_samples)
 
             print('drawing.. '+ agent + ' setting: '+str(item), np.nansum(draw_lc))
-
+            sort_performance_arr.append([item, np.nansum(draw_lc)])
             plt.fill_between(opt_range, draw_lc - draw_lcse, draw_lc + draw_lcse, alpha = 0.2)#, facecolor=colors[idx])
             #handle, = plt.plot(opt_range, draw_lc, colors[idx], linewidth=1.0) 
             handle, = plt.plot(opt_range, draw_lc, linewidth=1.0) 
             handle_arr.append(handle)
+
+        for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
+            print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
 
         legend_arr = []
         for i in range(len(selected_idx)):
