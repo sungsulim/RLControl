@@ -37,10 +37,10 @@ class RunningMeanStd(object):
 
 def test_runningmeanstd():
     for (x1, x2, x3) in [
-        (np.array([[-0.5,-3]]), np.array([[0.0, -2]]), np.array([[0.5, -1]]))
+        (np.array([[-0.5,5]]), np.array([[0.0, 5]]), np.array([[0.5, 5]]))
         ]:
 
-        rms = RunningMeanStd(epsilon=0.0, shape=x1.shape[1:])
+        rms = RunningMeanStd(epsilon=1e-4, shape=x1.shape[1:])
 
         x = np.concatenate([x1, x2, x3], axis=0)
         ms1 = [x.mean(axis=0), x.var(axis=0)]
@@ -53,7 +53,8 @@ def test_runningmeanstd():
         print('x1',x1)
         print('x2', x2)
         print('x3', x3)
-        print(ms2)
+        print('ms1', ms1)
+        print('ms2',ms2)
         print(rms.normalize(x1[0]))
         print(rms.normalize(x2[0]))
         print(rms.normalize(x3[0]))

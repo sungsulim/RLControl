@@ -322,7 +322,9 @@ class NAF(BaseAgent):
                                    self.use_external_exploration, config, random_seed=random_seed)
 
         self.cum_steps = 0  # cumulative steps across episodes
-    
+
+        # self.temp_states = []
+
     def start(self, state, is_train):
         return self.take_action(state, is_train)
 
@@ -352,6 +354,24 @@ class NAF(BaseAgent):
         return action
 
     def update(self, state, next_state, reward, action, is_terminal):
+
+        # log all states
+        # if self.write_log:
+        #     for i in range(len(state)):
+        #         write_summary(self.writer, self.cum_steps, state[i], tag='states/[%d]' %i)
+
+
+        # self.temp_states.append(state)
+        #
+        # # np.savetxt(filename, temp_state, delimiter=", ", fmt='%f')
+        #
+        # if self.cum_steps > 2000:
+        #     print('cum_steps', self.cum_steps)
+        #     filename = open('state_log.txt', 'ab')
+        #     np.array(self.temp_states).tofile(filename, sep=',', format='%15.8f')
+        #     filename.close()
+        #     exit()
+
 
         if not is_terminal:
             self.replay_buffer.add(state, action, reward, next_state, self.gamma)

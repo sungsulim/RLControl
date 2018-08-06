@@ -36,9 +36,9 @@ import json
 # selected_idx=  range(27, 54)
 
 
-selected_idx=  [0] # range(0, 27) # range(27, 54)
+selected_idx=  [] # range(0, 27) # range(27, 54)
 selected_type = selected_idx[:] # This will be the labels for those idx.
-selected_type = [str(selected_idx[0])+": self_noise"]
+# selected_type = [str(selected_idx[0])+": self_noise"]
 
 truncate_train_ep = 2000
 # Example: selected_type = ['NAF', 'Wire_fitting']

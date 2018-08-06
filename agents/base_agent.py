@@ -73,6 +73,7 @@ class BaseAgent(object):
 
     # set writer (to log useful stuff in tensorboard)
     def set_writer(self, writer):
+        self.writer = writer
         self.network.writer = writer
 
 
