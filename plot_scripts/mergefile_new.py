@@ -106,7 +106,10 @@ for setting_num in range(NUM_SETTINGS):
 
 
     # find median train ep length (truncate or pad with nan)
-    num_train_length = statistics.median(train_lc_length_arr)
+    try:
+        num_train_length = int(statistics.median(train_lc_length_arr))
+    except:
+        num_train_length = 0
     
 
     if num_train_length > max_median_length:
@@ -129,7 +132,9 @@ for setting_num in range(NUM_SETTINGS):
 
     if run_non_count == NUM_RUNS:
         print('setting ' + str(setting_num) + ' does not exist')
-        exit() ## Perhaps continue?? TODO
+        print(np.shape(train_lc_arr), train_lc_arr)
+        print(np.shape(eval_mean_lc_arr), eval_mean_lc_arr)
+        # exit() ## Perhaps continue?? TODO
 
     #### Need to have same size
     train_mean_rewards.append(np.nanmean(train_lc_arr, axis=0))

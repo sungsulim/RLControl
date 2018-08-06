@@ -29,10 +29,16 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-selected_idx= [23, 38]# range(0, 54) #[] [18, 20, 36, 38, 45]
-selected_type = selected_idx[:] # This will be the labels for those idx.
-selected_type = [str(selected_idx[0])+": ou_noise", str(selected_idx[1])+": own_expl"]
+# NAF check OU_noise
+# selected_idx=  range(0, 27) # range(27, 54)
 
+# NAF check self_noise
+# selected_idx=  range(27, 54)
+
+
+selected_idx=  [0] # range(0, 27) # range(27, 54)
+selected_type = selected_idx[:] # This will be the labels for those idx.
+selected_type = [str(selected_idx[0])+": self_noise"]
 
 truncate_train_ep = 2000
 # Example: selected_type = ['NAF', 'Wire_fitting']
@@ -86,6 +92,10 @@ elif envname == 'Swimmer-v2':
 elif envname == 'Reacher-v2':
     ymin = [-50, -20]
     ymax = [0, 0]
+
+elif envname == 'HumanoidStandup-v2':
+    ymin = [20000, 20000]
+    ymax = [160000, 160000]
 
 elif envname == 'LunarLanderContinuous-v2':
     ymin = [-250, -250]
@@ -230,27 +240,27 @@ for result_idx, result in enumerate(result_type):
             print('The best param setting of '+ agent + ' is ')
             print(params[:])
         else:
+            sort_performance_arr = []
+            for i in range(len(lc)):
+                sort_performance_arr.append([i, np.nansum(lc[i])])
 
-            if result == 'TrainEpisode':
-                #print(np.shape(lc))
-                #BestInd = np.argmax(np.sum(lc[:,xmax], axis = 1))
-                BestInd = np.argmax(np.sum(lc, axis = 1))
+            for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
+                print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
 
-            elif result == 'EvalEpisode':
-                #BestInd = np.argmax(lc[:,[xmax[-1]]])
-                #BestInd = np.argmax(np.sum(lc[:,xmax], axis = 1))
-                BestInd = np.argmax(np.sum(lc, axis = 1))
+            BestInd = np.argmax(np.nansum(lc, axis = 1))
 
-            else:
-                print("Result Type Error")
-                exit()
-            # print(np.sum(lc[:,opt_range], axis = 1))
-            # exit()            
+
+             
             bestlc = lc[BestInd,:xmax]
             lcse = lcstd[BestInd,:xmax]/np.sqrt(num_samples)
-            print('The best param setting of '+ agent + ' is ')
-            print(params[BestInd,:])
-            assert(BestInd == float(params[BestInd,0]))
+            
+            try:
+                assert(BestInd == float(params[BestInd,0]))
+                print('The best param setting of '+ agent + ' is ')
+                print(params[BestInd,:])
+            except:
+                # occurring because there aren't any results for some settings
+                print('the best param setting of ' + agent + ' is ' +str(BestInd))
 
 
         legends = [agent + ', ' + str(num_runs) + ' runs']
