@@ -31,11 +31,10 @@ class InputConvexNetwork(object):
         self.episode_ave_max_q = 0.0
         self.graph = tf.Graph()
 
-        # k in the buddle entropy method
         self.inference_max_steps = config.inference_max_steps
 
-        # self.inference = 'bundle_entropy'
-        self.inference = 'adam'
+        self.inference = 'bundle_entropy'
+        # self.inference = 'adam'
 
         with self.graph.as_default():
             tf.set_random_seed(random_seed)

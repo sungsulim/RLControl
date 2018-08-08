@@ -102,7 +102,7 @@ class EntropyNetwork(BaseNetwork):
             if self.inference == 'bundle_entropy':
                 # q(s,a) = q(s,a) + h(a)
                 tmpA = tf.clip_by_value(self.rmapAction(action), 0.0001, 0.9999)
-                outputs = outputs - tf.reduce_sum(tmpA * tf.log(tmpA) - (1 - tmpA) * tf.log(1 - tmpA), reduction_indices = 1, keep_dims=True)
+                outputs = outputs + tf.reduce_sum(tmpA * tf.log(tmpA) + (1 - tmpA) * tf.log(1 - tmpA), reduction_indices = 1, keep_dims=True)
 
         return inputs, phase, action, outputs
 
