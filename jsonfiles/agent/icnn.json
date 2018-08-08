@@ -2,17 +2,17 @@
     "agent": "ICNN",
 
     "sweeps": {
-        "norm": ["none", "batch", "layer"],
+        "norm": ["layer"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],
         "ou_mu": [0.0],
         "ou_sigma": [0.2],
 
-        "critic_l1_dim": [64],
-        "critic_l2_dim": [64],
-        "critic_lr": [1e-2, 1e-3],
+        "critic_l1_dim": [200],
+        "critic_l2_dim": [200],
+        "critic_lr": [1e-2, 1e-3, 1e-4],
 
-        "inference_max_steps": [10]
+        "inference_max_steps": [5]
     }
 }
