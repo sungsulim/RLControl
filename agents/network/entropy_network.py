@@ -108,8 +108,8 @@ class EntropyNetwork(BaseNetwork):
 
     def layer_norm_network(self, inputs, action, phase):
         # TODO: make codes of the PICNN more compact. It can now only learn two layers, make it learnable in the case of multiple layers.
-        normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
-
+        # normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+        normalized_inputs = self.input_norm.normalize(inputs)
 
         u1 = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=None, \
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
