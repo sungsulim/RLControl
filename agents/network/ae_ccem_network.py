@@ -1,12 +1,12 @@
 import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
-import math
+import os
 
 from matplotlib import pyplot as plt
 
 class AE_CCEM_Network(BaseNetwork):
-    def __init__(self, sess, input_norm, shared_layer_dim, actor_layer_dim, expert_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, actor_lr, expert_lr, tau, rho, num_samples, num_modal, norm_type):
+    def __init__(self, sess, input_norm, shared_layer_dim, actor_layer_dim, expert_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, actor_lr, expert_lr, tau, rho, num_samples, num_modal, action_selection, norm_type):
         super(AE_CCEM_Network, self).__init__(sess, state_dim, action_dim, [actor_lr, expert_lr], tau)
 
         self.shared_layer_dim = shared_layer_dim
@@ -38,6 +38,8 @@ class AE_CCEM_Network(BaseNetwork):
         # print('total actor_output_dim', self.actor_output_dim)
         ### ###
 
+        self.action_selection = action_selection
+
         # CEM Hydra network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha , self.q_prediction= self.build_network(scope_name = 'cem_hydra')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='cem_hydra')
@@ -48,7 +50,6 @@ class AE_CCEM_Network(BaseNetwork):
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params  = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
-
 
         if self.norm_type == 'batch':
             raise NotImplementedError
@@ -347,27 +348,75 @@ class AE_CCEM_Network(BaseNetwork):
         phase = args[1]
 
 
-        # alpha: batchsize x num_modal x 1
-        # mean: batchsize x num_modal x action_dim
-        alpha, mean = self.sess.run([self.action_prediction_alpha, self.action_prediction_mean], feed_dict={
-            self.inputs: inputs,
-            self.phase: phase
-        })
-        max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
-        # print('predict action')
-        # print('alpha', alpha, np.shape(alpha))
-        # print('max_idx', max_idx)
-        # print("mean", mean)
 
-        best_mean = []
-        for idx,m in zip(max_idx, mean):
-            # print(idx, m)
-            # print(m[idx])
-            best_mean.append(m[idx])
-        best_mean = np.asarray(best_mean)
-        # print('best mean', best_mean, np.shape(best_mean))
 
-        # input()
+        if self.action_selection == 'highest_alpha':
+
+            # alpha: batchsize x num_modal x 1
+            # mean: batchsize x num_modal x action_dim
+            alpha, mean, sigma = self.sess.run([self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
+                self.inputs: inputs,
+                self.phase: phase
+            })
+
+            self.setModalStats(alpha[0], mean[0], sigma[0])
+
+            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+            # print('predict action')
+            # print('alpha', alpha, np.shape(alpha))
+            # print('max_idx', max_idx)
+            # print("mean", mean)
+
+            best_mean = []
+            for idx,m in zip(max_idx, mean):
+                # print(idx, m)
+                # print(m[idx])
+                best_mean.append(m[idx])
+            best_mean = np.asarray(best_mean)
+            # print('best mean', best_mean, np.shape(best_mean))
+
+            # input()
+
+        elif self.action_selection == 'highest_q_val':
+            # mean: batchsize x num_modal x action_dim
+            alpha, mean, sigma = self.sess.run([self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
+                self.inputs: inputs,
+                self.phase: phase
+            })
+
+            self.setModalStats(alpha[0], mean[0], sigma[0])
+
+            # print('mean shape', np.shape(mean))
+            mean_reshaped = np.reshape(mean, (np.shape(mean)[0] * np.shape(mean)[1], np.shape(mean)[2]))
+            # print('mean_reshaped', np.shape(mean_reshaped))
+
+
+            stacked_state_batch = None
+
+            for state in inputs:
+                stacked_one_state = np.tile(state, (self.num_modal, 1))
+
+                if stacked_state_batch is None:
+                    stacked_state_batch = stacked_one_state
+                else:
+                    stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
+
+            # print('stacked_states', np.shape(stacked_state_batch))
+
+            q_prediction = np.expand_dims(self.predict_q(stacked_state_batch, mean_reshaped, True), axis=0)
+
+            # print('q_pred', np.shape(q_prediction))
+            # print( (np.shape(mean)[0], np.shape(mean)[1], -1))
+
+            q_prediction = np.squeeze(np.reshape(q_prediction, (np.shape(mean)[0], np.shape(mean)[1], -1)), axis=2)
+
+            # print('q_pred', q_prediction)
+            best_mean = [mean[b][np.argmax(q_prediction[b])] for b in range(len(q_prediction))]
+            # print('mean', mean)
+            # print(best_mean)
+            # input()
+
+
         return best_mean
 
         #######################
@@ -484,40 +533,63 @@ class AE_CCEM_Network(BaseNetwork):
                                             self.action: np.expand_dims(action, 0), 
                                             self.phase:False})
 
-    # Buggy
-    def plotFunc(self,func, x_min, x_max, resolution=1e2, display_title='', save_title='', linewidth=2.0, grid=True, show=True, equal_aspect=False):
+    def getPolicyFunction(self, alpha, mean, sigma):
 
-        fig, ax = plt.subplots(figsize=(10, 5))    
+        mean = np.squeeze(mean, axis=1)
+        sigma = np.squeeze(sigma, axis=1)
+
+        return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+
+    # Buggy
+    def plotFunc(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
+
+        fig, ax = plt.subplots(2, sharex=True)
+        # fig, ax = plt.subplots(figsize=(10, 5))
 
         x = np.linspace(x_min, x_max, resolution)
-        y = []
+        y1 = []
+        y2 = []
 
         max_point_x = x_min
         max_point_y = np.float('-inf')
 
         for point_x in x:
-            point_y = np.squeeze(func([point_x])) # reduce dimension
+            point_y1 = np.squeeze(func1([point_x])) # reduce dimension
+            point_y2 = func2(point_x)
 
-            if point_y > max_point_y:
+            if point_y1 > max_point_y:
                 max_point_x = point_x
-                max_point_y = point_y
+                max_point_y = point_y1
 
-            y.append(point_y)
+            y1.append(point_y1)
+            y2.append(point_y2)
 
-        ax.plot(x, y, linewidth = linewidth)
-        plt.ylim((-0.5, 1.6))
+        ax[0].plot(x, y1, linewidth = linewidth)
+        ax[1].plot(x, y2, linewidth = linewidth)
+        # plt.ylim((-0.5, 1.6))
         if equal_aspect:
-            ax.set_aspect('equal')
+            ax.set_aspect('auto')
 
         if grid:
-            ax.grid(True)
-            ax.axhline(y=0, linewidth=1.5, color='darkslategrey')
-            ax.axvline(x=0, linewidth=1.5, color='darkslategrey')
+            ax[0].grid(True)
+            # ax[0].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            # ax[0].axvline(x=0, linewidth=1.5, color='darkslategrey')
+
+            ax[1].grid(True)
+            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=0, linewidth=1.5, color='darkslategrey')
 
         if display_title:
-            display_title+= ", true_maxA: " + str(max_point_x) + ', true_maxQ: '+str(max_point_y)
+
+            display_title += ", maxA: {:.3f}".format(max_point_x) + ", maxQ: {:.3f}".format(max_point_y) + "\n state: " + str(state)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
+
+
+            mode_string=""
+            for i in range(len(mean)):
+                mode_string+= "{:.3f}".format(np.squeeze(mean[i])) +", "
+            ax[1].set_title("modes: " + mode_string)
 
         else: 
             top_margin = 1.0
@@ -529,7 +601,10 @@ class AE_CCEM_Network(BaseNetwork):
             plt.show()
         else:
             #print(save_title)
-            plt.savefig('./figures/'+save_title)
+            save_dir = save_dir+'/figures/'
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            plt.savefig(save_dir+save_title)
             plt.close()
 
 

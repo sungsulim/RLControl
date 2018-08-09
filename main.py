@@ -78,7 +78,7 @@ def main():
         monitor_dir = summary_dir+'/monitor'
 
         if args.render:
-            train_env.instance = gym.wrappers.Monitor(train_env.instance, monitor_dir, force=True)
+            train_env.instance = gym.wrappers.Monitor(train_env.instance, monitor_dir, video_callable=(lambda x: True), force=True)
         else:
             train_env.instance = gym.wrappers.Monitor(train_env.instance, monitor_dir, video_callable=False, force=True)
 

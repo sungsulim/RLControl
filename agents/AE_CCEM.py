@@ -40,20 +40,22 @@ class AE_CCEM_Network(object):
         self.rho = config.rho
         self.num_samples = config.num_samples
 
+        # Action selection mode
+        self.action_selection = config.action_selection
 
         with self.graph.as_default():
             tf.set_random_seed(random_seed)
             self.sess = tf.Session() 
 
-            self.hydra_network = ae_ccem_network.AE_CCEM_Network(self.sess, self.input_norm, 
+            self.hydra_network = ae_ccem_network.AE_CCEM_Network(self.sess, self.input_norm,
                                                                                     config.shared_l1_dim, config.actor_l2_dim, config.expert_l2_dim, 
                                                                                     state_dim, state_min, state_max, action_dim, action_min, action_max,
                                                                                     config.actor_lr, config.expert_lr, config.tau, config.rho, config.num_samples, 
-                                                                                    config.num_modal, norm_type = self.norm_type)
+                                                                                    config.num_modal, config.action_selection, norm_type = self.norm_type)
 
             self.sess.run(tf.global_variables_initializer())
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         # print('action candidates', action_init)
         if is_train:
@@ -78,7 +80,6 @@ class AE_CCEM_Network(object):
             if self.write_log:
                 self.train_global_steps += 1
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
-            
 
                 alpha, mean, sigma = self.hydra_network.getModalStats()
                 for i in range(len(alpha)):
@@ -91,8 +92,15 @@ class AE_CCEM_Network(object):
                     write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
 
-            ### Plot Q Func
-            # self.hydra_network.plotFunc(self.hydra_network.getQFunction(state), self.action_min, self.action_max, display_title='steps: '+str(self.train_global_steps), save_title='steps_'+str(self.train_global_steps), show=False)
+                # plot Q function, and find mode
+                # if self.train_global_steps % 1 == 0:
+                # # if is_start:
+                #     # find modes
+                #     func1 = self.hydra_network.getQFunction(state)
+                #     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
+                #
+                #     self.hydra_network.plotFunc(func1, func2, state, mean, self.action_min, self.action_max,
+                #                                 display_title='steps: '+str(self.train_global_steps), save_title='steps_'+str(self.train_global_steps), save_dir=self.writer.get_logdir(), show=False)
 
         else:
             # Use mean directly
@@ -100,8 +108,16 @@ class AE_CCEM_Network(object):
             chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
             if self.write_log:
-
                 self.eval_global_steps += 1
+                if self.eval_global_steps % 1 == 0:
+                    alpha, mean, sigma = self.hydra_network.getModalStats()
+                    func1 = self.hydra_network.getQFunction(state)
+                    func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
+
+                    self.hydra_network.plotFunc(func1, func2, state, mean, self.action_min, self.action_max,
+                                                display_title='steps: ' + str(self.eval_global_steps),
+                                                save_title='steps_' + str(self.eval_global_steps),
+                                                save_dir=self.writer.get_logdir(), show=False)
 
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
@@ -240,18 +256,18 @@ class AE_CCEM(BaseAgent):
         self.cum_steps = 0 # cumulative steps across episodes
 
     def start(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=False)
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         if self.cum_steps < self.warmup_steps:
             action = np.random.uniform(self.action_min, self.action_max)
 
         else:
-            action = self.network.take_action(state, is_train)
+            action = self.network.take_action(state, is_train, is_start)
 
             # Train
             if is_train:
