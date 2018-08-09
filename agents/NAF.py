@@ -9,6 +9,9 @@ import tensorflow.contrib.slim as slim
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
+from matplotlib import pyplot as plt
+import os
+
 class NAF_Network:
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
 
@@ -195,7 +198,7 @@ class NAF_Network:
         #prod_tensor should be dim: batchsize*action_dim
         prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis = 1)
         # print 'prod tensor shape is :: ', prod_tensor.shape
-        adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis = 1, keep_dims=True)
+        adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis=1, keep_dims=True)
         q_value = value + adv_value
         max_q = value
         
@@ -230,6 +233,9 @@ class NAF_Network:
         max_q = value
                 
         return q_value, max_q, action, Lmat_columns
+
+
+
 
     '''return an action to take for each state'''
     def take_action(self, state, is_train):
@@ -270,11 +276,11 @@ class NAF_Network:
                 # print('train', sampled_act)
                 chosen_action = np.clip(sampled_act, self.action_min, self.action_max)
 
-                if self.write_log:
-                    self.train_global_steps += 1
-                    write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat00') # logging only top-left element!
+                # if self.write_log:
+                #     write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat00') # logging only top-left element!
 
             if self.write_log:
+                self.train_global_steps += 1
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
             return chosen_action
@@ -287,6 +293,12 @@ class NAF_Network:
             if self.write_log:
                 self.eval_global_steps += 1
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+                func1 = self.getQFunction(state)
+                self.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
+                                            display_title='steps: ' + str(self.eval_global_steps),
+                                            save_title='steps_' + str(self.eval_global_steps),
+                                            save_dir=self.writer.get_logdir(), show=False)
 
             return chosen_action
 
@@ -309,6 +321,69 @@ class NAF_Network:
 
     def reset(self):
         pass
+
+    def getQFunction(self, state):
+        return lambda action: self.sess.run(self.q_val, feed_dict={self.state_input: np.expand_dims(state, 0),
+                                                                   self.action_input: np.expand_dims(action, 0),
+                                                                   self.phase: False})
+
+    def plotFunction(self, func1, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
+
+        fig, ax = plt.subplots(2, sharex=True)
+        # fig, ax = plt.subplots(figsize=(10, 5))
+
+        x = np.linspace(x_min, x_max, resolution)
+        y1 = []
+
+        max_point_x = x_min
+        max_point_y = np.float('-inf')
+
+        for point_x in x:
+            point_y1 = np.squeeze(func1([point_x])) # reduce dimension
+
+            if point_y1 > max_point_y:
+                max_point_x = point_x
+                max_point_y = point_y1
+
+            y1.append(point_y1)
+
+        ax[0].plot(x, y1, linewidth = linewidth)
+        # plt.ylim((-0.5, 1.6))
+        if equal_aspect:
+            ax.set_aspect('auto')
+
+        if grid:
+            ax[0].grid(True)
+            # ax[0].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            # ax[0].axvline(x=0, linewidth=1.5, color='darkslategrey')
+
+            ax[1].grid(True)
+            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=mean[0], linewidth=1.5, color='red')
+
+        if display_title:
+
+            display_title += ", maxA: {:.3f}".format(max_point_x) + ", maxQ: {:.3f}".format(max_point_y) + "\n state: " + str(state)
+            fig.suptitle(display_title, fontsize=11, fontweight='bold')
+            top_margin = 0.95
+
+            ax[1].set_title("mean: " + str(mean[0]))
+
+        else:
+            top_margin = 1.0
+
+
+        #plt.tight_layout(rect=(0,0,1, top_margin))
+
+        if show:
+            plt.show()
+        else:
+            #print(save_title)
+            save_dir = save_dir+'/figures/'
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            plt.savefig(save_dir+save_title)
+            plt.close()
 
 class NAF(BaseAgent):
     def __init__(self, env, config, random_seed):

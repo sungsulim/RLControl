@@ -15,6 +15,7 @@ from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 
+
 class DDPG_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
         
@@ -26,6 +27,14 @@ class DDPG_Network(object):
         else:
             assert(self.norm_type == 'none')
             self.input_norm = None
+
+        self.action_min = action_min
+        self.action_max = action_max
+
+        self.train_global_steps = 0
+        self.eval_global_steps = 0
+        self.write_log = config.write_log
+
 
         self.episode_ave_max_q = 0.0
         self.graph = tf.Graph()
@@ -48,7 +57,25 @@ class DDPG_Network(object):
             self.critic_network.update_target_network()
 
     def take_action(self, state, is_train):
-        return self.actor_network.predict(np.expand_dims(state, 0), False)[0]
+
+        chosen_action = self.actor_network.predict(np.expand_dims(state, 0), False)[0]
+
+        if not is_train:
+            if self.write_log:
+                self.eval_global_steps += 1
+
+                if self.eval_global_steps % 1 == 0:
+
+                    func1 = self.critic_network.getQFunction(state)
+
+                    self.critic_network.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
+                                                    display_title='steps: ' + str(self.eval_global_steps),
+                                                    save_title='steps_' + str(self.eval_global_steps),
+                                                    save_dir=self.writer.get_logdir(), show=False)
+
+                # write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+        return chosen_action
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 

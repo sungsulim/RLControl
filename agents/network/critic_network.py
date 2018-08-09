@@ -2,8 +2,9 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 import itertools
-import copy
-import matplotlib.pyplot as plt
+
+from matplotlib import pyplot as plt
+import os
 
 
 class CriticNetwork(BaseNetwork):
@@ -348,58 +349,65 @@ class CriticNetwork(BaseNetwork):
             print("Shape: ", v.shape)
             print(v)
 
-
-    # Buggy
     def getQFunction(self, state):
         return lambda action: self.sess.run(self.outputs, {self.inputs: np.expand_dims(state, 0), 
                                             self.action: np.expand_dims(action, 0), 
-                                            self.phase:False})
+                                            self.phase: False})
 
-    # Buggy
-    def plotFunc(self,func, x_min, x_max, resolution=1e5, display_title='', save_title='', linewidth=2.0, grid=True, show=True, equal_aspect=False):
+    def plotFunction(self, func1, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
 
-        fig, ax = plt.subplots(figsize=(10, 5))    
+        fig, ax = plt.subplots(2, sharex=True)
+        # fig, ax = plt.subplots(figsize=(10, 5))
 
-        x = self.all_searchable_actions # np.linspace(x_min, x_max, resolution)
-        y = []
+        x = np.linspace(x_min, x_max, resolution)
+        y1 = []
 
         max_point_x = x_min
         max_point_y = np.float('-inf')
 
         for point_x in x:
-            point_y = np.squeeze(func(point_x)) # reduce dimension
+            point_y1 = np.squeeze(func1([point_x])) # reduce dimension
 
-            if point_y > max_point_y:
+            if point_y1 > max_point_y:
                 max_point_x = point_x
-                max_point_y = point_y
+                max_point_y = point_y1
 
-            y.append(point_y)
+            y1.append(point_y1)
 
-        ax.plot(x, y, linewidth = linewidth)
-
+        ax[0].plot(x, y1, linewidth = linewidth)
+        # plt.ylim((-0.5, 1.6))
         if equal_aspect:
-            ax.set_aspect('equal')
+            ax.set_aspect('auto')
 
         if grid:
-            ax.grid(True)
-            ax.axhline(y=0, linewidth=1.5, color='darkslategrey')
-            ax.axvline(x=0, linewidth=1.5, color='darkslategrey')
+            ax[0].grid(True)
+            # ax[0].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            # ax[0].axvline(x=0, linewidth=1.5, color='darkslategrey')
+
+            ax[1].grid(True)
+            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=mean[0], linewidth=1.5, color='red')
 
         if display_title:
-            display_title+= ", true_maxA: " + str(max_point_x) + ', true_maxQ: '+str(max_point_y)
+
+            display_title += ", maxA: {:.3f}".format(max_point_x) + ", maxQ: {:.3f}".format(max_point_y) + "\n state: " + str(state)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
-        else: 
+            ax[1].set_title("mean: " + str(mean[0]))
+
+        else:
             top_margin = 1.0
 
-        if equal_aspect:
-            ax.setaspect('equal')
 
-        plt.tight_layout(rect=(0,0,1, top_margin))
+        #plt.tight_layout(rect=(0,0,1, top_margin))
 
         if show:
             plt.show()
         else:
-            plt.savefig('./figures/'+save_title)
+            #print(save_title)
+            save_dir = save_dir+'/figures/'
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+            plt.savefig(save_dir+save_title)
             plt.close()

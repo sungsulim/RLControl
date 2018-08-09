@@ -2,7 +2,7 @@
     "agent": "DDPG",
 
     "sweeps": {
-        "norm": ["layer", "input_norm"],
+        "norm": ["layer"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],

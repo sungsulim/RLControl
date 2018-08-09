@@ -114,10 +114,10 @@ class AE_CCEM_Network(object):
                     func1 = self.hydra_network.getQFunction(state)
                     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
-                    self.hydra_network.plotFunc(func1, func2, state, mean, self.action_min, self.action_max,
-                                                display_title='steps: ' + str(self.eval_global_steps),
-                                                save_title='steps_' + str(self.eval_global_steps),
-                                                save_dir=self.writer.get_logdir(), show=False)
+                    self.hydra_network.plotFunction(func1, func2, state, mean, self.action_min, self.action_max,
+                                                    display_title='steps: ' + str(self.eval_global_steps),
+                                                    save_title='steps_' + str(self.eval_global_steps),
+                                                    save_dir=self.writer.get_logdir(), show=False)
 
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 

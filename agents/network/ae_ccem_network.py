@@ -540,8 +540,7 @@ class AE_CCEM_Network(BaseNetwork):
 
         return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
-    # Buggy
-    def plotFunc(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
+    def plotFunction(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
 
         fig, ax = plt.subplots(2, sharex=True)
         # fig, ax = plt.subplots(figsize=(10, 5))
