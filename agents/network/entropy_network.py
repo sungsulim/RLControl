@@ -28,8 +28,8 @@ class EntropyNetwork(BaseNetwork):
         self.actionRange = action_max - action_min
 
         # Critic network
-        # notice here outputs is -1.0 * qvalue, not qvalue directly!
-        self.inputs, self.phase, self.action, self.outputs = self.build_network(scope_name = 'critic')
+        # notice here outputs is -1.0 * qvalue, not qvalue directly! f_outputs is outputs - entropy and is only for bunddle entropy optimization
+        self.inputs, self.phase, self.action, self.outputs, self.f_outputs = self.build_network(scope_name = 'critic')
         self.qvalue = -1.0 * self.outputs
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic') # tf.trainable_variables()[num_actor_vars:]
         self.wz_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic/zub')
@@ -38,7 +38,7 @@ class EntropyNetwork(BaseNetwork):
 
         # Target network
         # notice here target_outputs is -1.0 * qvalue, not qvalue directly!
-        self.target_inputs, self.target_phase, self.target_action, self.target_outputs = self.build_network(scope_name = 'target_critic')
+        self.target_inputs, self.target_phase, self.target_action, self.target_outputs, self.f_target_outputs = self.build_network(scope_name = 'target_critic')
         self.target_qvalue = -1.0 * self.target_outputs
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_critic') # tf.trainable_variables()[len(self.net_params) + num_actor_vars:]
 
@@ -78,6 +78,10 @@ class EntropyNetwork(BaseNetwork):
         self.action_grads = tf.gradients(self.outputs, self.action)
         self.action_grads_target = tf.gradients(self.target_outputs, self.target_action)
 
+        # Get the gradient of the network part (without entropy regularization) w.r.t. the action
+        self.f_action_grads = tf.gradients(self.f_outputs, self.action)
+        self.f_action_grads_target = tf.gradients(self.f_target_outputs, self.target_action)
+
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):
 
@@ -87,24 +91,20 @@ class EntropyNetwork(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             if self.norm_type == 'layer':
-                outputs = self.layer_norm_network(inputs, action, phase)
+                f_outputs = self.layer_norm_network(inputs, action, phase)
             elif self.norm_type == 'batch':
                 assert (self.input_norm is None)
-                outputs = self.batch_norm_network(inputs, action, phase)
+                f_outputs = self.batch_norm_network(inputs, action, phase)
             elif self.norm_type == 'none':
                 assert (self.input_norm is None)
-                outputs = self.no_norm_network(inputs, action, phase)
+                f_outputs = self.no_norm_network(inputs, action, phase)
             else:
                 raise Exception('WRONG NORM TYPE!!')
 
-            # q(s,a) = a^T * f(s; theta)
-            # outputs = tf.reduce_sum(outputs * action, reduction_indices = 1, keepdims=True)
-            if self.inference == 'bundle_entropy':
-                # q(s,a) = q(s,a) + h(a)
-                tmpA = tf.clip_by_value(self.rmapAction(action), 0.0001, 0.9999)
-                outputs = outputs + tf.reduce_sum(tmpA * tf.log(tmpA) + (1 - tmpA) * tf.log(1 - tmpA), reduction_indices = 1, keep_dims=True)
+            tmpA = tf.clip_by_value(self.rmapAction(action), 0.0001, 0.9999)
+            outputs = f_outputs + tf.reduce_sum(tmpA * tf.log(tmpA) + (1 - tmpA) * tf.log(1 - tmpA), reduction_indices = 1, keep_dims=True)
 
-        return inputs, phase, action, outputs
+        return inputs, phase, action, outputs, f_outputs
 
     def layer_norm_network(self, inputs, action, phase):
         # TODO: make codes of the PICNN more compact. It can now only learn two layers, make it learnable in the case of multiple layers.
@@ -224,9 +224,9 @@ class EntropyNetwork(BaseNetwork):
                                                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
                                                  biases_initializer = None)
 
-        outputs = zub2 + yub2 + wub2
+        f_outputs = zub2 + yub2 + wub2
 
-        return outputs
+        return f_outputs
 
     def batch_norm_network(self, inputs, action, phase):
         # state input -> bn
@@ -354,9 +354,9 @@ class EntropyNetwork(BaseNetwork):
                                                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
                                                  biases_initializer = None)
 
-        outputs = zub2 + yub2 + wub2
+        f_outputs = zub2 + yub2 + wub2
 
-        return outputs
+        return f_outputs
 
     def no_norm_network(self, inputs, action, phase):
 
@@ -473,9 +473,9 @@ class EntropyNetwork(BaseNetwork):
                                                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
                                                  biases_initializer = None)
 
-        outputs = zub2 + yub2 + wub2
+        f_outputs = zub2 + yub2 + wub2
 
-        return outputs
+        return f_outputs
 
 
     def train(self, *args):
@@ -506,6 +506,23 @@ class EntropyNetwork(BaseNetwork):
             self.target_phase: args[2]
         })
 
+    # note this is for buddle entropy optimization and it returns f_outputs rather than -f_ouputs as in predict qvalues.
+    def f_predict(self, *args):
+        # args  (inputs, action, phase)
+        return self.sess.run(self.f_outputs, feed_dict={
+            self.inputs: args[0],
+            self.action: args[1],
+            self.phase: args[2]
+        })
+
+    def f_predict_target(self, *args):
+        # args  (inputs, action, phase)
+        return self.sess.run(self.f_target_outputs, feed_dict={
+            self.target_inputs: args[0],
+            self.target_action: args[1],
+            self.target_phase: args[2]
+        })
+
     def alg_opt(self, state, action_init, inference_max_step):
         #print('param:', self.sess.run(self.net_params))
         if self.inference == 'bundle_entropy':
@@ -529,8 +546,8 @@ class EntropyNetwork(BaseNetwork):
 
         finished = set([])
         for t in range(inference_max_step):
-            fi = -1 * self.predict(state, self.mapAction(action), False)[:, 0]
-            gi = self.actionRange * self.action_gradients(state, action, False)[0]
+            fi = self.f_predict(state, self.mapAction(action), False)[:, 0]
+            gi = self.actionRange * self.f_action_gradients(state, self.mapAction(action), False)[0]
             Gi = gi
             hi = fi - np.sum(gi * action, axis=1)
             for u in range(num):
@@ -542,6 +559,7 @@ class EntropyNetwork(BaseNetwork):
                 actions[u].append(np.copy(action[u]))
 
                 prev_action = action[u].copy()
+                #print('G:', G[u][0])
                 if len(G[u]) > 1:
                     lam[u] = self.proj_newton_logistic(np.array(G[u]), np.array(h[u]), None)
                     action[u] = 1 / (1 + np.exp(np.array(G[u]).T.dot(lam[u])))
@@ -634,8 +652,8 @@ class EntropyNetwork(BaseNetwork):
 
         finished = set([])
         for t in range(inference_max_step):
-            fi = -1 * self.predict_target(state, self.mapAction(action), False)[:, 0]
-            gi = self.actionRange * self.action_gradients_target(state, action, False)[0]
+            fi = self.f_predict_target(state, self.mapAction(action), False)[:, 0]
+            gi = self.actionRange * self.f_action_gradients_target(state, self.mapAction(action), False)[0]
             Gi = gi
             hi = fi - np.sum(gi * action, axis=1)
             for u in range(num):
@@ -727,6 +745,20 @@ class EntropyNetwork(BaseNetwork):
 
     def action_gradients_target(self, inputs, action, is_training):
         return self.sess.run(self.action_grads_target, feed_dict={
+            self.target_inputs: inputs,
+            self.target_action: action,
+            self.target_phase: is_training
+        })
+
+    def f_action_gradients(self, inputs, action, is_training):
+        return self.sess.run(self.f_action_grads, feed_dict={
+            self.inputs: inputs,
+            self.action: action,
+            self.phase: is_training
+        })
+
+    def f_action_gradients_target(self, inputs, action, is_training):
+        return self.sess.run(self.f_action_grads_target, feed_dict={
             self.target_inputs: inputs,
             self.target_action: action,
             self.target_phase: is_training
