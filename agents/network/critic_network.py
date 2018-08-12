@@ -3,6 +3,11 @@ from agents.network.base_network import BaseNetwork
 import numpy as np
 import itertools
 
+import matplotlib as mpl
+if os.environ.get('DISPLAY','') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+
 from matplotlib import pyplot as plt
 import os
 

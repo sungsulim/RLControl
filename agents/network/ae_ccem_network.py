@@ -3,6 +3,12 @@ from agents.network.base_network import BaseNetwork
 import numpy as np
 import os
 
+
+import matplotlib as mpl
+if os.environ.get('DISPLAY','') == '':
+    print('no display found. Using non-interactive Agg backend')
+    mpl.use('Agg')
+
 from matplotlib import pyplot as plt
 
 class AE_CCEM_Network(BaseNetwork):
@@ -540,7 +546,7 @@ class AE_CCEM_Network(BaseNetwork):
 
         return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
-    def plotFunction(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
+    def plotFunction(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, ep_count=0, grid=True, show=False, equal_aspect=False):
 
         fig, ax = plt.subplots(2, sharex=True)
         # fig, ax = plt.subplots(figsize=(10, 5))
@@ -600,12 +606,11 @@ class AE_CCEM_Network(BaseNetwork):
             plt.show()
         else:
             #print(save_title)
-            save_dir = save_dir+'/figures/'
+            save_dir = save_dir+'/figures/'+str(ep_count)+'/'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             plt.savefig(save_dir+save_title)
             plt.close()
-
 
     def setModalStats(self, alpha, mean, sigma):
         self.temp_alpha = alpha

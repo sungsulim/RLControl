@@ -21,6 +21,7 @@ class AE_CCEM_Network(object):
         #record step n for tf Summary
         self.train_global_steps = 0
         self.eval_global_steps = 0
+        self.eval_ep_count = 0
 
         self.action_min = action_min
         self.action_max = action_max
@@ -109,17 +110,21 @@ class AE_CCEM_Network(object):
 
             if self.write_log:
                 self.eval_global_steps += 1
+                if is_start:
+                    self.eval_ep_count += 1
+
                 if self.eval_global_steps % 1 == 0:
                     alpha, mean, sigma = self.hydra_network.getModalStats()
                     func1 = self.hydra_network.getQFunction(state)
                     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
                     self.hydra_network.plotFunction(func1, func2, state, mean, self.action_min, self.action_max,
-                                                    display_title='steps: ' + str(self.eval_global_steps),
+                                                    display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
                                                     save_title='steps_' + str(self.eval_global_steps),
-                                                    save_dir=self.writer.get_logdir(), show=False)
+                                                    save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
 
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
 
             #####################
             # # Take best action among n actions
@@ -142,6 +147,8 @@ class AE_CCEM_Network(object):
         #assert(chosen_action >= self.action_min and chosen_action <= self.action_max)
         
         # print('take Action', chosen_action)
+
+
         return chosen_action
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):

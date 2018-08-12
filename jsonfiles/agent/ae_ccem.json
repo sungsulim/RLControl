@@ -4,7 +4,7 @@
     "sweeps": {
 
         "action_selection": ["highest_alpha"],
-        "norm": ["layer", "input_norm"],
+        "norm": ["layer"],
 
         "exploration_policy": ["none"],
 
@@ -18,6 +18,6 @@
 
         "rho": [0.2],
         "num_samples": [20],
-        "num_modal": [1]
+        "num_modal": [1,2]
     }
 }
