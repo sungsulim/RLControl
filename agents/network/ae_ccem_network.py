@@ -167,7 +167,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -5.0, 5.0))
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, 0.0, 5.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -247,7 +247,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -5.0, 5.0))
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, 0.0, 5.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
