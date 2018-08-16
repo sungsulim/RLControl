@@ -60,7 +60,7 @@ class BaseAgent(object):
     def get_value(self, s, a):
         raise NotImplementedError
     
-    def update(self, state, next_state, reward, action, is_terminal):
+    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
         raise NotImplementedError
 
     # Sets the random seed for the agent

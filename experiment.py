@@ -93,19 +93,24 @@ class Experiment(object):
 
         while not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT or self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT):
 
-            
+            episode_step_count += 1
+            self.total_step_count += 1
 
             obs_n, reward, done, info = self.train_environment.step(Aold)
-            episode_reward += reward            
-            self.agent.update(obs, obs_n, float(reward), Aold, done)
+            episode_reward += reward
+
+            # if the episode was externally terminated by episode step limit, don't do update
+            if done and episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT:
+                is_truncated = True
+            else:
+                is_truncated = False
+
+            self.agent.update(obs, obs_n, float(reward), Aold, done, is_truncated)
 
             if not done:
                 Aold = self.agent.step(obs_n, is_train)
 
             obs = obs_n
-            episode_step_count += 1
-            self.total_step_count +=1
-
 
             if self.total_step_count % self.train_environment.eval_interval == 0:
                 self.eval()

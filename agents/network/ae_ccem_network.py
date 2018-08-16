@@ -167,7 +167,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, 0.0, 5.0))
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -3.0, 3.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -247,7 +247,7 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, 0.0, 5.0))
+        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -3.0, 3.0))
         
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -348,13 +348,9 @@ class AE_CCEM_Network(BaseNetwork):
             self.target_phase: phase
         })
 
-
     def predict_action(self, *args):
         inputs = args[0]
         phase = args[1]
-
-
-
 
         if self.action_selection == 'highest_alpha':
 
@@ -395,7 +391,6 @@ class AE_CCEM_Network(BaseNetwork):
             # print('mean shape', np.shape(mean))
             mean_reshaped = np.reshape(mean, (np.shape(mean)[0] * np.shape(mean)[1], np.shape(mean)[2]))
             # print('mean_reshaped', np.shape(mean_reshaped))
-
 
             stacked_state_batch = None
 

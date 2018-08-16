@@ -22,7 +22,7 @@ class OrnsteinUhlenbeckProcess(object):
         
 
 class RandomUniform(object):
-    def __init__(self, action_min, action_max, isContinuous):
+    def __init__(self, action_min, action_max, is_continuous):
 
         self.action_min = action_min
         self.action_max = action_max

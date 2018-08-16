@@ -434,7 +434,7 @@ class NAF(BaseAgent):
             action = np.clip(action, self.action_min, self.action_max) 
         return action
 
-    def update(self, state, next_state, reward, action, is_terminal):
+    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
 
         # log all states
         # if self.write_log:
@@ -453,11 +453,11 @@ class NAF(BaseAgent):
         #     filename.close()
         #     exit()
 
-
-        if not is_terminal:
-            self.replay_buffer.add(state, action, reward, next_state, self.gamma)
-        else:
-            self.replay_buffer.add(state, action, reward, next_state, 0.0)
+        if not is_truncated:
+            if not is_terminal:
+                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+            else:
+                self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
         if self.network.norm_type == 'input_norm' or self.network.norm_type == 'layer':
             self.network.input_norm.update(np.array([state]))

@@ -14,9 +14,10 @@ from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 class AE_CCEM_Network(object):
-    def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
+    def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
 
         self.write_log = config.write_log
+        self.use_external_exploration = use_external_exploration
 
         #record step n for tf Summary
         self.train_global_steps = 0
@@ -61,20 +62,25 @@ class AE_CCEM_Network(object):
         # print('action candidates', action_init)
         if is_train:
 
-            action_init = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0] # single state so first idx
-            
+            # just return the best action
+            if self.use_external_exploration:
+                chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
+                chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
+            else:
+                action_init = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0] # single state so first idx
 
-            # Choose one random action among n actions
-            idx = np.random.randint(len(action_init))
-            action_init = action_init[idx]
 
-            # Gradient Ascent
-            # action_final = self.expert_network.gradient_ascent(np.expand_dims(state, 0), action_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, False)[0] # do ascent on original network
-            
-            action_final = action_init
-            chosen_action = action_final
+                # Choose one random action among n actions
+                idx = np.random.randint(len(action_init))
+                action_init = action_init[idx]
 
-            chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
+                # Gradient Ascent
+                # action_final = self.expert_network.gradient_ascent(np.expand_dims(state, 0), action_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, False)[0] # do ascent on original network
+
+                action_final = action_init
+                chosen_action = action_final
+
+                chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
 
             ######## LOGGING #########
@@ -82,26 +88,23 @@ class AE_CCEM_Network(object):
                 self.train_global_steps += 1
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
-                alpha, mean, sigma = self.hydra_network.getModalStats()
-                for i in range(len(alpha)):
-                    # print('get alpha', alpha[i])
-                    # print('get mean', mean[i])
-                    # print('get sigma', sigma[i])
-                    # input()
-                    write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
-                    write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
-                    write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
+                if not self.use_external_exploration:
+                    alpha, mean, sigma = self.hydra_network.getModalStats()
+                    for i in range(len(alpha)):
+                        write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
+                        write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
+                        write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
 
-                # plot Q function, and find mode
-                # if self.train_global_steps % 1 == 0:
-                # # if is_start:
-                #     # find modes
-                #     func1 = self.hydra_network.getQFunction(state)
-                #     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
-                #
-                #     self.hydra_network.plotFunc(func1, func2, state, mean, self.action_min, self.action_max,
-                #                                 display_title='steps: '+str(self.train_global_steps), save_title='steps_'+str(self.train_global_steps), save_dir=self.writer.get_logdir(), show=False)
+                    # plot Q function, and find mode
+                    # if self.train_global_steps % 1 == 0:
+                    # # if is_start:
+                    #     # find modes
+                    #     func1 = self.hydra_network.getQFunction(state)
+                    #     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
+                    #
+                    #     self.hydra_network.plotFunc(func1, func2, state, mean, self.action_min, self.action_max,
+                    #                                 display_title='steps: '+str(self.train_global_steps), save_title='steps_'+str(self.train_global_steps), save_dir=self.writer.get_logdir(), show=False)
 
         else:
             # Use mean directly
@@ -257,8 +260,8 @@ class AE_CCEM(BaseAgent):
         
         # Network
         self.network = AE_CCEM_Network(self.state_dim, self.state_min, self.state_max, 
-                                        self.action_dim, self.action_min, self.action_max,
-                                        config, random_seed = random_seed)
+                                       self.action_dim, self.action_min, self.action_max,
+                                       self.use_external_exploration, config, random_seed = random_seed)
         
         self.cum_steps = 0 # cumulative steps across episodes
 
@@ -281,20 +284,23 @@ class AE_CCEM(BaseAgent):
 
                 # if using an external exploration policy
                 if self.use_external_exploration:
+                    # print('action before', action)
                     action = self.exploration_policy.generate(action, self.cum_steps)
-                
+                    # print('action after', action)
+                    # input()
                 # only increment during training, not evaluation
                 self.cum_steps += 1
 
             action = np.clip(action, self.action_min, self.action_max) 
         return action
 
-    def update(self, state, next_state, reward, action, is_terminal):
+    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
 
-        if not is_terminal:
-            self.replay_buffer.add(state, action, reward, next_state, self.gamma)
-        else:
-            self.replay_buffer.add(state, action, reward, next_state, 0.0)
+        if not is_truncated:
+            if not is_terminal:
+                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+            else:
+                self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
         if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':
             self.network.input_norm.update(np.array([state]))
