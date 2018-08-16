@@ -2,7 +2,7 @@
     "agent": "ICNN",
 
     "sweeps": {
-        "norm": ["layer","none"],
+        "norm": ["none"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],
@@ -11,6 +11,7 @@
 
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
+
         "critic_lr": [1e-2, 1e-3, 1e-4],
 
         "inference_max_steps": [5]
