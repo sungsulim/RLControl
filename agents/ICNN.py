@@ -146,13 +146,14 @@ class ICNN(BaseAgent):
 
         return action
 
-    def update(self, state, next_state, reward, action, is_terminal):
+    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
 
         # Add to experience replay buffer
-        if not is_terminal:
-            self.replay_buffer.add(state, action, reward, next_state, self.gamma)
-        else:
-            self.replay_buffer.add(state, action, reward, next_state, 0.0)
+        if not is_truncated:
+            if not is_terminal:
+                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+            else:
+                self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
         # update running mean/std
         if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':

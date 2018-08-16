@@ -65,7 +65,7 @@ class EntropyNetwork(BaseNetwork):
 
 
         else:
-            assert (self.norm_type == 'none' or self.norm_type == 'layer')
+            assert (self.norm_type == 'none' or self.norm_type == 'input_norm')
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
@@ -90,16 +90,19 @@ class EntropyNetwork(BaseNetwork):
 
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
+            if self.norm_type == 'input_norm' or self.norm_type == 'layer':
+                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+
             if self.norm_type == 'layer':
                 f_outputs = self.layer_norm_network(inputs, action, phase)
+
             elif self.norm_type == 'batch':
                 assert (self.input_norm is None)
                 f_outputs = self.batch_norm_network(inputs, action, phase)
-            elif self.norm_type == 'none':
-                assert (self.input_norm is None)
-                f_outputs = self.no_norm_network(inputs, action, phase)
+
             else:
-                raise Exception('WRONG NORM TYPE!!')
+                assert (self.norm_type == 'none' or self.norm_type == 'input_norm')
+                f_outputs = self.no_norm_network(inputs, action, phase)
 
             tmpA = tf.clip_by_value(self.rmapAction(action), 0.0001, 0.9999)
             outputs = f_outputs + tf.reduce_sum(tmpA * tf.log(tmpA) + (1 - tmpA) * tf.log(1 - tmpA), reduction_indices = 1, keep_dims=True)
@@ -108,10 +111,8 @@ class EntropyNetwork(BaseNetwork):
 
     def layer_norm_network(self, inputs, action, phase):
         # TODO: make codes of the PICNN more compact. It can now only learn two layers, make it learnable in the case of multiple layers.
-        # normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
-        normalized_inputs = self.input_norm.normalize(inputs)
 
-        u1 = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=None, \
+        u1 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(), \
@@ -129,7 +130,7 @@ class EntropyNetwork(BaseNetwork):
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
 
-        wub0 = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=None, \
+        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(), \
@@ -137,7 +138,7 @@ class EntropyNetwork(BaseNetwork):
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        yub0 = tf.contrib.layers.fully_connected(normalized_inputs, self.action_dim, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None, \
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(), \
