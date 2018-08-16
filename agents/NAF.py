@@ -9,7 +9,7 @@ import tensorflow.contrib.slim as slim
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
-
+import os
 import matplotlib as mpl
 if os.environ.get('DISPLAY','') == '':
     print('no display found. Using non-interactive Agg backend')
