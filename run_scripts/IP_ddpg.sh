@@ -3,7 +3,7 @@
 #SBATCH --output=/home/sungsu/scratch/output_log/IP/ddpg/%A%a.out
 #SBATCH --error=/home/sungsu/scratch/output_log/IP/ddpg/%A%a.err
 
-#SBATCH --array=0-7:1
+#SBATCH --array=0-89:1
 
 # SBATCH --gres=gpu:1
 

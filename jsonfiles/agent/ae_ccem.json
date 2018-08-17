@@ -4,7 +4,7 @@
     "sweeps": {
 
         "action_selection": ["highest_alpha"],
-        "norm": ["input_norm", "layer"],
+        "norm": ["layer"],
 
         "exploration_policy": ["none"],
 
@@ -16,12 +16,11 @@
         "actor_l2_dim": [200],
         "expert_l2_dim": [200],
 
-
-        "actor_lr": [1e-3, 1e-4, 1e-5],
-        "expert_lr": [1e-2, 1e-3, 1e-4],
+        "actor_lr": [1e-4],
+        "expert_lr": [1e-3],
 
         "rho": [0.2],
-        "num_samples": [20],
+        "num_samples": [30],
         "num_modal": [1,2]
     }
 }
