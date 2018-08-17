@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 
 class AE_Supervised_Network(BaseNetwork):
     def __init__(self, sess, input_norm, shared_layer_dim, actor_layer_dim, expert_layer_dim, state_dim, state_min,
-                 state_max, action_dim, action_min, action_max, actor_lr, expert_lr, tau, rho, num_samples, num_modal,
+                 state_max, action_dim, action_min, action_max, actor_lr, expert_lr, tau, num_modal,
                  action_selection, norm_type):
         super(AE_Supervised_Network, self).__init__(sess, state_dim, action_dim, [actor_lr, expert_lr], tau)
 
@@ -30,22 +30,20 @@ class AE_Supervised_Network(BaseNetwork):
         self.input_norm = input_norm
         self.norm_type = norm_type
 
-        self.rho = rho
-        self.num_samples = num_samples
         self.num_modal = num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
         self.action_selection = action_selection
 
-        # CEM Hydra network
+        # Supervised Hydra network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
-            scope_name='cem_hydra')
-        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='cem_hydra')
+            scope_name='supervised_hydra')
+        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='supervised_hydra')
 
         # Target network
         self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha, self.target_q_prediction = self.build_network(
-            scope_name='target_cem_hydra')
-        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_cem_hydra')
+            scope_name='target_supervised_hydra')
+        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_supervised_hydra')
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [
@@ -85,6 +83,9 @@ class AE_Supervised_Network(BaseNetwork):
         # self.sample_action_op = self.sample_action_func()
         # self.sample_action_target_op = self.sample_action_target_func()
 
+        # Get the gradient of the expert w.r.t. the action
+        self.action_grads = tf.gradients(self.q_prediction, self.action)
+
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):
             inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
@@ -95,13 +96,9 @@ class AE_Supervised_Network(BaseNetwork):
             if self.norm_type is not 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
-            action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(
-                inputs, action, phase)
+            action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(inputs, action, phase)
 
         return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
-
-    def batch_norm_network(self, inputs, action, phase):
-        raise NotImplementedError
 
     def network(self, inputs, action, phase):
         # shared net
@@ -139,7 +136,7 @@ class AE_Supervised_Network(BaseNetwork):
         # tf.random_uniform_initializer(-3e-3, 3e-3))
 
         action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim,
-                                                                    activation_fn=None,
+                                                                    activation_fn=tf.tanh,
                                                                     weights_initializer=tf.random_uniform_initializer(
                                                                         -3e-3, 3e-3),
                                                                     weights_regularizer=None,
@@ -164,7 +161,8 @@ class AE_Supervised_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -3.0, 3.0))
+        # action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -3.0, 3.0))
+        action_prediction_sigma = tf.exp(action_prediction_sigma)
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -272,6 +270,7 @@ class AE_Supervised_Network(BaseNetwork):
         inputs = args[0]
         phase = args[1]
 
+        # returns the mean of the modal with highest mixing coefficient
         if self.action_selection == 'highest_alpha':
 
             # alpha: batchsize x num_modal x 1
@@ -300,6 +299,7 @@ class AE_Supervised_Network(BaseNetwork):
 
             # input()
 
+        # evaluates Q values of all the mean of modals and returns mean with the highest Q-val
         elif self.action_selection == 'highest_q_val':
             # mean: batchsize x num_modal x action_dim
             alpha, mean, sigma = self.sess.run(
@@ -378,6 +378,7 @@ class AE_Supervised_Network(BaseNetwork):
 
         inputs = args[0]
         phase = args[1]
+        num_samples = 1
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
@@ -397,7 +398,7 @@ class AE_Supervised_Network(BaseNetwork):
         # for each transition in batch
         sampled_actions = []
         for prob, m, s in zip(alpha, mean, sigma):
-            modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
+            modal_idx = np.random.choice(self.num_modal, num_samples, p=prob)
             # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
             sampled_actions.append(actions)
@@ -411,6 +412,7 @@ class AE_Supervised_Network(BaseNetwork):
 
         inputs = args[0]
         phase = args[1]
+        num_samples = 1
 
         alpha, mean, sigma = self.sess.run([self.target_action_prediction_alpha, self.target_action_prediction_mean,
                                             self.target_action_prediction_sigma], feed_dict={
@@ -429,7 +431,7 @@ class AE_Supervised_Network(BaseNetwork):
         # for each transition in batch
         sampled_actions = []
         for prob, m, s in zip(alpha, mean, sigma):
-            modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
+            modal_idx = np.random.choice(self.num_modal, num_samples, p=prob)
             # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
             sampled_actions.append(actions)
@@ -438,6 +440,37 @@ class AE_Supervised_Network(BaseNetwork):
 
         # input()
         return sampled_actions
+
+    def gradient_ascent(self, state, action_init, gd_alpha, gd_max_steps, gd_stop, is_training):
+
+        action = np.copy(action_init)
+
+        ascent_count = 0
+        update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
+
+        while np.any(update_flag > 0) and ascent_count < gd_max_steps:
+            action_old = np.copy(action)
+
+            gradients = self.action_gradients(state, action, is_training)[0]
+            action += update_flag * gd_alpha * gradients
+            action = np.clip(action, self.action_min, self.action_max)
+
+            # stop if action diff. is small
+            stop_idx = [idx for idx in range(len(action)) if
+                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= gd_stop]
+            update_flag[stop_idx] = 0
+            # print(update_flag)
+
+            ascent_count += 1
+        return action
+
+    def action_gradients(self, inputs, action, is_training):
+
+        return self.sess.run(self.action_grads, feed_dict={
+            self.inputs: inputs,
+            self.action: action,
+            self.phase: is_training
+        })
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])

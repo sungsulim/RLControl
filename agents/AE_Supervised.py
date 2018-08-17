@@ -38,12 +38,12 @@ class AE_Supervised_Network(object):
         self.episode_ave_max_q = 0.0
         self.graph = tf.Graph()
 
-        # Cross Entropy Method Params
-        self.rho = config.rho
-        self.num_samples = config.num_samples
-
         # Action selection mode
         self.action_selection = config.action_selection
+
+        self.gd_alpha = config.gd_alpha
+        self.gd_max_steps = config.gd_max_steps
+        self.gd_stop = config.gd_stop
 
         with self.graph.as_default():
             tf.set_random_seed(random_seed)
@@ -55,7 +55,6 @@ class AE_Supervised_Network(object):
                                                                  state_dim, state_min, state_max, action_dim,
                                                                  action_min, action_max,
                                                                  config.actor_lr, config.expert_lr, config.tau,
-                                                                 config.rho, config.num_samples,
                                                                  config.num_modal, config.action_selection,
                                                                  norm_type=self.norm_type)
 
@@ -63,27 +62,19 @@ class AE_Supervised_Network(object):
 
     def take_action(self, state, is_train, is_start):
 
-        # print('action candidates', action_init)
         if is_train:
-
             # just return the best action
             if self.use_external_exploration:
                 chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
                 chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
             else:
-                action_init = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[
-                    0]  # single state so first idx
-
-                # Choose one random action among n actions
-                idx = np.random.randint(len(action_init))
-                action_init = action_init[idx]
+                action_init = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0][0]  # single batch, and single sample
 
                 # Gradient Ascent
                 # action_final = self.expert_network.gradient_ascent(np.expand_dims(state, 0), action_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, False)[0] # do ascent on original network
-
                 action_final = action_init
-                chosen_action = action_final
 
+                chosen_action = action_final
                 chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
             ######## LOGGING #########
@@ -179,61 +170,20 @@ class AE_Supervised_Network(object):
         self.episode_ave_max_q += np.amax(predicted_q_val)
 
         ###### Actor Update #####
-        # for each transition, n actions
-        # shape: (batchsize , n actions, action_dim)
+        # for each transition, 1 action
+        # shape: (batchsize , 1 action, action_dim)
         action_batch_init = self.hydra_network.sample_action(state_batch, True)
 
-        # reshape (batchsize * n , action_dim)
-        action_batch_init = np.reshape(action_batch_init, (batch_size * self.num_samples, self.action_dim))
+        # reshape (batchsize * 1 , action_dim)
+        action_batch_init = np.reshape(action_batch_init, (batch_size * 1, self.action_dim))
 
         # Gradient Ascent
-        # action_batch_final = self.expert_network.gradient_ascent(state_batch, action_batch_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, True) # do ascent on original network
-        action_batch_final = action_batch_init
+        action_batch_final = self.hydra_network.gradient_ascent(state_batch, action_batch_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, True)  # do ascent on original network
 
-        # Currently using Current state batch instead of next state batch
-        # (batchsize * n action values)
+        # print('action_batch_final shape (should be batch x action_dim)', np.shape(action_batch_final))
+        # input()
 
-        # restack states (batchsize * n, 1)
-        stacked_state_batch = None
-
-        for state in state_batch:
-            stacked_one_state = np.tile(state, (self.num_samples, 1))
-
-            if stacked_state_batch is None:
-                stacked_state_batch = stacked_one_state
-            else:
-                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-
-        q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final, True)
-        q_val = np.reshape(q_val, (batch_size, self.num_samples))
-
-        # print(np.shape(action_batch_final))
-        action_batch_final = np.reshape(action_batch_final, (batch_size, self.num_samples, self.action_dim))
-        # print(np.shape(action_batch_final))
-
-        # Find threshold (top (1-rho) percentile)
-        selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val))
-
-        # print('seleted idxs:', np.shape(selected_idxs))
-
-        action_list = []
-        for action, idx in zip(action_batch_final, selected_idxs):
-            action_list.append(action[idx])
-
-        # restack states (batchsize * top_idx_num, 1)
-        stacked_state_batch = None
-        for state in state_batch:
-            stacked_one_state = np.tile(state, (int(self.num_samples * self.rho), 1))
-
-            if stacked_state_batch is None:
-                stacked_state_batch = stacked_one_state
-            else:
-                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-
-        action_list = np.reshape(action_list, (batch_size * int(self.num_samples * self.rho), self.action_dim))
-        # print(np.shape(action_list))
-        # exit()
-        self.hydra_network.train_actor(stacked_state_batch, action_list)
+        self.hydra_network.train_actor(state_batch, action_batch_final)
 
         # Update target networks
         self.hydra_network.update_target_network()
@@ -275,13 +225,9 @@ class AE_Supervised(BaseAgent):
 
             # Train
             if is_train:
-
-                # if using an external exploration policy
                 if self.use_external_exploration:
-                    # print('action before', action)
                     action = self.exploration_policy.generate(action, self.cum_steps)
-                    # print('action after', action)
-                    # input()
+
                 # only increment during training, not evaluation
                 self.cum_steps += 1
 
