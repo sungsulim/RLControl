@@ -462,6 +462,8 @@ class AE_Supervised_Network(BaseNetwork):
             # print(update_flag)
 
             ascent_count += 1
+
+        # print('ascent count:', ascent_count)
         return action
 
     def action_gradients(self, inputs, action, is_training):
