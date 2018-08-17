@@ -15,14 +15,13 @@ from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 
-
 class DDPG_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
         
         # type of normalization: 'none', 'batch', 'layer', 'input_norm'
         self.norm_type = config.norm
 
-        if self.norm_type == 'input_norm' or self.norm_type == 'layer' or self.norm_type == 'batch':
+        if self.norm_type is not 'none':
             self.input_norm = RunningMeanStd(state_dim)
         else:
             assert(self.norm_type == 'none')
@@ -47,9 +46,9 @@ class DDPG_Network(object):
             critic_layer_dim = [config.critic_l1_dim, config.critic_l2_dim]
 
             self.actor_network = ActorNetwork(self.sess, self.input_norm, actor_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max,
-                                              config.actor_lr, config.tau, norm_type = self.norm_type)
+                                              config.actor_lr, config.tau, norm_type=self.norm_type)
             self.critic_network = CriticNetwork(self.sess, self.input_norm, critic_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max,
-                                                config.critic_lr, config.tau, norm_type = self.norm_type)
+                                                config.critic_lr, config.tau, norm_type=self.norm_type)
 
             self.sess.run(tf.global_variables_initializer())
 
@@ -69,9 +68,9 @@ class DDPG_Network(object):
                     func1 = self.critic_network.getQFunction(state)
 
                     self.critic_network.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
-                                                    display_title='steps: ' + str(self.eval_global_steps),
-                                                    save_title='steps_' + str(self.eval_global_steps),
-                                                    save_dir=self.writer.get_logdir(), show=False)
+                                                     display_title='steps: ' + str(self.eval_global_steps),
+                                                     save_title='steps_' + str(self.eval_global_steps),
+                                                     save_dir=self.writer.get_logdir(), show=False)
 
                 # write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
@@ -119,7 +118,7 @@ class DDPG(BaseAgent):
         # Network
         self.network = DDPG_Network(self.state_dim, self.state_min, self.state_max, 
                                     self.action_dim, self.action_min, self.action_max,
-                                    config, random_seed = random_seed)
+                                    config, random_seed=random_seed)
 
         self.cum_steps = 0 # cumulative steps across episodes
 
@@ -159,7 +158,7 @@ class DDPG(BaseAgent):
             else:
                 self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-        if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':
+        if self.network.norm_type is not 'none':
             self.network.input_norm.update(np.array([state]))
 
         self.learn()

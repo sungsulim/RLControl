@@ -5,18 +5,15 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
-
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
-
 import os
 import matplotlib as mpl
 if os.environ.get('DISPLAY','') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
-
 from matplotlib import pyplot as plt
-import os
+
 
 class NAF_Network:
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
@@ -27,7 +24,7 @@ class NAF_Network:
         self.state_min = state_min
         self.state_max = state_max
 
-        self.action_dim  = action_dim
+        self.action_dim = action_dim
         self.action_min = action_min
         self.action_max = action_max
 
@@ -35,7 +32,7 @@ class NAF_Network:
         # type of normalization: 'none', 'batch', 'layer', 'input_norm'
         self.norm_type = config.norm
 
-        if self.norm_type == 'input_norm' or self.norm_type == 'layer' or self.norm_type == 'batch':
+        if self.norm_type is not 'none':
             self.input_norm = RunningMeanStd(self.state_dim)
         else:
             assert(self.norm_type == 'none')
@@ -105,143 +102,89 @@ class NAF_Network:
                 action_input = tf.placeholder(self.dtype, [None, self.action_dim])
                 
                 # normalize state inputs if using "input_norm" or "layer" or "batch"
-                if self.norm_type == 'input_norm' or self.norm_type == 'layer' or self.norm_type == 'batch':
-                    state_input = tf.clip_by_value(self.input_norm.normalize(state_input), self.state_min, self.state_max)
+                if self.norm_type is not 'none':
+                    state_input = self.input_norm.normalize(state_input)
 
-                # layer norm network
-                if self.norm_type == 'layer':
-                    q_value, max_q, action, Lmat_columns = self.layer_norm_network(state_input, action_input)
 
-                # batch norm network
-                elif self.norm_type == 'batch':
-                    q_value, max_q, action, Lmat_columns = self.batch_norm_network(state_input, action_input)
+                q_value, max_q, action, Lmat_columns = self.network(state_input, action_input)
 
-                # no norm network
-                else:
-                    assert(self.norm_type == 'none' or self.norm_type == 'input_norm')
-                    q_value, max_q, action, Lmat_columns = self.no_norm_network(state_input, action_input)
+                # # layer norm network
+                # if self.norm_type == 'layer':
+                #     q_value, max_q, action, Lmat_columns = self.layer_norm_network(state_input, action_input)
+                #
+                # # batch norm network
+                # elif self.norm_type == 'batch':
+                #     q_value, max_q, action, Lmat_columns = self.batch_norm_network(state_input, action_input)
+                #
+                # # no norm network
+                # else:
+                #     assert(self.norm_type == 'none' or self.norm_type == 'input_norm')
+                #     q_value, max_q, action, Lmat_columns = self.no_norm_network(state_input, action_input)
 
             # get variables
             tvars = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=scopename)
             return state_input, action_input, q_value, max_q, action, Lmat_columns, tvars
 
-    def layer_norm_network(self, state_input, action_input):
+    def network(self, state_input, action_input):
 
-        state_hidden1 = slim.fully_connected(state_input, self.network_layer_dim[0], activation_fn = None)
-        state_hidden1_layernorm1 = tf.contrib.layers.layer_norm(state_hidden1, center=True, scale=True, activation_fn=tf.nn.relu)
+        state_hidden1 = slim.fully_connected(state_input, self.network_layer_dim[0], activation_fn=None)
 
-        # three branch: first output action
-        action_hidden2 = slim.fully_connected(state_hidden1_layernorm1, self.network_layer_dim[1], activation_fn = None)
-        action_hidden2_layernorm1 = tf.contrib.layers.layer_norm(action_hidden2, center=True, scale=True, activation_fn=tf.nn.relu)
+        # net, activation_fn, phase, layer_num):
+        state_hidden1_norm = self.apply_norm(state_hidden1, activation_fn=tf.nn.relu, phase=self.phase, layer_num=1)
 
-        action = slim.fully_connected(action_hidden2_layernorm1, self.action_dim, activation_fn = tf.nn.tanh)*self.action_max
-
+        # action branch
+        action_hidden2 = slim.fully_connected(state_hidden1_norm, self.network_layer_dim[1], activation_fn=None)
+        action_hidden2_norm = self.apply_norm(action_hidden2, activation_fn=tf.nn.relu, phase=self.phase, layer_num=2)
+        action = slim.fully_connected(action_hidden2_norm, self.action_dim,
+                                      activation_fn=tf.nn.tanh) * self.action_max
 
         # value branch
-        value_hidden = slim.fully_connected(state_hidden1_layernorm1, self.network_layer_dim[1], activation_fn = None)
-        value_hidden_layernorm1 = tf.contrib.layers.layer_norm(value_hidden, center=True, scale=True, activation_fn=tf.nn.relu)
-
-        value = slim.fully_connected(value_hidden_layernorm1, 1, activation_fn = None,
+        value_hidden = slim.fully_connected(state_hidden1_norm, self.network_layer_dim[1], activation_fn=None)
+        value_hidden_norm = self.apply_norm(value_hidden, activation_fn=tf.nn.relu, phase=self.phase, layer_num=3)
+        value = slim.fully_connected(value_hidden_norm, 1, activation_fn=None,
                                      weights_initializer=tf.random_uniform_initializer(minval=-0.003, maxval=0.003))
-        
+
         # Lmat branch
         act_mu_diff = action_input - action
-        
-        # Lmat_flattened = slim.fully_connected(state_hidden1_layernorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-        # Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
 
-        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1_layernorm1, 1, activation_fn=None), -5.0, 5.0)) for _ in range(self.action_dim)]  # clipping to prevent blowup
-        Lmat_nondiag = [slim.fully_connected(state_hidden1_layernorm1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
+        # Lmat_flattened = slim.fully_connected(state_hidden1_norm, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
+        # Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_norm, 1, activation_fn = None)) for _ in range(self.action_dim)]
+
+        Lmat_diag = [
+            tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1_norm, 1, activation_fn=None), -5.0, 5.0))
+            for _ in range(self.action_dim)]  # clipping to prevent blowup
+        Lmat_nondiag = [slim.fully_connected(state_hidden1_norm, k - 1, activation_fn=None) for k in
+                        range(self.action_dim, 1, -1)]
 
         # in Lmat_columns, if actdim = 1, first part is empty
-        Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]),axis=1) for id in range(len(Lmat_nondiag))] + [Lmat_diag[-1]]
-        act_mu_diff_Lmat_prod = [tf.reduce_sum(tf.slice(act_mu_diff,[0,cid],[-1,-1])*Lmat_columns[cid], axis=1, keep_dims=True) for cid in range(len(Lmat_columns))]
+        Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]), axis=1) for id in range(len(Lmat_nondiag))] + [
+            Lmat_diag[-1]]
+        act_mu_diff_Lmat_prod = [
+            tf.reduce_sum(tf.slice(act_mu_diff, [0, cid], [-1, -1]) * Lmat_columns[cid], axis=1, keep_dims=True) for cid
+            in range(len(Lmat_columns))]
         # prod_tensor should be dim: batchsize*action_dim
-        prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis = 1)
+        prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis=1)
         # print 'prod tensor shape is :: ', prod_tensor.shape
-        adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis = 1, keep_dims=True)
+        adv_value = -0.5 * tf.reduce_sum(prod_tensor * prod_tensor, axis=1, keep_dims=True)
         q_value = value + adv_value
         max_q = value
-        
+
         return q_value, max_q, action, Lmat_columns
 
-    def batch_norm_network(self, state_input, action_input):
+    # currently a hack. Should later incorporate inheriting from base_network.apply_norm()
+    def apply_norm(self, net, activation_fn, phase, layer_num):
 
-        state_hidden1 = slim.fully_connected(state_input, self.network_layer_dim[0], activation_fn = None)
+        if self.norm_type == 'layer':
+            norm_net = tf.contrib.layers.layer_norm(net, center=True, scale=True, activation_fn=activation_fn)
+        elif self.norm_type == 'batch':
+            norm_net = tf.contrib.layers.batch_norm(net, fused=True, center=True, scale=True, activation_fn=activation_fn,
+                                                    is_training=phase, scope='batchnorm_'+str(layer_num))
+        elif self.norm_type == 'none' or self.norm_type == 'input_norm':
+            norm_net = activation_fn(net)
+        else:
+            raise ValueError('unknown norm type')
 
-        state_hidden1_batchnorm1 = tf.contrib.layers.batch_norm(state_hidden1, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
-                                            is_training=self.phase, scope='batchnorm_1')
-
-
-        # three branch: first output action
-        action_hidden2 = slim.fully_connected(state_hidden1_batchnorm1, self.network_layer_dim[1], activation_fn = None)
-        action_hidden2_batchnorm1 = tf.contrib.layers.batch_norm(action_hidden2, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
-                                            is_training=self.phase, scope='batchnorm_2')
-
-        action = slim.fully_connected(action_hidden2_batchnorm1, self.action_dim, activation_fn = tf.nn.tanh)*self.action_max
-
-
-        # value branch
-        value_hidden = slim.fully_connected(state_hidden1_batchnorm1, self.network_layer_dim[1], activation_fn = None)
-        value_hidden_batchnorm1 = tf.contrib.layers.batch_norm(value_hidden, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
-                                            is_training=self.phase, scope='batchnorm_3')
-
-        value = slim.fully_connected(value_hidden_batchnorm1, 1, activation_fn = None,
-                                                        weights_initializer=tf.random_uniform_initializer(minval=-0.003, maxval=0.003))
-        
-        # Lmat branch
-        act_mu_diff = action_input - action
-        
-        #Lmat_flattened = slim.fully_connected(state_hidden1_batchnorm1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-
-        # Lmat_diag = [tf.exp(slim.fully_connected(state_hidden1_batchnorm1, 1, activation_fn = None)) for _ in range(self.action_dim)]
-        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1_batchnorm1, 1, activation_fn=None), -5.0, 5.0)) for _ in range(self.action_dim)]  # clipping to prevent blowup
-        Lmat_nondiag = [slim.fully_connected(state_hidden1_batchnorm1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
-
-        #in Lmat_columns, if actdim = 1, first part is empty
-        Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]),axis=1) for id in range(len(Lmat_nondiag))] + [Lmat_diag[-1]]
-        act_mu_diff_Lmat_prod = [tf.reduce_sum(tf.slice(act_mu_diff,[0,cid],[-1,-1])*Lmat_columns[cid], axis=1, keep_dims=True) for cid in range(len(Lmat_columns))]
-        #prod_tensor should be dim: batchsize*action_dim
-        prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis = 1)
-        # print 'prod tensor shape is :: ', prod_tensor.shape
-        adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis=1, keep_dims=True)
-        q_value = value + adv_value
-        max_q = value
-        
-        return q_value, max_q, action, Lmat_columns
-
-    def no_norm_network(self, state_input, action_input):
-
-        state_hidden1 = slim.fully_connected(state_input, self.network_layer_dim[0], activation_fn = tf.nn.relu)
-        #three branch: first output action
-        action_hidden2 = slim.fully_connected(state_hidden1, self.network_layer_dim[1], activation_fn = tf.nn.relu)
-        action = slim.fully_connected(action_hidden2, self.action_dim, activation_fn = tf.nn.tanh)*self.action_max
-        #value branch
-        value_hidden = slim.fully_connected(state_hidden1, self.network_layer_dim[1], activation_fn = tf.nn.relu)
-        w_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
-        value = slim.fully_connected(value_hidden, 1, activation_fn = None, weights_initializer=w_init)
-        
-        #Lmat branch
-        act_mu_diff = action_input - action
-        #Lmat_flattened = slim.fully_connected(state_hidden1, (1+self.action_dim)*self.action_dim/2, activation_fn = None)
-
-
-        Lmat_diag = [tf.exp(tf.clip_by_value(slim.fully_connected(state_hidden1, 1, activation_fn = None), -5.0, 5.0)) for _ in range(self.action_dim)] # clipping to prevent blowup
-        Lmat_nondiag = [slim.fully_connected(state_hidden1, k-1, activation_fn = None) for k in range(self.action_dim, 1, -1)]
-        #in Lmat_columns, if actdim = 1, first part is empty
-        Lmat_columns = [tf.concat((Lmat_diag[id], Lmat_nondiag[id]),axis=1) for id in range(len(Lmat_nondiag))] + [Lmat_diag[-1]]
-        act_mu_diff_Lmat_prod = [tf.reduce_sum(tf.slice(act_mu_diff,[0,cid],[-1,-1])*Lmat_columns[cid], axis=1, keep_dims=True) for cid in range(len(Lmat_columns))]
-        #prod_tensor should be dim: batchsize*action_dim
-        prod_tensor = tf.concat(act_mu_diff_Lmat_prod, axis = 1)
-        # print 'prod tensor shape is :: ', prod_tensor.shape
-        adv_value = -0.5 * tf.reduce_sum(prod_tensor*prod_tensor, axis = 1, keep_dims=True)
-        q_value = value + adv_value
-        max_q = value
-                
-        return q_value, max_q, action, Lmat_columns
-
-
-
+        return norm_net
 
     '''return an action to take for each state'''
     def take_action(self, state, is_train):
@@ -302,9 +245,9 @@ class NAF_Network:
 
                 func1 = self.getQFunction(state)
                 self.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
-                                            display_title='steps: ' + str(self.eval_global_steps),
-                                            save_title='steps_' + str(self.eval_global_steps),
-                                            save_dir=self.writer.get_logdir(), show=False)
+                                  display_title='steps: ' + str(self.eval_global_steps),
+                                  save_title='steps_' + str(self.eval_global_steps),
+                                  save_dir=self.writer.get_logdir(), show=False)
 
             return chosen_action
 
@@ -321,7 +264,7 @@ class NAF_Network:
     def update(self, state, action, next_state, reward, gamma):
         with self.g.as_default():
             target_q = self.compute_target_Q(state, action, next_state, reward, gamma)
-            self.sess.run(self.optimize, feed_dict = {self.state_input: state.reshape(-1, self.state_dim), self.action_input: action.reshape(-1, self.action_dim), self.target_q_input: target_q.reshape(-1), self.phase: True})
+            self.sess.run(self.optimize, feed_dict={self.state_input: state.reshape(-1, self.state_dim), self.action_input: action.reshape(-1, self.action_dim), self.target_q_input: target_q.reshape(-1), self.phase: True})
             self.sess.run( [self.update_target, self.update_target_batchnorm_params])
         return None
 
@@ -378,9 +321,6 @@ class NAF_Network:
         else:
             top_margin = 1.0
 
-
-        #plt.tight_layout(rect=(0,0,1, top_margin))
-
         if show:
             plt.show()
         else:
@@ -390,6 +330,7 @@ class NAF_Network:
                 os.makedirs(save_dir)
             plt.savefig(save_dir+save_title)
             plt.close()
+
 
 class NAF(BaseAgent):
     def __init__(self, env, config, random_seed):
@@ -436,30 +377,13 @@ class NAF(BaseAgent):
 
     def update(self, state, next_state, reward, action, is_terminal, is_truncated):
 
-        # log all states
-        # if self.write_log:
-        #     for i in range(len(state)):
-        #         write_summary(self.writer, self.cum_steps, state[i], tag='states/[%d]' %i)
-
-
-        # self.temp_states.append(state)
-        #
-        # # np.savetxt(filename, temp_state, delimiter=", ", fmt='%f')
-        #
-        # if self.cum_steps > 2000:
-        #     print('cum_steps', self.cum_steps)
-        #     filename = open('state_log.txt', 'ab')
-        #     np.array(self.temp_states).tofile(filename, sep=',', format='%15.8f')
-        #     filename.close()
-        #     exit()
-
         if not is_truncated:
             if not is_terminal:
                 self.replay_buffer.add(state, action, reward, next_state, self.gamma)
             else:
                 self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-        if self.network.norm_type == 'input_norm' or self.network.norm_type == 'layer':
+        if self.network.norm_type is not 'none':
             self.network.input_norm.update(np.array([state]))
         self.learn()
 

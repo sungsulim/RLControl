@@ -1,3 +1,5 @@
+import tensorflow as tf
+
 
 class BaseNetwork(object):
     def __init__(self, sess, state_dim, action_dim, learning_rate, tau):
@@ -37,6 +39,18 @@ class BaseNetwork(object):
     def get_num_trainable_vars(self):
         raise NotImplementedError("update target network!")
 
+    def apply_norm(self, net, activation_fn, phase, layer_num):
 
+        if self.norm_type == 'layer':
+            norm_net = tf.contrib.layers.layer_norm(net, center=True, scale=True, activation_fn=activation_fn)
+        elif self.norm_type == 'batch':
+            norm_net = tf.contrib.layers.batch_norm(net, fused=True, center=True, scale=True, activation_fn=activation_fn,
+                                                    is_training=phase, scope='batchnorm_'+str(layer_num))
+        elif self.norm_type == 'none' or self.norm_type == 'input_norm':
+            norm_net = activation_fn(net)
+        else:
+            raise ValueError('unknown norm type')
+
+        return norm_net
 
 

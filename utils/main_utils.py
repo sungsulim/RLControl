@@ -18,13 +18,12 @@ def create_agent(agent_string, env, config, seed):
         from agents.ICNN import ICNN
         return ICNN(env, config, seed)
 
+    elif agent_string == "AE_Supervised":
+        from agents.AE_Supervised import AE_Supervised
+        return AE_Supervised(env, config, seed)
     elif agent_string == "AE_CCEM":
         from agents.AE_CCEM import AE_CCEM
         return AE_CCEM(env, config, seed)
-    elif agent_string == "CriticAssistant_hydra":
-        from agents.CriticAssistant_hydra import CriticAssistant_hydra
-        return CriticAssistant_hydra(env, config, seed)
-
 
     else:
         print("Don't know this agent")

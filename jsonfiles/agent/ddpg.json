@@ -2,7 +2,7 @@
     "agent": "DDPG",
 
     "sweeps": {
-        "norm": ["input_norm"],
+        "norm": ["input_norm", "layer"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],
@@ -15,7 +15,7 @@
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
         
-        "actor_lr": [1e-3],
-        "critic_lr": [1e-3]
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "critic_lr": [1e-2, 1e-3, 1e-4]
     }
 }

@@ -30,7 +30,6 @@ class CriticNetwork(BaseNetwork):
         self.input_norm = input_norm
         self.norm_type = norm_type
 
-
         # Critic network
         self.inputs, self.phase, self.action, self.outputs = self.build_network(scope_name = 'critic')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic') # tf.trainable_variables()[num_actor_vars:]
@@ -38,17 +37,14 @@ class CriticNetwork(BaseNetwork):
         # Target network
         self.target_inputs, self.target_phase, self.target_action, self.target_outputs = self.build_network(scope_name = 'target_critic')
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_critic') # tf.trainable_variables()[len(self.net_params) + num_actor_vars:]
-
         
         # Network target (y_i)
         # Obtained from the target networks
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
 
-
         # Op for periodically updating target network with online network weights
         self.update_target_net_params  = [tf.assign_add(self.target_net_params[idx], \
                                             self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
-
 
         if self.norm_type == 'batch':
             # Batchnorm Ops and Vars
@@ -62,12 +58,10 @@ class CriticNetwork(BaseNetwork):
                                                 self.batchnorm_vars[idx]) for idx in range(len(self.target_batchnorm_vars)) \
                                                 if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0') or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
 
-
         else:
             assert (self.norm_type == 'none' or self.norm_type == 'layer' or self.norm_type == 'input_norm')
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
-
 
         # Define loss and optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
@@ -86,115 +80,40 @@ class CriticNetwork(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
-            if self.norm_type == 'input_norm' or self.norm_type == 'layer':
-                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+            if self.norm_type is not 'none':
+                inputs = self.input_norm.normalize(inputs)
 
-            if self.norm_type == 'layer':
-                outputs = self.layer_norm_network(inputs, action, phase)
-            elif self.norm_type == 'batch':
-                outputs = self.batch_norm_network(inputs, action, phase)
-            elif self.norm_type == 'none' or self.norm_type == 'input_norm':
-                outputs = self.no_norm_network(inputs, action, phase)
-
-            else:
-                raise Exception('WRONG NORM TYPE!!')
+            outputs = self.network(inputs, action, phase)
 
         return inputs, phase, action, outputs
 
-
-    def layer_norm_network(self, inputs, action, phase):
+    def network(self, inputs, action, phase):
         # 1st fc
-        net = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-        # layer norm
-        net = tf.contrib.layers.layer_norm(net, center=True, scale=True, activation_fn=tf.nn.relu)
+        net = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None,
+                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                    factor=1.0, mode="FAN_IN", uniform=True),
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                    factor=1.0, mode="FAN_IN", uniform=True))
+
+        net = self.apply_norm(net, activation_fn=tf.nn.relu, phase=phase, layer_num=1)
 
         # 2nd fc
-        net = tf.contrib.layers.fully_connected(tf.concat([net, action], 1), self.l2, activation_fn=None, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-        # layer norm
-        net = tf.contrib.layers.layer_norm(net, center=True, scale=True, activation_fn=tf.nn.relu)
+        net = tf.contrib.layers.fully_connected(tf.concat([net, action], 1), self.l2, activation_fn=None,
+                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                    factor=1.0, mode="FAN_IN", uniform=True),
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                    factor=1.0, mode="FAN_IN", uniform=True))
 
+        net = self.apply_norm(net, activation_fn=tf.nn.relu, phase=phase, layer_num=2)
 
-        outputs = tf.contrib.layers.fully_connected(net, 1, activation_fn = None, \
-                                        weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return outputs
-
-
-    def batch_norm_network(self, inputs, action, phase):
-        # state input -> bn (According to paper)
-        net = tf.contrib.layers.batch_norm(inputs, fused=True, center=True, scale=True, activation_fn=None,
-                                            is_training=phase, scope='batchnorm_0')
-        # 1st fc
-        net = tf.contrib.layers.fully_connected(net, self.l1, activation_fn=None, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        # bn -> relu
-        net = tf.contrib.layers.batch_norm(net, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
-                                            is_training=phase, scope='batchnorm_1')
-
-        # 2nd fc
-        net = tf.contrib.layers.fully_connected(tf.concat([net, action], 1), self.l2, activation_fn=tf.nn.relu, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        outputs = tf.contrib.layers.fully_connected(net, 1, activation_fn = None, \
-                                        weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return outputs
-
-    def no_norm_network(self, inputs, action, phase):
-        
-        # 1st fc
-        net = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=tf.nn.relu, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        # 2nd fc
-        net = tf.contrib.layers.fully_connected(tf.concat([net, action], 1), self.l2, activation_fn=tf.nn.relu, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        outputs = tf.contrib.layers.fully_connected(net, 1, activation_fn = None, \
-                                        weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return outputs
-
-    def input_norm_network(self, inputs, action, phase):
-        normalized_inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
-
-        # 1st fc
-        net = tf.contrib.layers.fully_connected(normalized_inputs, self.l1, activation_fn=tf.nn.relu, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        # 2nd fc
-        net = tf.contrib.layers.fully_connected(tf.concat([net, action], 1), self.l2, activation_fn=tf.nn.relu, \
-                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True), #tf.truncated_normal_initializer(), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
-
-        outputs = tf.contrib.layers.fully_connected(net, 1, activation_fn = None, \
-                                        weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3), \
-                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                        biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
+        outputs = tf.contrib.layers.fully_connected(net, 1, activation_fn=None,
+                                                    weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
+                                                    weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                    biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
         return outputs
 
@@ -242,12 +161,7 @@ class CriticNetwork(BaseNetwork):
             # print(update_flag)
 
             ascent_count += 1
-        # print('final A, Q, num_steps:', action, self.predict(state,action), ascent_count)
-        #print('gradient_ascent:', ascent_count, 'diff a:', action-action_init)
-        #print('max step count', ascent_count)
         return action
-
-
 
     def gradient_ascent_target(self, state, action_init, gd_alpha, gd_max_steps, gd_stop, is_training):
         
@@ -268,11 +182,7 @@ class CriticNetwork(BaseNetwork):
             update_flag[stop_idx] = 0
 
             ascent_count += 1
-        # print('target final A, Q, num_steps:', action, self.predict_target(state,action), ascent_count)
-        #print('gradient_ascent:', ascent_count , 'diff a:', action-action_init)
         return action
-
-
 
     def action_gradients(self, inputs, action, is_training):
 
@@ -290,7 +200,6 @@ class CriticNetwork(BaseNetwork):
             self.target_phase: is_training
         })
 
-
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
         return self.sess.run([self.outputs, self.optimize], feed_dict={
@@ -299,11 +208,9 @@ class CriticNetwork(BaseNetwork):
             self.predicted_q_value: args[2],
             self.phase: True
         })
-
         
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
-
 
     # For OMNISCIENT
     def get_argmax_q(self, inputs, gd_alpha, gd_max_steps, gd_stop, mode):
@@ -404,9 +311,6 @@ class CriticNetwork(BaseNetwork):
 
         else:
             top_margin = 1.0
-
-
-        #plt.tight_layout(rect=(0,0,1, top_margin))
 
         if show:
             plt.show()

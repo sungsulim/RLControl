@@ -2,7 +2,7 @@
     "agent": "NAF",
 
     "sweeps": {
-        "norm": ["layer"],
+        "norm": ["input_norm", "layer"],
 
         "ou_theta": [0.15],
         "ou_mu": [0.0],
@@ -11,9 +11,9 @@
         "l1_dim": [200],
         "l2_dim": [200],
 
-        "noise_scale":[1.0],
+        "noise_scale":[0.1, 0.3, 1.0],
 
-        "learning_rate":[1e-3],
+        "learning_rate":[1e-2, 1e-3, 1e-4],
 
         "exploration_policy": ["none"]
 
