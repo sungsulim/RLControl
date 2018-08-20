@@ -89,6 +89,10 @@ class Experiment(object):
         done = False
         Aold = self.agent.start(obs, is_train)
 
+        # print('initial state', obs)
+        # print('action', Aold)
+        # input()
+
         episode_step_count = 0
 
         while not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT or self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT):
@@ -111,6 +115,11 @@ class Experiment(object):
                 Aold = self.agent.step(obs_n, is_train)
 
             obs = obs_n
+
+            # print("reward", reward)
+            # print('state', obs_n)
+            # print('action', Aold)
+            # input()
 
             if self.total_step_count % self.train_environment.eval_interval == 0:
                 self.eval()
@@ -156,7 +165,11 @@ class Experiment(object):
         episode_reward = 0.
         done = False
         Aold = self.agent.start(obs, is_train)
-        # print(Aold)
+
+        # print('initial state', obs)
+        # print('action', Aold)
+        # input()
+
         episode_step_count = 0
         while not (done or episode_step_count == test_env.EPISODE_STEPS_LIMIT):
             
@@ -172,6 +185,9 @@ class Experiment(object):
             obs = obs_n
             episode_step_count += 1
 
+            # print('state', obs_n)
+            # print('action', Aold)
+            # input()
         return (episode_reward, episode_step_count)
 
 

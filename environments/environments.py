@@ -2,21 +2,21 @@ import gym
 import numpy as np
 import random
 import math
-
-
-# import pybullet as p
-# import pybullet_envs
+import matplotlib.pyplot as plt
 
 
 def create_environment(env_params):
     env_name = env_params['environment']
 
-    if env_name == 'BimodalEnv':
-        return BimodalEnvironment(env_params)
+    if env_name == 'Bimodal1DEnv':
+        return Bimodal1DEnvironment(env_params)
+    elif env_name == 'Bimodal2DEnv':
+        return Bimodal2DEnvironment(env_params)
     else:
         return ContinuousEnvironment(env_params)
 
-#This file provide environments to interact with, consider actions as continuous, need to rewrite otherwise
+
+# This file provide environments to interact with, consider actions as continuous, need to rewrite otherwise
 class ContinuousEnvironment(object):
     def __init__(self, env_params):
 
@@ -136,9 +136,8 @@ class ContinuousEnvironment(object):
         self.instance.close()
 
 
-class BimodalEnvironment(object):
+class Bimodal1DEnvironment(object):
     def __init__(self, env_params):
-
 
         self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
         self.eval_episodes = env_params['EvalEpisodes']
@@ -197,8 +196,7 @@ class BimodalEnvironment(object):
         done = True
         info = {}
 
-        return (self.state, reward, done, info)
-
+        return self.state, reward, done, info
 
     def reward_func(self, action):
 
@@ -216,3 +214,151 @@ class BimodalEnvironment(object):
     # Close the environment and clear memory
     def close(self):
         pass
+
+
+class Bimodal2DEnvironment(object):
+    def __init__(self, env_params):
+
+        self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
+        self.eval_episodes = env_params['EvalEpisodes']
+
+        # total number of steps allowed in a run
+        self.TOTAL_STEPS_LIMIT = env_params['TotalMilSteps'] * 1000000
+
+        # maximum number of steps allowed for each episode
+        # if -1 takes default setting from gym
+        if env_params['EpisodeSteps'] != -1:
+            self.EPISODE_STEPS_LIMIT = env_params['EpisodeSteps']
+
+        else:
+            self.EPISODE_STEPS_LIMIT = 1  # only one state env
+
+        # state info
+        self.state_dim = 2
+        self.state_range = np.array([12.0, 12.0])
+        self.state_min = np.array([-6.0, -6.0])
+        self.state_max = np.array([6.0, 6.0])
+        self.state_bounded = True
+
+        # action info
+        self.action_dim = 2
+        self.action_range = np.array([2.0, 2.0])
+        self.action_min = np.array([-1.0, -1.0])
+        self.action_max = np.array([1.0, 1.0])
+
+        self.state = None
+        self.goal_states = np.array([[-4.0, -4.0], [4.0, 4.0]])
+
+        # DEBUG
+        # print('stateDim:',self.stateDim)
+        # print('stateRange:', self.stateRange)
+        # print('stateMin:', self.stateMin)
+        # print("stateBounded :: ", self.stateBounded)
+
+        # print("actionDim", self.actionDim)
+        # print('actRange', self.actRange)
+        # print("actionBound :: ", self.actionBound)
+        # print('actMin', self.actMin)
+        # self.plot_reward_func()
+
+        # optimal trajectory
+        opt_return = 0.0
+
+        # opt_return += self.reward_func([0, 0])
+        opt_return += self.reward_func([1, -1])
+        opt_return += self.reward_func([2, -2])
+        opt_return += self.reward_func([3, -3])
+        opt_return += self.reward_func([4, -4])
+        print("====== opt_return", opt_return)
+        # exit()
+
+    def seed(self, seed):
+        # No randomness in this env
+        # TODO: Perhaps control randomness in setting initial states
+        pass
+
+    # Reset the environment for a new episode. return the initial state
+    def reset(self):
+        #val = np.random.uniform(-1.0, 1.0)
+        val = 0.0
+        # the agent is initialized along the diagonal axis
+        self.state = np.array([val, val])
+
+        return self.state
+
+    def step(self, action):
+        self.state = np.clip(self.state + action, self.state_min, self.state_max)  # terminal state
+        reward = self.reward_func(self.state)
+
+        done = self.reached_goal(self.state)
+        info = {}
+
+        return self.state, reward, done, info
+
+    def reward_func(self, state):
+
+        magnitude = 125
+        stddev = 2.25
+
+        # Reward function.
+        # Bimodal Gaussian mixture
+        coeff1 = 0.5
+        coeff2 = 1 - coeff1
+
+        modal1 = coeff1 * 1.0/(2 * np.pi * np.square(stddev)) * np.exp(-0.5*(np.square((state[0]-self.goal_states[0][0])/stddev) + np.square((state[1]-self.goal_states[0][1])/stddev)))
+        modal2 = coeff2 * 1.0/(2 * np.pi * np.square(stddev)) * np.exp(-0.5 * (np.square((state[0] - self.goal_states[1][0])/stddev) + np.square((state[1] - self.goal_states[1][1])/stddev)))
+
+        # state = [0, 0]
+        # modal1 = coeff1 * 1.0 / (2 * np.pi * np.square(stddev)) * np.exp(-0.5 * (
+        #         np.square((state[0] - self.goal_states[0][0]) / stddev) + np.square(
+        #     (state[1] - self.goal_states[0][1]) / stddev)))
+        # modal2 = coeff2 * 1.0 / (2 * np.pi * np.square(stddev)) * np.exp(-0.5 * (
+        #         np.square((state[0] - self.goal_states[1][0]) / stddev) + np.square(
+        #     (state[1] - self.goal_states[1][1]) / stddev)))
+        #
+        # reward = magnitude * (modal1 + modal2) - 2
+        # print(state, reward)
+        #
+        # state = [-4, 4]
+        # modal1 = coeff1 * 1.0 / (2 * np.pi * np.square(stddev)) * np.exp(-0.5 * (
+        #             np.square((state[0] - self.goal_states[0][0]) / stddev) + np.square(
+        #         (state[1] - self.goal_states[0][1]) / stddev)))
+        # modal2 = coeff2 * 1.0 / (2 * np.pi * np.square(stddev)) * np.exp(-0.5 * (
+        #             np.square((state[0] - self.goal_states[1][0]) / stddev) + np.square(
+        #         (state[1] - self.goal_states[1][1]) / stddev)))
+        #
+        # reward = magnitude * (modal1 + modal2) - 2
+        # print(state, reward)
+        #
+        # exit()
+
+        reward = magnitude * (modal1 + modal2) - 2
+
+        return reward
+
+    def plot_reward_func(self):
+        x = np.linspace(self.state_min[0], self.state_max[0], 50)
+        y = np.linspace(self.state_min[1], self.state_max[1], 50)
+        X, Y = np.meshgrid(x, y)
+        Z = self.reward_func([X, Y])
+        contours = plt.contour(X, Y, Z)
+
+        plt.clabel(contours, inline=True, fontsize=5)
+
+        plt.imshow(Z, extent=[self.state_min[0], self.state_max[0], self.state_min[1], self.state_max[1]], origin='lower',
+                   cmap='inferno', alpha=0.5)
+        plt.colorbar()
+        plt.show()
+
+
+    # Close the environment and clear memory
+    def close(self):
+        pass
+
+    def reached_goal(self, state):
+
+        for goal in self.goal_states:
+            if np.sum(np.square(np.abs(goal - state))) <= 0.5:
+                return True
+
+        return False
