@@ -374,8 +374,8 @@ class AE_CCEM_Network(BaseNetwork):
         for prob, m, s in zip(alpha, mean, sigma):
             modal_idx = np.random.choice(self.num_modal, self.num_samples, p = prob)
             # print(modal_idx)
-            actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx ))
-            sampled_actions.append(actions)
+            actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
+            sampled_actions.append(np.clip(actions,self.action_min, self.action_max))
         
         # print(sampled_actions, np.shape(sampled_actions))
         # input()
@@ -406,7 +406,7 @@ class AE_CCEM_Network(BaseNetwork):
             modal_idx = np.random.choice(self.num_modal, self.num_samples, p = prob)
             # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx ))
-            sampled_actions.append(actions)
+            sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
         
         # print(sampled_actions, np.shape(sampled_actions))
 
