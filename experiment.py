@@ -17,7 +17,7 @@ plot_maxA_fq = -1 # plot maxA after this many episodes
 
         
 class Experiment(object):
-    def __init__(self, agent, train_environment, test_environment, seed, summary_dir, write_log):
+    def __init__(self, agent, train_environment, test_environment, seed, summary_dir, write_log, write_plot):
         self.agent = agent
         self.train_environment = train_environment
         self.train_environment.seed(seed)
@@ -38,6 +38,7 @@ class Experiment(object):
 
         # boolean to log result for tensorboard
         self.write_log = write_log
+        self.write_plot = write_plot
 
     def run(self):
 

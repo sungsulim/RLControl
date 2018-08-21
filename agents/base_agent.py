@@ -6,6 +6,7 @@ class BaseAgent(object):
     def __init__(self, env, config):
         # to log useful stuff within agent
         self.write_log = config.write_log
+        self.write_plot = config.write_plot
         
         self.state_dim = env.state_dim
         self.state_min = env.state_min

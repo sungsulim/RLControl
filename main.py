@@ -23,6 +23,8 @@ def main():
     parser.add_argument('--monitor', default=False, action='store_true')
     parser.add_argument('--render', default=False, action='store_true')
     parser.add_argument('--write_log', default=False, action='store_true')
+    parser.add_argument('--write_plot', default=False, action='store_true')
+
 
     args = parser.parse_args()
 
@@ -49,6 +51,7 @@ def main():
 
     args_params = {}
     args_params['write_log'] = args.write_log
+    args_params['write_plot'] = args.write_plot
     config.merge_config(args_params)
 
     # get run idx and setting idx
@@ -89,7 +92,7 @@ def main():
     from experiment import Experiment
     
     # initialize experiment
-    experiment = Experiment(agent=agent, train_environment=train_env, test_environment= test_env, seed=RANDOM_SEED, summary_dir=summary_dir, write_log=args.write_log)
+    experiment = Experiment(agent=agent, train_environment=train_env, test_environment= test_env, seed=RANDOM_SEED, summary_dir=summary_dir, write_log=args.write_log, write_plot=args.write_plot)
     
     # run experiment
     episode_rewards, eval_episode_mean_rewards, eval_episode_std_rewards  = experiment.run()

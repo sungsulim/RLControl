@@ -8,15 +8,18 @@ import random
 import numpy as np
 import tensorflow as tf
 import utils.exploration_policy #import OrnsteinUhlenbeckProcess
-from utils.replaybuffer import ReplayBuffer
 from agents.network import ae_ccem_network
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
+import utils.plot_utils
+
 
 class AE_CCEM_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
 
         self.write_log = config.write_log
+        self.write_plot = config.write_plot
+
         self.use_external_exploration = use_external_exploration
 
         #record step n for tf Summary
@@ -109,8 +112,13 @@ class AE_CCEM_Network(object):
             chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
             chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
+            self.eval_global_steps += 1
+
             if self.write_log:
-                self.eval_global_steps += 1
+
+                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+            if self.write_plot:
                 if is_start:
                     self.eval_ep_count += 1
 
@@ -119,14 +127,16 @@ class AE_CCEM_Network(object):
                     func1 = self.hydra_network.getQFunction(state)
                     func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
-                    self.hydra_network.plotFunction(func1, func2, state, mean, self.action_min, self.action_max,
-                                                    display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
-                                                    save_title='steps_' + str(self.eval_global_steps),
-                                                    save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
+                    # self.hydra_network.plotFunction(func1, func2, state, mean, self.action_min, self.action_max,
+                    #                                 display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+                    #                                 save_title='steps_' + str(self.eval_global_steps),
+                    #                                 save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
 
-                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
-
-
+                    utils.plot_utils.plotFunction("AE_CCEM", [func1, func2], state, mean, self.action_min, self.action_max,
+                                                  display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+                                                  save_title='steps_' + str(self.eval_global_steps),
+                                                  save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count,
+                                                  show=False)
             #####################
             # # Take best action among n actions
             # action_init = self.actor_network.sample(np.expand_dims(state, 0), False)[0]

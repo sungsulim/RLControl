@@ -7,18 +7,14 @@ import tensorflow as tf
 import tensorflow.contrib.slim as slim
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
-import os
-import matplotlib as mpl
-if os.environ.get('DISPLAY','') == '':
-    print('no display found. Using non-interactive Agg backend')
-    mpl.use('Agg')
-from matplotlib import pyplot as plt
+import utils.plot_utils
 
 
 class NAF_Network:
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, use_external_exploration, config, random_seed):
 
         self.write_log = config.write_log
+        self.write_plot = config.write_plot
 
         self.state_dim = state_dim
         self.state_min = state_min
@@ -47,6 +43,7 @@ class NAF_Network:
         #record step n for tf Summary
         self.train_global_steps = 0
         self.eval_global_steps = 0
+        self.eval_ep_count = 0
         
 
         self.dtype = tf.float32
@@ -187,7 +184,7 @@ class NAF_Network:
         return norm_net
 
     '''return an action to take for each state'''
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         best_action, Lmat_columns = self.sess.run([self.best_action, self.Lmat_columns], {self.state_input: state.reshape(-1, self.state_dim), self.phase: False})
         
@@ -238,16 +235,26 @@ class NAF_Network:
         else:
 
             chosen_action = np.clip(best_action.reshape(-1), self.action_min, self.action_max)
+            self.eval_global_steps += 1
 
             if self.write_log:
-                self.eval_global_steps += 1
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
+            if self.write_plot:
+                if is_start:
+                    self.eval_ep_count += 1
+
                 func1 = self.getQFunction(state)
-                self.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
-                                  display_title='steps: ' + str(self.eval_global_steps),
-                                  save_title='steps_' + str(self.eval_global_steps),
-                                  save_dir=self.writer.get_logdir(), show=False)
+
+                utils.plot_utils.plotFunction("NAF", [func1], state, chosen_action, self.action_min, self.action_max,
+                                              display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+                                              save_title='steps_' + str(self.eval_global_steps),
+                                              save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
+
+                # utils.plot_utils.plotFunction([func1], state, chosen_action, self.action_min, self.action_max,
+                #                   display_title='steps: ' + str(self.eval_global_steps),
+                #                   save_title='steps_' + str(self.eval_global_steps),
+                #                   save_dir=self.writer.get_logdir(), show=False)
 
             return chosen_action
 
@@ -276,61 +283,6 @@ class NAF_Network:
                                                                    self.action_input: np.expand_dims(action, 0),
                                                                    self.phase: False})
 
-    def plotFunction(self, func1, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='', save_dir='', linewidth=2.0, grid=True, show=False, equal_aspect=False):
-
-        fig, ax = plt.subplots(2, sharex=True)
-        # fig, ax = plt.subplots(figsize=(10, 5))
-
-        x = np.linspace(x_min, x_max, resolution)
-        y1 = []
-
-        max_point_x = x_min
-        max_point_y = np.float('-inf')
-
-        for point_x in x:
-            point_y1 = np.squeeze(func1([point_x])) # reduce dimension
-
-            if point_y1 > max_point_y:
-                max_point_x = point_x
-                max_point_y = point_y1
-
-            y1.append(point_y1)
-
-        ax[0].plot(x, y1, linewidth = linewidth)
-        # plt.ylim((-0.5, 1.6))
-        if equal_aspect:
-            ax.set_aspect('auto')
-
-        if grid:
-            ax[0].grid(True)
-            # ax[0].axhline(y=0, linewidth=1.5, color='darkslategrey')
-            # ax[0].axvline(x=0, linewidth=1.5, color='darkslategrey')
-
-            ax[1].grid(True)
-            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
-            ax[1].axvline(x=mean[0], linewidth=1.5, color='red')
-
-        if display_title:
-
-            display_title += ", maxA: {:.3f}".format(max_point_x) + ", maxQ: {:.3f}".format(max_point_y) + "\n state: " + str(state)
-            fig.suptitle(display_title, fontsize=11, fontweight='bold')
-            top_margin = 0.95
-
-            ax[1].set_title("mean: " + str(mean[0]))
-
-        else:
-            top_margin = 1.0
-
-        if show:
-            plt.show()
-        else:
-            #print(save_title)
-            save_dir = save_dir+'/figures/'
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            plt.savefig(save_dir+save_title)
-            plt.close()
-
 
 class NAF(BaseAgent):
     def __init__(self, env, config, random_seed):
@@ -348,19 +300,19 @@ class NAF(BaseAgent):
         # self.temp_states = []
 
     def start(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=False)
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         # random action during warmup
         if self.cum_steps < self.warmup_steps:
             action = np.random.uniform(self.action_min, self.action_max)
 
         else:
-            action = self.network.take_action(state, is_train)
+            action = self.network.take_action(state, is_train, is_start)
 
             # Train
             if is_train:

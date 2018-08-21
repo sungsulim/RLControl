@@ -13,7 +13,7 @@ from agents.network.actor_network import ActorNetwork
 from agents.network.critic_network import CriticNetwork
 from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
-
+import utils.plot_utils
 
 class DDPG_Network(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
@@ -32,7 +32,10 @@ class DDPG_Network(object):
 
         self.train_global_steps = 0
         self.eval_global_steps = 0
+        self.eval_ep_count = 0
+
         self.write_log = config.write_log
+        self.write_plot = config.write_plot
 
 
         self.episode_ave_max_q = 0.0
@@ -55,24 +58,34 @@ class DDPG_Network(object):
             self.actor_network.update_target_network()
             self.critic_network.update_target_network()
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         chosen_action = self.actor_network.predict(np.expand_dims(state, 0), False)[0]
 
         if not is_train:
+            self.eval_global_steps += 1
+
             if self.write_log:
-                self.eval_global_steps += 1
+                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+            if self.write_plot:
+
+                if is_start:
+                    self.eval_ep_count += 1
 
                 if self.eval_global_steps % 1 == 0:
-
                     func1 = self.critic_network.getQFunction(state)
 
-                    self.critic_network.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
-                                                     display_title='steps: ' + str(self.eval_global_steps),
-                                                     save_title='steps_' + str(self.eval_global_steps),
-                                                     save_dir=self.writer.get_logdir(), show=False)
+                    utils.plot_utils.plotFunction("DDPG", [func1], state, chosen_action, self.action_min, self.action_max,
+                                       display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+                                       save_title='steps_' + str(self.eval_global_steps),
+                                       save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
 
-                # write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+                    # self.critic_network.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
+                    #                                  display_title='steps: ' + str(self.eval_global_steps),
+                    #                                  save_title='steps_' + str(self.eval_global_steps),
+                    #                                  save_dir=self.writer.get_logdir(), show=False)
 
         return chosen_action
 
@@ -120,22 +133,22 @@ class DDPG(BaseAgent):
                                     self.action_dim, self.action_min, self.action_max,
                                     config, random_seed=random_seed)
 
-        self.cum_steps = 0 # cumulative steps across episodes
+        self.cum_steps = 0  # cumulative steps across episodes
 
     def start(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=False)
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         # random action during warmup
         if self.cum_steps < self.warmup_steps:
             action = np.random.uniform(self.action_min, self.action_max)
 
         else:
-            action = self.network.take_action(state, is_train)
+            action = self.network.take_action(state, is_train, is_start)
 
             # Train
             if is_train:
