@@ -138,7 +138,7 @@ class AE_Supervised_Network(BaseNetwork):
         action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim,
                                                                     activation_fn=tf.tanh,
                                                                     weights_initializer=tf.random_uniform_initializer(
-                                                                        -3e-3, 3e-3),
+                                                                        0, 3e-3),
                                                                     weights_regularizer=None,
                                                                     # tf.contrib.layers.l2_regularizer(0.001),
                                                                     biases_initializer=tf.random_uniform_initializer(
