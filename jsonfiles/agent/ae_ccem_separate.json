@@ -1,0 +1,27 @@
+{
+    "agent": "AE_CCEM_separate",
+
+    "sweeps": {
+
+        "action_selection": ["highest_alpha"],
+        "norm": ["input_norm", "layer"],
+
+        "exploration_policy": ["none"],
+
+        "ou_theta": [0.15],
+        "ou_mu": [0.0],
+        "ou_sigma": [0.2],
+
+        "actor_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "expert_l1_dim": [200],
+        "expert_l2_dim": [200],
+
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "expert_lr": [1e-2, 1e-3, 1e-4],
+
+        "rho": [0.2],
+        "num_samples": [10],
+        "num_modal": [1,2]
+    }
+}

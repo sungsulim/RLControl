@@ -24,6 +24,9 @@ def create_agent(agent_string, env, config, seed):
     elif agent_string == "AE_CCEM":
         from agents.AE_CCEM import AE_CCEM
         return AE_CCEM(env, config, seed)
+    elif agent_string == "AE_CCEM_separate":
+        from agents.AE_CCEM_separate import AE_CCEM_separate
+        return AE_CCEM_separate(env, config, seed)
 
     else:
         print("Don't know this agent")
