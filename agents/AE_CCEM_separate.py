@@ -171,10 +171,6 @@ class AE_CCEM_Separate_Network(object):
         self.episode_ave_max_q += np.amax(predicted_q_val)
 
 
-        state_batch = state_batch[:1]
-        batch_size = 1
-
-
         ###### Actor Update #####
         # for each transition, n actions
         #shape: (batchsize , n actions, action_dim)

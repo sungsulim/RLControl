@@ -60,8 +60,8 @@ class ExpertNetwork(BaseNetwork):
 
             # expert update
             self.expert_loss = tf.reduce_mean(tf.squared_difference(self.predicted_q_value, self.q_prediction))
-            self.expert_optimizer = tf.train.AdamOptimizer(self.learning_rate)
-            self.expert_optimize = self.expert_optimizer.minimize(self.expert_loss)
+            # self.expert_optimizer = tf.train.AdamOptimizer(self.learning_rate)
+            self.expert_optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.expert_loss)
 
 
         # self.predict_action_op = self.predict_action_func(self.action_prediction_alpha, self.action_prediction_mean)

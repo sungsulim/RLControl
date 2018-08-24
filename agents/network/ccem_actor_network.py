@@ -69,8 +69,8 @@ class CCEM_ActorNetwork(BaseNetwork):
             self.actor_loss = self.get_lossfunc(self.action_prediction_alpha, self.action_prediction_sigma,
                                                 self.action_prediction_mean, self.actions)
 
-            self.actor_optimizer = tf.train.AdamOptimizer(self.learning_rate)  # tf.train.AdamOptimizer(self.learning_rate)
-            self.actor_optimize = self.actor_optimizer.minimize(self.actor_loss)
+            # self.actor_optimizer = tf.train.AdamOptimizer(self.learning_rate)  # tf.train.AdamOptimizer(self.learning_rate)
+            self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.actor_loss)
 
         # self.predict_action_op = self.predict_action_func(self.action_prediction_alpha, self.action_prediction_mean)
         # self.predict_action_target_op = self.predict_action_target_func(self.target_action_prediction_alpha, self.target_action_prediction_mean)
