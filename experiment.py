@@ -11,7 +11,7 @@ import tensorflow as tf
 
 ## DEBUG PARAMS
 ## -1 to disable
-output_ep_result_fq = 1 # print to console (not saved output) after this many episodes
+output_ep_result_fq = 100 # print to console (not saved output) after this many episodes
 save_maxQ_fq = -1 # plot cost-to-go after this many episodes
 plot_maxA_fq = -1 # plot maxA after this many episodes
 
@@ -105,10 +105,13 @@ class Experiment(object):
             episode_reward += reward
 
             # if the episode was externally terminated by episode step limit, don't do update
-            if done and episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT:
-                is_truncated = True
-            else:
+            if self.train_environment.name == 'Bimodal1DEnv':
                 is_truncated = False
+            else:
+                if done and episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT:
+                    is_truncated = True
+                else:
+                    is_truncated = False
 
             self.agent.update(obs, obs_n, float(reward), Aold, done, is_truncated)
 

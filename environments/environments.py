@@ -20,7 +20,7 @@ def create_environment(env_params):
 class ContinuousEnvironment(object):
     def __init__(self, env_params):
 
-
+        self.name = env_params['environment']
         self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
         self.eval_episodes = env_params['EvalEpisodes']
 
@@ -139,6 +139,7 @@ class ContinuousEnvironment(object):
 class Bimodal1DEnvironment(object):
     def __init__(self, env_params):
 
+        self.name = env_params['environment']
         self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
         self.eval_episodes = env_params['EvalEpisodes']
 
@@ -156,16 +157,22 @@ class Bimodal1DEnvironment(object):
         
         # state info
         self.state_dim = 1
-        self.state_range = np.array([10.])
-        self.state_min = np.array([-5.])
-        self.state_max = np.array([5.])
+        # self.state_range = np.array([10.])
+        # self.state_min = np.array([-5.])
+        # self.state_max = np.array([5.])
+        self.state_range = np.array([4.])
+        self.state_min = np.array([-2.])
+        self.state_max = np.array([2.])
         self.state_bounded = True
         
         # action info
         self.action_dim = 1
-        self.action_range = np.array([10.]) 
-        self.action_min = np.array([-5.])
-        self.action_max = np.array([5.])
+        # self.action_range = np.array([10.])
+        # self.action_min = np.array([-5.])
+        # self.action_max = np.array([5.])
+        self.action_range = np.array([4.])
+        self.action_min = np.array([-2.])
+        self.action_max = np.array([2.])
 
         #DEBUG
         # print('stateDim:',self.stateDim)
@@ -200,14 +207,14 @@ class Bimodal1DEnvironment(object):
 
     def reward_func(self, action):
 
-        maxima1 = -2.5
-        maxima2 = 2.5
-        stddev = 0.5
+        maxima1 = -1.0
+        maxima2 = 1.0
+        stddev = 0.2
 
         # Reward function.
         # Two gaussian functions.
-        modal1 = 1.5 * math.exp(-0.5 * ((action - maxima1) / stddev)**2)
-        modal2 = 1. * math.exp(-0.5 * ((action - maxima2) / stddev)**2)
+        modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev)**2)
+        modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev)**2)
 
         return modal1 + modal2
 
@@ -219,6 +226,7 @@ class Bimodal1DEnvironment(object):
 class Bimodal2DEnvironment(object):
     def __init__(self, env_params):
 
+        self.name = env_params['environment']
         self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
         self.eval_episodes = env_params['EvalEpisodes']
 
