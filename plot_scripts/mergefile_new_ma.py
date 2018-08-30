@@ -17,6 +17,11 @@ import statistics
 # example: python3 ../plot_scripts/mergefile.py ../jsonfile/environment/LunarLanderContinuous-v2.json LunarLanderContinuous-v2results 9 5 NAF 
 # This will generate mergedRESULT Directory (i.e. mergedLunarLanderContinuous-v2results)
 
+def movingaverage (values, window):
+    weights = np.repeat(1.0, window)/window
+    sma = np.convolve(values, weights, 'valid')
+    return sma
+
 
 if len(sys.argv)!=6:
     print('Incorrect Input')
@@ -64,7 +69,7 @@ params_fn = None
 
 
 eval_lc_length = int(TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS) + 1
-
+eval_lc_length = eval_lc_length - 9 # for ma
 max_median_length = 1
 
 # for each setting
@@ -98,6 +103,10 @@ for setting_num in range(NUM_SETTINGS):
 
         lc_0 = np.loadtxt(train_rewards_filename, delimiter=',')
         lc_1 = np.loadtxt(eval_mean_rewards_filename, delimiter=',')
+
+        # compute moving window 
+        lc_0 = movingaverage(lc_0, 10)
+        lc_1 = movingaverage(lc_1, 10)
 
 
         train_lc_arr.append(lc_0)

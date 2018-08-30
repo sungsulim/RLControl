@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 import json
 
+from plot_agent_new import get_xyrange
+
 ############## USAGE
 # You should be in actiongeneral/python/results when running the script
 
@@ -22,21 +24,36 @@ import json
 # This should be the agent name between Pendulum-v0_(   )_EvalEpisode_BestResult_avg.npy
 # You can change the agent name between ( ) to be anything, as long as other format is same.
 
-# PD
-agents = ['CrossEntropy_CriticAssistant','Simple_CriticAssistant', 'NAF', 'Wire_fitting']
-#agents = ['CEM_hydra_multimodal_setting2', 'CriticAssistant_hydra_setting2', 'NAF_batch_setting1', 'NAF_layer', 'Wire_fitting'] 
+# LL combined
+# agents = ['DDPG_10runs', 'NAF_10runs', 'AE_CCEM_9runs', 'AE_Supervised_10runs']
 
-# LL
-#agents = ['CrossEntropy_CriticAssistant', 'Simple_CriticAssistant', 'NAF']
-# agents = ['CEM_hydra_multimodal_setting3', 'CriticAssistant_hydra_setting2', 'NAF_layer_setting7', 'NAF_batch_setting3', 'NAF_none_setting8']
+# LL separate
+agents = ['DDPG_10runs', 'NAF_10runs', 'AE_CCEM_separate_10runs', 'AE_Supervised_separate_10runs']
+
+
+# HC combined
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_10runs', 'AE_Supervised_5runs']
+
+# HC separate
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_separate_5runs', 'AE_Supervised_separate_10runs']
+
+# Hopper combined
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_8runs', 'AE_CCEM_10runs', 'AE_Supervised_5runs']
+
+# Hopper separate
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_8runs', 'AE_CCEM_separate_5runs', 'AE_Supervised_separate_10runs']
+
+# PD Combined
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_10runs', 'AE_Supervised_10runs']
+
+# PD Separate
+# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_separate_10runs', 'AE_Supervised_separate_10runs']
+
+
 display_idx = 1 # IDX to determine whether to plot train_episode or eval_episode (0: Train, 1: Eval)
 
 
-# HC
-#agents = ['CrossEntropy_CriticAssistant','Simple_CriticAssistant', 'NAF']
 ###################
-
-
 
 # Stored Directory
 DIR = str(sys.argv[2])+'/'
@@ -49,8 +66,6 @@ envname = env_json['environment']
 TOTAL_MIL_STEPS = env_json['TotalMilSteps']
 EVAL_INTERVAL_MIL_STEPS = env_json['EvalIntervalMilSteps']
 EVAL_EPISODES = env_json['EvalEpisodes']
-
-
 
 
 result_type = ['TrainEpisode', 'EvalEpisode']
@@ -82,104 +97,67 @@ colors = ['b', 'g', 'r', 'c', 'm', 'k']
 
 plt.figure(figsize=(12,6))
 
+#xmax = int(max_length)
+xmax, ymin, ymax = get_xyrange(envname)
 
-xmax = int(max_length)
-
-
-if envname == 'HalfCheetah-v2':
-
-    # Train Episode Rewards
-    if display_idx == 0:
-        pass
-
-    # EvalEpisode Rewards
-    elif display_idx == 1:
-        plt.title('Eval Episode Rewards: '+str(agents))
-
-        ylimt = (-500, 4000)
-        plt.xlabel('Training steps (per 1000 steps)')
-        plt.ylabel("Cum. Reward per episode").set_rotation(90)
-        opt_range = range(1, xmax+1)
-        xlimt = (1, xmax)
-
-        x_tick_interval = 5
-        #plt.xticks(opt_range, np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS))
+if xmax is None:
+    xmax = int(max_length)
 
 
-elif envname == 'LunarLanderContinuous-v2':
+# Train Episode Rewards
+if display_idx == 0:
+    ylimt = (ymin[display_idx], ymax[display_idx])
+    print("Train Episode plot not implemented")
+    exit()
+    pass
 
-    # Train Episode Rewards
-    if display_idx == 0:
-        plt.title('Train Episode Rewards: '+str(agents))
+# EvalEpisode Rewards
+elif display_idx == 1:
+    ylimt = (ymin[display_idx], ymax[display_idx])
 
-        ylimt = (-400, 250)
-        plt.xlabel('Episodes')
-        plt.ylabel("Cum. Reward per episode").set_rotation(90)
-        opt_range = range(0, xmax)
-        xlimt = (0, xmax)
+    plt.title(envname)
+    plt.xlabel('Training steps (per 1000 steps)')
+    plt.ylabel("Cum. Reward per episode").set_rotation(90)
 
-    # EvalEpisode Rewards
-    elif display_idx == 1:
-        plt.title('Eval Episode Rewards: '+str(agents))
+    opt_range = range(0, xmax) 
+    xlimt = (0, xmax-1)
 
-        ylimt = (-150, 250)
-        plt.xlabel('Training steps (per 1000 steps)')
-        plt.ylabel("Cum. Reward per episode").set_rotation(90)
-        opt_range = range(1, xmax+1)
-        xlimt = (1, xmax)
+    # opt_range = range(1, xmax+1)
+    # xlimt = (1, xmax)
+    
+    
 
-        x_tick_interval = 5
-        #plt.xticks(opt_range, np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS))
+    if envname == 'Pendulum-v0':
+        # plt.axhline(y=-150, linewidth=1.0, linestyle='--', color='darkslategrey', label='-150')
+        plt.xticks(opt_range[::20], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), min(int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1, xmax))[::20])
 
-elif envname == 'MountainCarContinuous-v0':
+    # elif envname == 'HalfCheetah-v2' or envname == 'Hopper-v2':
+    #     opt_range = range(1, xmax+1)
+    #     xlimt = (1, xmax)
 
-    # Train Episode Rewards
-    if display_idx == 0:
-        plt.title('Train Episode Rewards: '+str(agents))
+    #     x_tick_interval = 10
 
-        ylimt = (-50, 100)
-        plt.xlabel('Episodes')
-        plt.ylabel("Reward").set_rotation(90)
-        opt_range = range(0, xmax)
-        xlimt = (0, xmax)
+    #     ## HARD CODED!! For HalfCheetah and Hopper
+    #     loc_arr = np.array([1, 11, 21, 31, 41, 51, 61, 71, 81, 91])
+    #     val_arr = np.array([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
 
-    # EvalEpisode Rewards
-    elif display_idx == 1:
-        plt.title('Eval Episode Rewards: '+str(agents))
+    elif envname == 'LunarLanderContinuous-v2':
+        # print('xmax', xmax)
+        # print('len',np.shape(agents_avg))
+        # exit()
+        tick_interval = 30
+        loc_arr = np.array(range(0,xmax,tick_interval))
+        
+        # val_arr = np.array(range(250, 1001, 125)) 
+        val_arr = np.array(range(int(EVAL_INTERVAL_MIL_STEPS*1000*9), 1001, int(EVAL_INTERVAL_MIL_STEPS*1000*tick_interval)) )
 
-        ylimt = (-50, 100)
-        plt.xlabel('Training steps (per 1000 steps)')
-        plt.ylabel("Reward").set_rotation(90)
-        opt_range = range(1, xmax+1)
-        xlimt = (1, xmax)
-        #plt.xticks(opt_range[9::10], np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS)[9::10])
+        plt.xticks(loc_arr, val_arr)
 
+        plt.yticks([-150, -100, -50, 0, 50, 100, 150, 200, 250],[-150, -100, -50, 0, 50, 100, 150, 200, 250])
 
-elif envname == 'Pendulum-v0':
+    else:
+        plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
 
-    # Train Episode Rewards
-    if display_idx == 0:
-        plt.title('Train Episode Rewards: '+str(agents))
-
-        ylimt = (-1800, 0)
-        plt.xlabel('Episodes')
-        plt.ylabel("Cum. Reward per episode").set_rotation(90)
-        opt_range = range(0, xmax)
-        xlimt = (0, xmax)
-
-    # EvalEpisode Rewards
-    elif display_idx == 1:
-        plt.title('Eval Episode Rewards: '+str(agents))
-        #plt.title('Comparison between Value-based methods')
-        ylimt = (-1800, 0)
-        plt.xlabel('Training steps (per 1000 steps)')
-        plt.ylabel("Cum. Reward per episode").set_rotation(90)
-        opt_range = range(1, xmax+1)
-        xlimt = (1, xmax)
-
-        x_tick_interval = 5
-
-plt.xticks(np.append(1, opt_range[x_tick_interval-1::x_tick_interval]), np.append(EVAL_INTERVAL_MIL_STEPS * 1e3, np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), float(xmax))[x_tick_interval-1::x_tick_interval]))
 
 plt.xlim(xlimt)
 plt.ylim(ylimt)

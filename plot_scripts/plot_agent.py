@@ -29,9 +29,9 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-selected_idx= [5, 14]
+selected_idx= [1,3,5,7]
 selected_type = selected_idx[:] # This will be the labels for those idx.
-selected_type = ['unimodal', 'bimodal']
+# selected_type = ['unimodal', 'bimodal']
 
 # Example: selected_type = ['NAF', 'Wire_fitting']
 ##############################
