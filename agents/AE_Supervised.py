@@ -150,6 +150,8 @@ class AE_Supervised_Network(object):
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
         ###### Expert Update #####
+        num_samples = 10
+        rho = 0.4
 
         batch_size = np.shape(state_batch)[0]
 
@@ -170,20 +172,61 @@ class AE_Supervised_Network(object):
         self.episode_ave_max_q += np.amax(predicted_q_val)
 
         ###### Actor Update #####
-        # for each transition, 1 action
-        # shape: (batchsize , 1 action, action_dim)
+        # for each transition, 5 actions
+        # shape: (batchsize , 5 action, action_dim)
         action_batch_init = self.hydra_network.sample_action(state_batch, True)
 
+        # restack states (batchsize * n, 1)
+        stacked_state_batch = None
+
+        for state in state_batch:
+            stacked_one_state = np.tile(state, (num_samples, 1))
+
+            if stacked_state_batch is None:
+                stacked_state_batch = stacked_one_state
+            else:
+                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
+
         # reshape (batchsize * 1 , action_dim)
-        action_batch_init = np.reshape(action_batch_init, (batch_size * 1, self.action_dim))
+        action_batch_init = np.reshape(action_batch_init, (batch_size * num_samples, self.action_dim))
 
         # Gradient Ascent
-        action_batch_final = self.hydra_network.gradient_ascent(state_batch, action_batch_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, True)  # do ascent on original network
+        action_batch_final = self.hydra_network.gradient_ascent(stacked_state_batch, action_batch_init, self.gd_alpha, self.gd_max_steps, self.gd_stop, True)  # do ascent on original network
 
-        # print('action_batch_final shape (should be batch x action_dim)', np.shape(action_batch_final))
-        # input()
 
-        self.hydra_network.train_actor(state_batch, action_batch_final)
+        #########
+        q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final, True)
+        q_val = np.reshape(q_val, (batch_size, num_samples))
+
+        action_batch_final = np.reshape(action_batch_final, (batch_size, num_samples, self.action_dim))
+        # print(np.shape(action_batch_final))
+
+        # Find threshold (top (1-rho) percentile)
+
+        selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(num_samples * rho)], q_val))
+
+        # print('seleted idxs:', np.shape(selected_idxs))
+
+        action_list = []
+        for action, idx in zip(action_batch_final, selected_idxs):
+            action_list.append(action[idx])
+
+        # restack states (batchsize * top_idx_num, 1)
+        stacked_state_batch = None
+        for state in state_batch:
+            stacked_one_state = np.tile(state, (int(num_samples * rho), 1))
+
+            if stacked_state_batch is None:
+                stacked_state_batch = stacked_one_state
+            else:
+                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
+
+        action_list = np.reshape(action_list, (batch_size * int(num_samples * rho), self.action_dim))
+
+        #############
+
+
+        self.hydra_network.train_actor(stacked_state_batch, action_list)
 
         # Update target networks
         self.hydra_network.update_target_network()

@@ -378,7 +378,7 @@ class AE_Supervised_Network(BaseNetwork):
 
         inputs = args[0]
         phase = args[1]
-        num_samples = 1
+        num_samples = 5
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
@@ -485,11 +485,15 @@ class AE_Supervised_Network(BaseNetwork):
 
     def getPolicyFunction(self, alpha, mean, sigma):
 
+        alpha = np.squeeze(alpha, axis=1)
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
-        return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-                                                         np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        # print('alpha', alpha)
+        # print('mean', mean)
+        # print('sigma', sigma)
+        # input()
+        return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def plotFunction(self, func1, func2, state, mean, x_min, x_max, resolution=1e2, display_title='', save_title='',
                      save_dir='', linewidth=2.0, ep_count=0, grid=True, show=False, equal_aspect=False):
@@ -549,7 +553,7 @@ class AE_Supervised_Network(BaseNetwork):
             plt.show()
         else:
             # print(save_title)
-            save_dir = save_dir + '/figures/' + str(ep_count) + '/'
+            save_dir = save_dir + '/figures/'
             if not os.path.exists(save_dir):
                 os.makedirs(save_dir)
             plt.savefig(save_dir + save_title)

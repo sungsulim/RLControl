@@ -3,6 +3,7 @@ import matplotlib as mpl
 if os.environ.get('DISPLAY','') == '':
     print('no display found. Using non-interactive Agg backend')
     mpl.use('Agg')
+mpl.use('Agg')
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -127,7 +128,7 @@ def plotFunction(agent_name, func_list, state, mean, x_min, x_max, resolution=1e
 
     else:
         # print(save_title)
-        save_dir = save_dir + '/figures/' + str(ep_count) + '/'
+        save_dir = save_dir + '/figures/'
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         plt.savefig(save_dir + save_title)

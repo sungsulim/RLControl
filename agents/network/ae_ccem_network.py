@@ -418,9 +418,14 @@ class AE_CCEM_Network(BaseNetwork):
 
     def getPolicyFunction(self, alpha, mean, sigma):
 
+        alpha = np.squeeze(alpha, axis=1)
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
+        # print('alpha', alpha)
+        # print('mean', mean)
+        # print('sigma', sigma)
+        # input()
         return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
