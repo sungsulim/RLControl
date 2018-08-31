@@ -378,7 +378,7 @@ class AE_Supervised_Network(BaseNetwork):
 
         inputs = args[0]
         phase = args[1]
-        num_samples = 5
+        num_samples = 10
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
