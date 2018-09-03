@@ -2,6 +2,7 @@
     "agent": "WireFitting",
 
     "sweeps": {
+        "norm": ["input_norm", "layer"],
         "exploration_policy": ["ou_noise"],
 
         "ou_theta": [0.15],

@@ -2,6 +2,7 @@ import numpy as np
 import random
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
+from utils.running_mean_std import RunningMeanStd
 
 from agents.base_agent import BaseAgent # for python3
 #from base_agent import BaseAgent # for python2
@@ -30,6 +31,14 @@ class WireFittingNetwork:
         self.action_max = action_max
 
         self.dtype = tf.float64
+
+        self.norm_type = config.norm
+        if self.norm_type is not 'none':
+            self.input_norm = RunningMeanStd(self.state_dim)
+        else:
+            assert(self.norm_type == 'none')
+            self.input_norm = None
+
 
         self.g = tf.Graph()
         
@@ -81,20 +90,24 @@ class WireFittingNetwork:
         with self.g.as_default():
             with tf.variable_scope(scopename):
                 state_input = tf.placeholder(self.dtype, [None, n_input])
-                
-                state_hidden1 = slim.fully_connected(state_input, n_hidden1, activation_fn = tf.nn.relu)
-                state_hidden2 = slim.fully_connected(state_hidden1, n_hidden2, activation_fn = tf.nn.relu)
-                
+                if self.norm_type is not 'none':
+                    state_input = self.input_norm.normalize(state_input)
+
+                state_hidden1 = slim.fully_connected(state_input, n_hidden1, activation_fn = None)
+                state_hidden1_norm = self.apply_norm(state_hidden1, activation_fn=tf.nn.relu, phase=True, layer_num=1) ## TODO: Hacky way. Not using batchnorm so just set phase to True. (Need to implement self.phase in the class)
+                state_hidden2 = slim.fully_connected(state_hidden1_norm, n_hidden2, activation_fn = None)
+                state_hidden2_norm = self.apply_norm(state_hidden2, activation_fn=tf.nn.relu, phase=True, layer_num=2)
+
                 #state_hidden2_val = slim.fully_connected(state_hidden1, n_hidden1, activation_fn = tf.nn.relu)
                 '''
                 state_hidden1 = tf.nn.relu(tf.contrib.layers.batch_norm(tf.contrib.layers.fully_connected(state_input, n_hidden1, activation_fn = None), center=True, scale=True, is_training=self.is_training))
                 state_hidden2 = tf.nn.relu(tf.contrib.layers.batch_norm(tf.contrib.layers.fully_connected(state_hidden1, n_hidden2, activation_fn = None), center=True, scale=True, is_training=self.is_training))
                 '''
                 w_init = tf.random_uniform_initializer(minval=-1., maxval=1.)
-                interim_acts = slim.fully_connected(state_hidden2, self.app_points * self.action_dim, activation_fn = tf.nn.tanh, weights_initializer=w_init) * self.action_max
+                interim_acts = slim.fully_connected(state_hidden2_norm, self.app_points * self.action_dim, activation_fn = tf.nn.tanh, weights_initializer=w_init) * self.action_max
                 # print 'interim action shape is :: ', interim_acts.shape
                 # w_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
-                interim_qvalues = slim.fully_connected(state_hidden2, self.app_points, activation_fn = None, weights_initializer=w_init)
+                interim_qvalues = slim.fully_connected(state_hidden2_norm, self.app_points, activation_fn = None, weights_initializer=w_init)
                 # print 'interim q values shape is :: ', interim_qvalues.shape
                 maxqvalue = tf.reduce_max(interim_qvalues, axis=1)
 
@@ -159,6 +172,21 @@ class WireFittingNetwork:
 
             return action_input, reshaped_action_input, reshaped_action_output, q_distance, qvalue
 
+    # currently a hack. Should later incorporate inheriting from base_network.apply_norm()
+    def apply_norm(self, net, activation_fn, phase, layer_num):
+
+        if self.norm_type == 'layer':
+            norm_net = tf.contrib.layers.layer_norm(net, center=True, scale=True, activation_fn=activation_fn)
+        elif self.norm_type == 'batch':
+            norm_net = tf.contrib.layers.batch_norm(net, fused=True, center=True, scale=True, activation_fn=activation_fn,
+                                                    is_training=phase, scope='batchnorm_'+str(layer_num))
+        elif self.norm_type == 'none' or self.norm_type == 'input_norm':
+            norm_net = activation_fn(net)
+        else:
+            raise ValueError('unknown norm type')
+
+        return norm_net
+
     '''return an action to take for each state, NOTE this action is in [-1, 1]'''
     def take_action(self, state, is_train):
         bestact, acts = self.sess.run([self.bestact, self.interim_actions], {self.state_input: state.reshape(-1, self.state_dim), self.is_training: False})
@@ -208,6 +236,7 @@ class WireFittingNetwork:
         pass
 
 
+
 class WireFitting(BaseAgent):
     def __init__(self, env, config, random_seed):
         super(WireFitting, self).__init__(env, config)
@@ -255,18 +284,22 @@ class WireFitting(BaseAgent):
 
         return action
 
-    def update(self, state, next_state, reward, action, is_terminal):
+    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
 
         # Add to experience replay buffer
-        if not is_terminal:
-            self.replay_buffer.add(state, action, reward, next_state, self.gamma)
-        else:
-            self.replay_buffer.add(state, action, reward, next_state, 0.0)
+        if not is_truncated:
+            if not is_terminal:
+                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+            else:
+                self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
         # TODO: WF has no normalization currently
         # # update running mean/std
         # if self.network.norm_type == 'layer' or self.network.norm_type == 'input_norm':
         #     self.network.input_norm.update(np.array([state]))
+
+        if self.network.norm_type is not 'none':
+            self.network.input_norm.update(np.array([state]))
 
         self.learn()
 
@@ -286,3 +319,5 @@ class WireFitting(BaseAgent):
         # set writer
     def set_writer(self, writer):
         self.network.writer = writer
+        if self.exploration_policy:
+            self.exploration_policy.reset()
