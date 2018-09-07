@@ -4,32 +4,37 @@ from collections import OrderedDict
 # Takes a string and returns and instance of an agent
 # [env] is an instance of an environment
 # [p] is a dictionary of agent parameters
-def create_agent(agent_string, env, config, seed):
+def create_agent(agent_string, config, seed):
     if agent_string == "DDPG": 
         from agents.DDPG import DDPG
-        return DDPG(env, config, seed)
+        return DDPG(config, seed)
+
     elif agent_string == "NAF":
         from agents.NAF import NAF
-        return NAF(env, config, seed)
+        return NAF(config, seed)
+
     elif agent_string == "WireFitting":
         from agents.WireFitting import WireFitting
-        return WireFitting(env, config, seed)
+        return WireFitting(config, seed)
+
     elif agent_string == "ICNN":
         from agents.ICNN import ICNN
-        return ICNN(env, config, seed)
+        return ICNN(config, seed)
 
-    elif agent_string == "AE_Supervised":
-        from agents.AE_Supervised import AE_Supervised
-        return AE_Supervised(env, config, seed)
-    elif agent_string == "AE_CCEM":
-        from agents.AE_CCEM import AE_CCEM
-        return AE_CCEM(env, config, seed)
-    elif agent_string == "AE_CCEM_separate":
-        from agents.AE_CCEM_separate import AE_CCEM_separate
-        return AE_CCEM_separate(env, config, seed)
-    elif agent_string == "AE_Supervised_separate":
-        from agents.AE_Supervised_separate import AE_Supervised_separate
-        return AE_Supervised_separate(env, config, seed)
+    elif agent_string == "ActorExpert":
+        from agents.ActorExpert import ActorExpert
+        return ActorExpert(config, seed)
+
+    elif agent_string == "ActorExpert_Plus":
+        from agents.ActorExpert_Plus import ActorExpert_Plus
+        return ActorExpert_Plus(config, seed)
+
+    # elif agent_string == "AE_CCEM_separate":
+    #     from agents.AE_CCEM_separate import AE_CCEM_separate
+    #     return AE_CCEM_separate(env, config, seed)
+    # elif agent_string == "AE_Supervised_separate":
+    #     from agents.AE_Supervised_separate import AE_Supervised_separate
+    #     return AE_Supervised_separate(env, config, seed)
 
     else:
         print("Don't know this agent")

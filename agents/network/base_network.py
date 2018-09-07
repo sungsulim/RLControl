@@ -2,23 +2,28 @@ import tensorflow as tf
 
 
 class BaseNetwork(object):
-    def __init__(self, sess, state_dim, action_dim, learning_rate, tau):
+    def __init__(self, sess, config, learning_rate):
         """
         base network for actor and critic network.
         Args:
             sess: tf.Session()
-            state_dim: env.observation_space.shape
-            action_dim: env.action_space.shape[0]
-            learning_rate: learning rate for training
-            tau: update parameter for target.
+            config: Configuration object
+            learning_rate: learning rate for training (Could be an array if two networks)
         """
         self.sess = sess
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.learning_rate = learning_rate
-        self.tau = tau
 
-    def build_network(self):
+        self.state_dim = config.state_dim
+        self.state_min = config.state_min
+        self.state_max = config.state_max
+
+        self.action_dim = config.action_dim
+        self.action_min = config.action_min
+        self.action_max = config.action_max
+
+        self.learning_rate = learning_rate
+        self.tau = config.tau
+
+    def build_network(self, scope_name):
         """
         build network.
         """

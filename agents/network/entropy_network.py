@@ -855,14 +855,12 @@ class EntropyNetwork(BaseNetwork):
             print("Shape: ", v.shape)
             print(v)
 
-
-    # Buggy
     def getQFunction(self, state):
-        raise NotImplementedError
+        return lambda action: self.sess.run(self.qvalue, feed_dict={self.inputs: np.expand_dims(state, 0),
+                                                                   self.action: np.expand_dims(action, 0),
+                                                                   self.phase: False})
 
-    # Buggy
-    def plotFunc(self,func, x_min, x_max, resolution=1e5, display_title='', save_title='', linewidth=2.0, grid=True, show=True, equal_aspect=False):
-        raise NotImplementedError
+
 
     # for bundle_entropy, mapping [0, 1] to real range of actions
     def mapAction(self, act):

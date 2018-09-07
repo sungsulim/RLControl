@@ -6,11 +6,21 @@ from utils.running_mean_std import RunningMeanStd
 
 from agents.base_agent import BaseAgent # for python3
 #from base_agent import BaseAgent # for python2
+import utils.plot_utils
 
 
-class WireFittingNetwork:
+class WireFittingNetwork(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
-        
+
+        self.write_log = config.write_log
+        self.write_plot = config.write_plot
+
+        self.train_global_steps = 0
+        self.eval_global_steps = 0
+        self.train_ep_count = 0
+        self.eval_ep_count = 0
+
+
         self.interplt_lr = config.interplt_lr
         #self.interim_NN_lc = params['interim_nn_lc']
         
@@ -189,6 +199,12 @@ class WireFittingNetwork:
 
     '''return an action to take for each state, NOTE this action is in [-1, 1]'''
     def take_action(self, state, is_train):
+
+        # Very hacky
+        if is_train:
+            self.train_global_steps += 1
+        else:
+            self.eval_global_steps += 1
         bestact, acts = self.sess.run([self.bestact, self.interim_actions], {self.state_input: state.reshape(-1, self.state_dim), self.is_training: False})
         #print bestact.shape, acts.shape
         return bestact.reshape(-1), acts.reshape(self.app_points, self.action_dim)
@@ -235,11 +251,16 @@ class WireFittingNetwork:
     def reset(self):
         pass
 
+    def getQFunction(self, state):
+        return lambda action: self.sess.run(self.qvalue, feed_dict={self.state_input: np.expand_dims(state, 0),
+                                                                   self.action_input: np.expand_dims(action, 0),
+                                                                   self.is_training: False})
 
 
 class WireFitting(BaseAgent):
     def __init__(self, env, config, random_seed):
         super(WireFitting, self).__init__(env, config)
+
 
         np.random.seed(random_seed)  # Random action selection
         random.seed(random_seed)  # Experience Replay Buffer
@@ -253,13 +274,13 @@ class WireFitting(BaseAgent):
         self.cum_steps = 0  # cumulative steps across episodes
 
     def start(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
         # print self.next_action
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=False)
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         # random action during warmup
         if self.cum_steps < self.warmup_steps:
@@ -270,15 +291,33 @@ class WireFitting(BaseAgent):
 
             # Train
             if is_train:
-
+                greedy_action = action
                 # if using an external exploration policy
                 if self.use_external_exploration:
                     # print('greedy action', action)
-                    action = self.exploration_policy.generate(action, self.cum_steps)
+                    action = self.exploration_policy.generate(greedy_action, self.cum_steps)
                     # print("noise added action", action)
                     # input()
                 # only increment during training, not evaluation
                 self.cum_steps += 1
+
+                # HACKY WAY
+                if self.write_plot:
+
+                    if is_start:
+                        self.network.train_ep_count += 1
+
+                    func1 = self.network.getQFunction(state)
+
+                    utils.plot_utils.plotFunction("WireFitting", [func1], state, greedy_action, action, self.action_min,
+                                                  self.action_max,
+                                                  display_title='ep: ' + str(
+                                                      self.network.train_ep_count) + ', steps: ' + str(
+                                                      self.network.train_global_steps),
+                                                  save_title='steps_' + str(self.network.train_global_steps),
+                                                  save_dir=self.writer.get_logdir(),
+                                                  ep_count=self.network.train_ep_count,
+                                                  show=False)
 
             action = np.clip(action, self.action_min, self.action_max)
 
@@ -316,8 +355,3 @@ class WireFitting(BaseAgent):
         if self.use_external_exploration:
             self.exploration_policy.reset()
 
-        # set writer
-    def set_writer(self, writer):
-        self.network.writer = writer
-        if self.exploration_policy:
-            self.exploration_policy.reset()

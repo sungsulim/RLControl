@@ -43,6 +43,7 @@ class NAF_Network:
         #record step n for tf Summary
         self.train_global_steps = 0
         self.eval_global_steps = 0
+        self.train_ep_count = 0
         self.eval_ep_count = 0
         
 
@@ -225,9 +226,23 @@ class NAF_Network:
                 # if self.write_log:
                 #     write_summary(self.writer, self.train_global_steps, covmat[0][0], tag='train/covmat00') # logging only top-left element!
 
+            self.train_global_steps += 1
             if self.write_log:
-                self.train_global_steps += 1
+
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
+
+            if self.write_plot:
+
+                if is_start:
+                    self.train_ep_count += 1
+
+                func1 = self.getQFunction(state)
+                func2 = self.getPolicyFunction(best_action, covmat)
+
+                utils.plot_utils.plotFunction("NAF", [func1, func2], state, best_action, chosen_action, self.action_min, self.action_max,
+                                              display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
+                                              save_title='steps_' + str(self.train_global_steps),
+                                              save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count, show=False)
 
             return chosen_action
 
@@ -240,21 +255,18 @@ class NAF_Network:
             if self.write_log:
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
-            if self.write_plot:
-                if is_start:
-                    self.eval_ep_count += 1
+            # if self.write_plot:
+            #     if is_start:
+            #         self.eval_ep_count += 1
+            #
+            #     func1 = self.getQFunction(state)
+            #
+            #     utils.plot_utils.plotFunction("NAF", [func1], state, chosen_action, self.action_min, self.action_max,
+            #                                   display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+            #                                   save_title='steps_' + str(self.eval_global_steps),
+            #                                   save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
 
-                func1 = self.getQFunction(state)
 
-                utils.plot_utils.plotFunction("NAF", [func1], state, chosen_action, self.action_min, self.action_max,
-                                              display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
-                                              save_title='steps_' + str(self.eval_global_steps),
-                                              save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
-
-                # utils.plot_utils.plotFunction([func1], state, chosen_action, self.action_min, self.action_max,
-                #                   display_title='steps: ' + str(self.eval_global_steps),
-                #                   save_title='steps_' + str(self.eval_global_steps),
-                #                   save_dir=self.writer.get_logdir(), show=False)
 
             return chosen_action
 
@@ -282,6 +294,15 @@ class NAF_Network:
         return lambda action: self.sess.run(self.q_val, feed_dict={self.state_input: np.expand_dims(state, 0),
                                                                    self.action_input: np.expand_dims(action, 0),
                                                                    self.phase: False})
+
+    def getPolicyFunction(self, m, v):
+
+        mean = np.squeeze(m)
+        var = np.squeeze(v)
+
+        assert(var >= 0)
+        return lambda action: np.multiply(np.sqrt(1.0 / (2 * np.pi * var)), np.exp(-np.square(action - mean) / (2.0 * var)))
+
 
 
 class NAF(BaseAgent):

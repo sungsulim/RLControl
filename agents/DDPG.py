@@ -32,6 +32,7 @@ class DDPG_Network(object):
 
         self.train_global_steps = 0
         self.eval_global_steps = 0
+        self.train_ep_count = 0
         self.eval_ep_count = 0
 
         self.write_log = config.write_log
@@ -68,24 +69,34 @@ class DDPG_Network(object):
             if self.write_log:
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
-            if self.write_plot:
+            # if self.write_plot:
+            #
+            #     if is_start:
+            #         self.eval_ep_count += 1
+            #
+            #     if self.eval_global_steps % 1 == 0:
+            #         func1 = self.critic_network.getQFunction(state)
+            #
+            #         utils.plot_utils.plotFunction("DDPG", [func1], state, chosen_action, self.action_min, self.action_max,
+            #                            display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
+            #                            save_title='steps_' + str(self.eval_global_steps),
+            #                            save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
 
-                if is_start:
-                    self.eval_ep_count += 1
+        else:
+            self.train_global_steps += 1
+            ## MOVED OUTSIDE TO LOG BOTH EXPLORATION AND GREEDY ACTION
+            # if self.write_plot:
+            #
+            #     if is_start:
+            #         self.train_ep_count += 1
+            #
+            #     func1 = self.critic_network.getQFunction(state)
+            #
+            #     utils.plot_utils.plotFunction("DDPG", [func1], state, chosen_action, self.action_min, self.action_max,
+            #                        display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
+            #                        save_title='steps_' + str(self.train_global_steps),
+            #                        save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count, show=False)
 
-                if self.eval_global_steps % 1 == 0:
-                    func1 = self.critic_network.getQFunction(state)
-
-                    utils.plot_utils.plotFunction("DDPG", [func1], state, chosen_action, self.action_min, self.action_max,
-                                       display_title='ep: ' + str(self.eval_ep_count) + ', steps: ' + str(self.eval_global_steps),
-                                       save_title='steps_' + str(self.eval_global_steps),
-                                       save_dir=self.writer.get_logdir(), ep_count=self.eval_ep_count, show=False)
-
-
-                    # self.critic_network.plotFunction(func1, state, chosen_action, self.action_min, self.action_max,
-                    #                                  display_title='steps: ' + str(self.eval_global_steps),
-                    #                                  save_title='steps_' + str(self.eval_global_steps),
-                    #                                  save_dir=self.writer.get_logdir(), show=False)
 
         return chosen_action
 
@@ -153,12 +164,29 @@ class DDPG(BaseAgent):
             # Train
             if is_train:
 
+                greedy_action = action
                 # if using an external exploration policy
                 if self.use_external_exploration:
-                    action = self.exploration_policy.generate(action, self.cum_steps)
+                    action = self.exploration_policy.generate(greedy_action, self.cum_steps)
                 
                 # only increment during training, not evaluation
                 self.cum_steps += 1
+
+                # HACKY WAY
+                if self.write_plot:
+
+                    if is_start:
+                        self.network.train_ep_count += 1
+
+                    func1 = self.network.critic_network.getQFunction(state)
+
+                    utils.plot_utils.plotFunction("DDPG", [func1], state, greedy_action, action, self.action_min,
+                                                  self.action_max,
+                                                  display_title='ep: ' + str(self.network.train_ep_count) + ', steps: ' + str(
+                                                      self.network.train_global_steps),
+                                                  save_title='steps_' + str(self.network.train_global_steps),
+                                                  save_dir=self.writer.get_logdir(), ep_count=self.network.train_ep_count,
+                                                  show=False)
 
             action = np.clip(action, self.action_min, self.action_max) 
         return action

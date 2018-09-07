@@ -3,39 +3,31 @@ from agents.network.base_network import BaseNetwork
 import numpy as np
 
 
-class AE_CCEM_Network(BaseNetwork):
-    def __init__(self, sess, input_norm, shared_layer_dim, actor_layer_dim, expert_layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, actor_lr, expert_lr, tau, rho, num_samples, num_modal, action_selection, norm_type):
-        super(AE_CCEM_Network, self).__init__(sess, state_dim, action_dim, [actor_lr, expert_lr], tau)
+class ActorExpert_Network(BaseNetwork):
+    def __init__(self, sess, input_norm, config):
+        super(ActorExpert_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
 
-        self.shared_layer_dim = shared_layer_dim
-
-        self.actor_layer_dim = actor_layer_dim
-        self.expert_layer_dim = expert_layer_dim
-
-
-        self.state_min = state_min
-        self.state_max = state_max
-
-        self.action_min = action_min
-        self.action_max = action_max
+        self.shared_layer_dim = config.shared_l1_dim
+        self.actor_layer_dim = config.actor_l2_dim
+        self.expert_layer_dim = config.expert_l2_dim
 
         self.input_norm = input_norm
-        self.norm_type = norm_type
+        self.norm_type = config.norm_type
 
-        self.rho = rho
-        self.num_samples = num_samples
-        self.num_modal = num_modal
+        self.rho = config.rho
+        self.num_samples = config.num_samples
+        self.num_modal = config.num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
-        self.action_selection = action_selection
+        self.action_selection = config.action_selection
 
-        # CEM Hydra network
-        self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha , self.q_prediction = self.build_network(scope_name='cem_hydra')
-        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='cem_hydra')
+        # original network
+        self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(scope_name='actorexpert')
+        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actorexpert')
 
         # Target network
-        self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha , self.target_q_prediction = self.build_network(scope_name='target_cem_hydra')
-        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_cem_hydra')
+        self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha, self.target_q_prediction = self.build_network(scope_name='target_actorexpert')
+        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_actorexpert')
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
@@ -54,24 +46,13 @@ class AE_CCEM_Network(BaseNetwork):
         # Optimization Op 
         with tf.control_dependencies(self.batchnorm_ops):
 
-            ### TODO Update loss 
-
-            # expert update
+            # Expert Update
             self.expert_loss = tf.reduce_mean(tf.squared_difference(self.predicted_q_value, self.q_prediction))
             self.expert_optimize = tf.train.AdamOptimizer(self.learning_rate[1]).minimize(self.expert_loss)
 
-
             # Actor update
-            # self.actor_loss = tf.reduce_mean(tf.squared_difference(self.actions, self.action_prediction))
-            # self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss)
             self.actor_loss = self.get_lossfunc(self.action_prediction_alpha, self.action_prediction_sigma, self.action_prediction_mean, self.actions)
             self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss)
-
-        # self.predict_action_op = self.predict_action_func(self.action_prediction_alpha, self.action_prediction_mean)
-        # self.predict_action_target_op = self.predict_action_target_func(self.target_action_prediction_alpha, self.target_action_prediction_mean)
-
-        # self.sample_action_op = self.sample_action_func()
-        # self.sample_action_target_op = self.sample_action_target_func()
 
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):
@@ -87,14 +68,10 @@ class AE_CCEM_Network(BaseNetwork):
 
         return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
 
-    def batch_norm_network(self, inputs, action, phase):
-        raise NotImplementedError
-
     def network(self, inputs, action, phase):
         # shared net
         shared_net = tf.contrib.layers.fully_connected(inputs, self.shared_layer_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),
-                                                       # tf.truncated_normal_initializer(), \
                                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
 
@@ -141,7 +118,6 @@ class AE_CCEM_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        #action_prediction_sigma = tf.exp(tf.clip_by_value(action_prediction_sigma, -3.0, 3.0))
         action_prediction_sigma = tf.exp(action_prediction_sigma)
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
@@ -189,16 +165,12 @@ class AE_CCEM_Network(BaseNetwork):
         # sigma: batch x num_modal x action_dim
         # mu: batch x num_modal x action_dim
         # y: batch x action_dim
-        # print(np.shape(y), np.shape(mu), np.shape(sigma))
         result = self.tf_normal(y, mu, sigma)
-        # print(np.shape(result), np.shape(alpha))
 
         result = tf.multiply(result, tf.squeeze(alpha, axis=2))
-        # print('get_lossfunc1',np.shape(result))
-        result = tf.reduce_sum(result, 1, keep_dims=True)
-        # print('get_lossfunc2',np.shape(result))
+        result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(result)
-        # exit()
+
         return tf.reduce_mean(result)
 
     def train_expert(self, *args):
@@ -258,20 +230,11 @@ class AE_CCEM_Network(BaseNetwork):
             self.setModalStats(alpha[0], mean[0], sigma[0])
 
             max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
-            # print('predict action')
-            # print('alpha', alpha, np.shape(alpha))
-            # print('max_idx', max_idx)
-            # print("mean", mean)
 
             best_mean = []
             for idx,m in zip(max_idx, mean):
-                # print(idx, m)
-                # print(m[idx])
                 best_mean.append(m[idx])
             best_mean = np.asarray(best_mean)
-            # print('best mean', best_mean, np.shape(best_mean))
-
-            # input()
 
         elif self.action_selection == 'highest_q_val':
             # mean: batchsize x num_modal x action_dim
@@ -282,9 +245,7 @@ class AE_CCEM_Network(BaseNetwork):
 
             self.setModalStats(alpha[0], mean[0], sigma[0])
 
-            # print('mean shape', np.shape(mean))
             mean_reshaped = np.reshape(mean, (np.shape(mean)[0] * np.shape(mean)[1], np.shape(mean)[2]))
-            # print('mean_reshaped', np.shape(mean_reshaped))
 
             stacked_state_batch = None
 
@@ -296,24 +257,15 @@ class AE_CCEM_Network(BaseNetwork):
                 else:
                     stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
 
-            # print('stacked_states', np.shape(stacked_state_batch))
-
             q_prediction = np.expand_dims(self.predict_q(stacked_state_batch, mean_reshaped, True), axis=0)
-
-            # print('q_pred', np.shape(q_prediction))
-            # print( (np.shape(mean)[0], np.shape(mean)[1], -1))
-
             q_prediction = np.squeeze(np.reshape(q_prediction, (np.shape(mean)[0], np.shape(mean)[1], -1)), axis=2)
 
-            # print('q_pred', q_prediction)
             best_mean = [mean[b][np.argmax(q_prediction[b])] for b in range(len(q_prediction))]
-            # print('mean', mean)
-            # print(best_mean)
-            # input()
 
+        else:
+            raise ValueError("Invalid value for config.action_selection")
         return best_mean
 
-        #######################
     def predict_action_target(self, *args):
         inputs = args[0]
         phase = args[1]
@@ -325,21 +277,12 @@ class AE_CCEM_Network(BaseNetwork):
         })
 
         max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
-        # print('predict action target')
-        # print('alpha', alpha, np.shape(alpha))
-        # print('max_idx', max_idx)
-        # print("mean", mean)
 
         best_mean = []
         for idx,m in zip(max_idx, mean):
-            # print(idx, m)
-            # print(m[idx])
             best_mean.append(m[idx])
-
         best_mean = np.asarray(best_mean)
-        # print('best mean', best_mean, np.shape(best_mean))
 
-        # input()
         return best_mean
 
     # Should return n actions
@@ -358,10 +301,6 @@ class AE_CCEM_Network(BaseNetwork):
         alpha = np.squeeze(alpha, axis=2)
 
         self.setModalStats(alpha[0], mean[0], sigma[0])
-        # print('alpha', alpha[0], np.shape(alpha[0]))
-        # print('mean', mean[0], np.shape(mean[0]))
-        # print('sigma', sigma[0], np.shape(sigma[0]))
-        # input()
 
         # for each transition in batch
         sampled_actions = []
@@ -370,9 +309,7 @@ class AE_CCEM_Network(BaseNetwork):
             # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
             sampled_actions.append(np.clip(actions,self.action_min, self.action_max))
-        
-        # print(sampled_actions, np.shape(sampled_actions))
-        # input()
+
         return sampled_actions
 
     # Should return n actions
@@ -388,44 +325,31 @@ class AE_CCEM_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        # print('sample action target')
-        # print('alpha', alpha, np.shape(alpha))
-        # print("mean", mean, np.shape(mean))
-
         assert(self.num_modal == np.shape(alpha)[1])
 
         # for each transition in batch
         sampled_actions = []
         for prob, m, s in zip(alpha, mean, sigma):
             modal_idx = np.random.choice(self.num_modal, self.num_samples, p = prob)
-            # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx ))
             sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
-        
-        # print(sampled_actions, np.shape(sampled_actions))
 
-        # input()
         return sampled_actions
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
-    # Buggy
     def getQFunction(self, state):
         return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0), 
                                             self.action: np.expand_dims(action, 0), 
-                                            self.phase:False})
+                                            self.phase: False})
 
     def getPolicyFunction(self, alpha, mean, sigma):
 
-        alpha = np.squeeze(alpha, axis=1)
+        # alpha = np.squeeze(alpha, axis=1)
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
-        # print('alpha', alpha)
-        # print('mean', mean)
-        # print('sigma', sigma)
-        # input()
         return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):

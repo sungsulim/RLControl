@@ -1,28 +1,40 @@
 from utils.replaybuffer import ReplayBuffer
 
+
 # Agent interface
 # Takes an environment (just so we can get some details from the environment like the number of observables and actions)
 class BaseAgent(object):
-    def __init__(self, env, config):
+    def __init__(self, config):
+
+        self.state_dim = config.state_dim
+        self.state_min = config.state_min
+        self.state_max = config.state_max
+
+        self.action_dim = config.action_dim
+        self.action_min = config.action_min
+        self.action_max = config.action_max
+
+        self.replay_buffer = ReplayBuffer(config.buffer_size)
+        self.batch_size = config.batch_size
+        self.warmup_steps = config.warmup_steps
+        self.gamma = config.gamma
+
         # to log useful stuff within agent
         self.write_log = config.write_log
         self.write_plot = config.write_plot
-        
-        self.state_dim = env.state_dim
-        self.state_min = env.state_min
-        self.state_max = env.state_max
-
-        self.action_dim = env.action_dim
-        self.action_min = env.action_min
-        self.action_max = env.action_max
 
         self.seed = None
         self.network = None
+        self.writer = config.writer
+        self.config = config
 
+        # set exploration
         if config.exploration_policy == 'ou_noise':
             from utils.exploration_policy import OrnsteinUhlenbeckProcess
             self.use_external_exploration = True
-            self.exploration_policy = OrnsteinUhlenbeckProcess(self.action_dim, self.action_min, self.action_max,
+            self.exploration_policy = OrnsteinUhlenbeckProcess(self.action_dim,
+                                                               self.action_min,
+                                                               self.action_max,
                                                                theta=config.ou_theta,
                                                                mu=config.ou_mu,
                                                                sigma=config.ou_sigma)
@@ -30,8 +42,8 @@ class BaseAgent(object):
         elif config.exploration_policy == 'epsilon_greedy':
             from utils.exploration_policy import EpsilonGreedy
             self.use_external_exploration = True
-            self.exploration_policy = EpsilonGreedy(self.action_min, self.action_max, config.annealing_steps,
-                                                    config.min_epsilon, config.max_epsilon, 
+            self.exploration_policy = EpsilonGreedy(self.action_min, self.action_max,
+                                                    config.annealing_steps, config.min_epsilon, config.max_epsilon,
                                                     is_continuous=True)
 
         elif config.exploration_policy == 'random_uniform':
@@ -45,11 +57,6 @@ class BaseAgent(object):
 
         else:
             raise NotImplementedError
-
-        self.replay_buffer = ReplayBuffer(config.buffer_size)    
-        self.batch_size = config.batch_size
-        self.warmup_steps = config.warmup_steps
-        self.gamma = config.gamma 
 
     def start(self, state, is_train):
         raise NotImplementedError
@@ -70,12 +77,6 @@ class BaseAgent(object):
     # Resets the agent between episodes. Should primarily be used to clear traces or other temporally linked parameters
     def reset(self):
         raise NotImplementedError
-
-    # set writer (to log useful stuff in tensorboard)
-    def set_writer(self, writer):
-        self.writer = writer
-        self.network.writer = writer
-
 
 
 

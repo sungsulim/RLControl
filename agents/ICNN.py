@@ -11,10 +11,21 @@ from agents.base_agent import BaseAgent # for python3
 # from base_agent import BaseAgent  # for python2
 from agents.network import entropy_network # for python3
 # from network import entropy_network # for python2
+import utils.plot_utils
 
 
 class InputConvexNetwork(object):
     def __init__(self, state_dim, state_min, state_max, action_dim, action_min, action_max, config, random_seed):
+
+        self.write_log = config.write_log
+        self.write_plot = config.write_plot
+
+        # record step n for tf Summary
+        self.train_global_steps = 0
+        self.eval_global_steps = 0
+        self.train_ep_count = 0
+        self.eval_ep_count = 0
+
 
         # type of normalization: 'none', 'batch', 'layer'
         self.norm_type = config.norm
@@ -50,17 +61,38 @@ class InputConvexNetwork(object):
             self.sess.run(tf.global_variables_initializer())
             self.critic_network.update_target_network()
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
         # initialize action space
         if self.inference == 'bundle_entropy':
             action_init = np.expand_dims((np.random.uniform(self.action_min, self.action_max) - self.action_min) * 1.0 / (self.action_max - self.action_min), 0)
             action_init = np.clip(action_init, 0.0001, 0.9999)
+
         elif self.inference == 'adam':
             action_init = np.expand_dims(np.random.uniform(self.action_min, self.action_max), 0)
         else:
             print('Do not know this inference method!')
             exit()
+
+
         action_final = self.critic_network.alg_opt(np.expand_dims(state, 0), action_init, self.inference_max_steps)[0]
+
+        if is_train:
+            self.train_global_steps += 1
+
+            # MOVED OUTSIDE TO PLOT BOTH EXPL AND GREEDY ACTION
+            # if self.write_plot:
+            #     if is_start:
+            #         self.train_ep_count += 1
+            #
+            #     func1 = self.critic_network.getQFunction(state)
+            #     # func2 = self.getPolicyFunction(best_action, covmat)
+            #
+            #     utils.plot_utils.plotFunction("ICNN", [func1], state, action_final, self.action_min, self.action_max,
+            #                                   display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(
+            #                                       self.train_global_steps),
+            #                                   save_title='steps_' + str(self.train_global_steps),
+            #                                   save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count, show=False)
+
         return action_final
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
@@ -118,29 +150,45 @@ class ICNN(BaseAgent):
         self.cum_steps = 0  # cumulative steps across episodes
 
     def start(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
-        return self.take_action(state, is_train)
+        return self.take_action(state, is_train, is_start=False)
 
-    def take_action(self, state, is_train):
+    def take_action(self, state, is_train, is_start):
 
         # random action during warmup
         if self.cum_steps < self.warmup_steps:
             action = np.random.uniform(self.action_min, self.action_max)
 
         else:
-            action = self.network.take_action(state, is_train)
+            action = self.network.take_action(state, is_train, is_start)
 
             # Train
             if is_train:
 
+                greedy_action = action
                 # if using an external exploration policy
                 if self.use_external_exploration:
-                    action = self.exploration_policy.generate(action, self.cum_steps)
+                    action = self.exploration_policy.generate(greedy_action, self.cum_steps)
 
                 # only increment during training, not evaluation
                 self.cum_steps += 1
+
+                if self.write_plot:
+                    if is_start:
+                        self.network.train_ep_count += 1
+
+                    func1 = self.network.critic_network.getQFunction(state)
+                    # func2 = self.getPolicyFunction(best_action, covmat)
+
+                    utils.plot_utils.plotFunction("ICNN", [func1], state, greedy_action, action, self.action_min,
+                                                  self.action_max,
+                                                  display_title='ep: ' + str(self.network.train_ep_count) + ', steps: ' + str(
+                                                      self.network.train_global_steps),
+                                                  save_title='steps_' + str(self.network.train_global_steps),
+                                                  save_dir=self.network.writer.get_logdir(), ep_count=self.network.train_ep_count,
+                                                  show=False)
 
             action = np.clip(action, self.action_min, self.action_max)
 
