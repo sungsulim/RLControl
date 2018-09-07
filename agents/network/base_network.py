@@ -8,10 +8,11 @@ class BaseNetwork(object):
         Args:
             sess: tf.Session()
             config: Configuration object
-            learning_rate: learning rate for training (Could be an array if two networks)
+            learning_rate: learning rate for training (Could be an array if two-headed network)
         """
         self.sess = sess
 
+        # Env config
         self.state_dim = config.state_dim
         self.state_min = config.state_min
         self.state_max = config.state_max
@@ -22,6 +23,8 @@ class BaseNetwork(object):
 
         self.learning_rate = learning_rate
         self.tau = config.tau
+
+        self.norm_type = config.norm_type
 
     def build_network(self, scope_name):
         """

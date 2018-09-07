@@ -1,72 +1,39 @@
 from __future__ import print_function
-
-from agents.base_agent import BaseAgent
 import random
 import numpy as np
 import tensorflow as tf
-import utils.exploration_policy
+
+from agents.base_agent import BaseAgent
+from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import ae_network
-from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 import utils.plot_utils
 
 
-class ActorExpert_Network(object):
-    def __init__(self, use_external_exploration, config, random_seed):
-
-        self.state_dim = config.state_dim
-        self.state_min = config.state_min
-        self.state_max = config.state_max
-
-        self.action_dim = config.action_dim
-        self.action_min = config.action_min
-        self.action_max = config.action_max
-
-        self.write_log = config.write_log
-        self.write_plot = config.write_plot
-        self.writer = config.writer
-
-        self.use_external_exploration = use_external_exploration
-
-        # record step for tf Summary
-        self.train_global_steps = 0
-        self.eval_global_steps = 0
-        self.train_ep_count = 0
-        self.eval_ep_count = 0
-
-        # type of normalization: 'none', 'batch', 'layer', 'input_norm'
-        self.norm_type = config.norm
-
-        if config.norm is not 'none':
-            self.input_norm = RunningMeanStd(self.state_dim)
-        else:
-            self.input_norm = None
-
-        # self.episode_ave_max_q = 0.0
-        self.graph = tf.Graph()
+class ActorExpert_Network_Manager(BaseNetwork_Manager):
+    def __init__(self, config, random_seed):
+        super(ActorExpert_Network_Manager, self).__init__(config)
 
         # Cross Entropy Method Params
         self.rho = config.rho
         self.num_samples = config.num_samples
 
-        # Action selection mode
-        self.action_selection = config.action_selection
-
         with self.graph.as_default():
             tf.set_random_seed(random_seed)
-            self.sess = tf.Session() 
-
+            self.sess = tf.Session()
             self.hydra_network = ae_network.ActorExpert_Network(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
 
     def take_action(self, state, is_train, is_start):
 
-        if is_train:
+        greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
 
-            # just return the best action
+        if is_train:
+            if is_start:
+                self.train_ep_count += 1
+
             if self.use_external_exploration:
-                chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
-                chosen_action = np.clip(chosen_action, self.action_min, self.self.action_max)
+                chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
             else:
                 # single state so first idx
                 sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
@@ -74,41 +41,36 @@ class ActorExpert_Network(object):
                 # Choose one random action among n actions
                 idx = np.random.randint(len(sampled_actions))
                 chosen_action = sampled_actions[idx]
-                chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
 
             self.train_global_steps += 1
 
             if self.write_log:
-
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
-                if not self.use_external_exploration:
-                    alpha, mean, sigma = self.hydra_network.getModalStats()
-                    for i in range(len(alpha)):
-                        write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
-                        write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
-                        write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
+                # Currently only works for 1D action
+                # if not self.use_external_exploration:
+                #     alpha, mean, sigma = self.hydra_network.getModalStats()
+                #     for i in range(len(alpha)):
+                #         write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
+                #         write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
+                #         write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
             if self.write_plot:
-                if is_start:
-                    self.train_ep_count += 1
-
                 alpha, mean, sigma = self.hydra_network.getModalStats()
                 func1 = self.hydra_network.getQFunction(state)
                 func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
-                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, mean, chosen_action,
+                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, greedy_action, chosen_action,
                                               self.action_min, self.action_max,
                                               display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                                               show=False)
-
         else:
-            # Use mean directly
-            chosen_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
-            chosen_action = np.clip(chosen_action, self.action_min, self.action_max)
+            if is_start:
+                self.eval_ep_count += 1
 
+            chosen_action = greedy_action
             self.eval_global_steps += 1
 
             if self.write_log:
@@ -187,7 +149,8 @@ class ActorExpert_Network(object):
         self.hydra_network.update_target_network()
 
     def reset(self):
-        pass
+        if self.exploration_policy:
+            self.exploration_policy.reset()
 
 
 class ActorExpert(BaseAgent):
@@ -198,10 +161,7 @@ class ActorExpert(BaseAgent):
         random.seed(random_seed)
         
         # Network
-        self.network = ActorExpert_Network(self.use_external_exploration, config,
-                                           random_seed=random_seed)
-        
-        self.cum_steps = 0  # cumulative steps across episodes: For warmup steps
+        self.network_manager = ActorExpert_Network_Manager(config, random_seed=random_seed)
 
     def start(self, state, is_train):
         return self.take_action(state, is_train, is_start=True)
@@ -210,24 +170,11 @@ class ActorExpert(BaseAgent):
         return self.take_action(state, is_train, is_start=False)
 
     def take_action(self, state, is_train, is_start):
-
-        if self.cum_steps < self.warmup_steps:
+        if is_train and self.replay_buffer.get_size() < self.warmup_steps:
             action = np.random.uniform(self.action_min, self.action_max)
-
         else:
-            action = self.network.take_action(state, is_train, is_start)
+            action = self.network_manager.take_action(state, is_train, is_start)
 
-            # Train
-            if is_train:
-
-                # if using an external exploration policy
-                if self.use_external_exploration:
-                    action = self.exploration_policy.generate(action, self.cum_steps)
-
-                # only increment during training, not evaluation
-                self.cum_steps += 1
-
-            action = np.clip(action, self.action_min, self.action_max)
         return action
 
     def update(self, state, next_state, reward, action, is_terminal, is_truncated):
@@ -238,24 +185,19 @@ class ActorExpert(BaseAgent):
             else:
                 self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-        if self.network.norm_type is not 'none':
-            self.network.input_norm.update(np.array([state]))
+        if self.norm_type is not 'none':
+            self.network_manager.input_norm.update(np.array([state]))
         self.learn()
 
     def learn(self):
 
         if self.replay_buffer.get_size() > max(self.warmup_steps, self.batch_size):
             state, action, reward, next_state, gamma = self.replay_buffer.sample_batch(self.batch_size)
-            self.network.update_network(state, action, next_state, reward, gamma)
+            self.network_manager.update_network(state, action, next_state, reward, gamma)
         else:
             return
 
-    # not implemented
-    def get_Qfunction(self, state):
-        raise NotImplementedError
-
     def reset(self):
-        self.network.reset()
-        if self.exploration_policy:
-            self.exploration_policy.reset()
+        self.network_manager.reset()
+
 

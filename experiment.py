@@ -78,7 +78,7 @@ class Experiment(object):
     def run_episode_train(self, is_train):
         
         obs = self.train_environment.reset()
-        self.agent.reset() # Need to be careful in Agent not to reset the weight
+        self.agent.reset()  # Need to be careful in Agent not to reset the weight
 
         episode_reward = 0.
         done = False

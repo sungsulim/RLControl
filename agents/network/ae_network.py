@@ -308,7 +308,7 @@ class ActorExpert_Network(BaseNetwork):
             modal_idx = np.random.choice(self.num_modal, self.num_samples, p = prob)
             # print(modal_idx)
             actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
-            sampled_actions.append(np.clip(actions,self.action_min, self.action_max))
+            sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
 
         return sampled_actions
 
