@@ -160,7 +160,7 @@ class ActorExpert(BaseAgent):
         np.random.seed(random_seed)
         random.seed(random_seed)
         
-        # Network
+        # Network Manager
         self.network_manager = ActorExpert_Network_Manager(config, random_seed=random_seed)
 
     def start(self, state, is_train):

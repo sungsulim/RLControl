@@ -12,8 +12,8 @@ class ActorExpert_Network(BaseNetwork):
         self.expert_layer_dim = config.expert_l2_dim
 
         self.input_norm = input_norm
-        self.norm_type = config.norm_type
 
+        # ae specific params
         self.rho = config.rho
         self.num_samples = config.num_samples
         self.num_modal = config.num_modal
@@ -32,6 +32,7 @@ class ActorExpert_Network(BaseNetwork):
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
 
+        # TODO: Currently doesn't support batchnorm
         if self.norm_type == 'batch':
             raise NotImplementedError
 

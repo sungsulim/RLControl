@@ -15,6 +15,7 @@ class BaseNetwork_Manager(object):
         self.action_min = config.action_min
         self.action_max = config.action_max
 
+        # Log config
         self.write_log = config.write_log
         self.write_plot = config.write_plot
         self.writer = config.writer
