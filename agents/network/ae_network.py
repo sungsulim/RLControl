@@ -59,7 +59,7 @@ class ActorExpert_Network(BaseNetwork):
         with tf.variable_scope(scope_name):
             inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
             phase = tf.placeholder(tf.bool)
-            action = tf.placeholder(tf.float32, [None, self.action_dim])
+            action = tf.placeholder(tf.float32, shape=(None, self.action_dim))
 
             # normalize inputs
             if self.norm_type is not 'none':
