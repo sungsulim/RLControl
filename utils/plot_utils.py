@@ -41,7 +41,6 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].grid(True)
             ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
             ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
-            ax[1].axvline(x=greedy_action[1], linewidth=1.5, color='red')
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
@@ -77,7 +76,6 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].grid(True)
             ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
             ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
-            ax[1].axvline(x=greedy_action[1], linewidth=1.5, color='red')
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
