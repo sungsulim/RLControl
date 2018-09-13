@@ -21,10 +21,11 @@
 
         "rho": [0.2],
         "num_samples": [30],
-        "num_modal": [1],
+        "num_modal": [2],
 
-        "policy_gd_alpha": [1e-0],
+        "policy_gd_alpha": [1e-1],
         "policy_gd_max_steps": [50],
-        "policy_gd_stop": [1e-3]
+        "policy_gd_stop": [1e-3],
+        "use_policy_gd": ["True"]
     }
 }

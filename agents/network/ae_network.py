@@ -22,7 +22,9 @@ class ActorExpert_Network(BaseNetwork):
         self.policy_gd_alpha = config.policy_gd_alpha
         self.policy_gd_max_steps = config.policy_gd_max_steps
         self.policy_gd_stop = config.policy_gd_stop
-
+        self.use_policy_gd = False
+        if config.use_policy_gd == "True":
+            self.use_policy_gd = True
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(scope_name='actorexpert')
@@ -223,7 +225,7 @@ class ActorExpert_Network(BaseNetwork):
 
             ascent_count += 1
 
-        # print('ascent count:', ascent_count)
+        print('ascent count:', ascent_count)
         return action
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
@@ -310,7 +312,11 @@ class ActorExpert_Network(BaseNetwork):
             # exit()
             # print('before', best_mean)
             # best_mean = self.policy_gradient_ascent(np.squeeze(alpha, axis=2), np.squeeze(mean, axis=2), np.squeeze(sigma, axis=2), best_mean)
-            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            old_best_mean = best_mean
+            if self.use_policy_gd:
+                print('taking action')
+                best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+
             # print('after', best_mean)
 
         elif self.action_selection == 'highest_q_val':
@@ -342,7 +348,7 @@ class ActorExpert_Network(BaseNetwork):
         else:
             raise ValueError("Invalid value for config.action_selection")
 
-        return best_mean
+        return old_best_mean, best_mean
 
     def predict_action_target(self, *args):
         inputs = args[0]
@@ -367,7 +373,10 @@ class ActorExpert_Network(BaseNetwork):
         # print(np.shape(best_mean))
         # exit()
         # print('before', best_mean)
-        best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+        old_best_mean = best_mean
+        if self.use_policy_gd:
+            print("getting target")
+            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
         # print('after', best_mean)
         return best_mean
 

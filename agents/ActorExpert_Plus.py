@@ -26,7 +26,11 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
 
     def take_action(self, state, is_train, is_start):
 
-        greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
+        # greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
+        old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+
+        old_greedy_action = old_greedy_action[0]
+        greedy_action = greedy_action[0]
 
         if is_train:
             if is_start:
@@ -60,7 +64,7 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                 func1 = self.hydra_network.getQFunction(state)
                 func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
-                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, greedy_action, chosen_action,
+                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, [greedy_action, old_greedy_action, mean], chosen_action,
                                               self.action_min, self.action_max,
                                               display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(
                                                   self.train_global_steps),

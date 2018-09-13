@@ -22,6 +22,13 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
     if agent_name == 'ActorExpert':
         func1, func2 = func_list[0], func_list[1]
+
+        mean_0 = greedy_action[2][0]
+        mean_1 = greedy_action[2][1]
+
+        old_greedy_action = greedy_action[1]
+        greedy_action = greedy_action[0]
+
         for point_x in x:
             point_y1 = np.squeeze(func1([point_x]))  # reduce dimension
             point_y2 = func2(point_x)
@@ -40,6 +47,9 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[0].grid(True)
             ax[1].grid(True)
             ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=mean_0[0], linewidth=1.5, color='grey')
+            ax[1].axvline(x=mean_1[0], linewidth=1.5, color='grey')
+            ax[1].axvline(x=old_greedy_action[0], linewidth=1.5, color='pink')
             ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
@@ -57,6 +67,10 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
     elif agent_name == 'ActorExpert_Plus':
         func1, func2 = func_list[0], func_list[1]
+
+        old_greedy_action = greedy_action[1]
+        greedy_action = greedy_action[0]
+
         for point_x in x:
             point_y1 = np.squeeze(func1([point_x]))  # reduce dimension
             point_y2 = func2(point_x)
@@ -75,6 +89,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[0].grid(True)
             ax[1].grid(True)
             ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=old_greedy_action[0], linewidth=1.5, color='pink')
             ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
