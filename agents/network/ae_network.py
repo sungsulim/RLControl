@@ -18,12 +18,20 @@ class ActorExpert_Network(BaseNetwork):
         self.num_samples = config.num_samples
         self.num_modal = config.num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
-
         self.action_selection = config.action_selection
+        self.policy_gd_alpha = config.policy_gd_alpha
+        self.policy_gd_max_steps = config.policy_gd_max_steps
+        self.policy_gd_stop = config.policy_gd_stop
+
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(scope_name='actorexpert')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actorexpert')
+
+        # print(np.shape(self.action_prediction_alpha))
+        # print(np.shape(self.action_prediction_mean))
+        # print(np.shape(self.action_prediction_sigma))
+        # exit()
 
         # Target network
         self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha, self.target_q_prediction = self.build_network(scope_name='target_actorexpert')
@@ -55,11 +63,15 @@ class ActorExpert_Network(BaseNetwork):
             self.actor_loss = self.get_lossfunc(self.action_prediction_alpha, self.action_prediction_sigma, self.action_prediction_mean, self.actions)
             self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss)
 
+        # # Get the gradient of the policy w.r.t. the action
+        self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
+        self.policy_action_grads = tf.gradients(self.policy_func, self.temp_action)
+
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):
-            inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
-            phase = tf.placeholder(tf.bool)
-            action = tf.placeholder(tf.float32, shape=(None, self.action_dim))
+            inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim), name="network_input_state")
+            phase = tf.placeholder(tf.bool, name="network_input_phase")
+            action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
 
             # normalize inputs
             if self.norm_type is not 'none':
@@ -157,9 +169,22 @@ class ActorExpert_Network(BaseNetwork):
 
         # stacked y: batch x num_modal x action_dim
         stacked_y = tf.expand_dims(y, 1)
-        stacked_y = tf.tile(stacked_y, [1, self.num_modal,1])
+        stacked_y = tf.tile(stacked_y, [1, self.num_modal, 1])
 
         return tf.reduce_prod(tf.sqrt(1.0 / (2 * np.pi * tf.square(sigma))) * tf.exp(-tf.square(stacked_y - mu) / (2 * tf.square(sigma))), axis=2)
+
+    def get_policyfunc(self):
+
+        alpha = tf.placeholder(tf.float32, shape=(None, self.num_modal, 1), name='temp_alpha')
+        mean = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_mean')
+        sigma = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_sigma')
+        action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name='temp_action')
+
+        result = self.tf_normal(action, mean, sigma)
+        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+        result = tf.reduce_sum(result, 1, keepdims=True)
+
+        return alpha, mean, sigma, action, result
 
     def get_lossfunc(self, alpha, sigma, mu, y):
         # alpha: batch x num_modal x 1
@@ -173,6 +198,47 @@ class ActorExpert_Network(BaseNetwork):
         result = -tf.log(result)
 
         return tf.reduce_mean(result)
+
+    def policy_gradient_ascent(self, alpha, mean, sigma, action_init):
+
+        action = np.copy(action_init)
+
+        ascent_count = 0
+        update_flag = np.ones([alpha.shape[0], self.action_dim])  # batch_size * action_dim
+
+        while np.any(update_flag > 0) and ascent_count < self.policy_gd_max_steps:
+            action_old = np.copy(action)
+
+            # print(np.shape(self.policy_action_gradients(alpha, mean, sigma, action)))
+            # exit()
+            gradients = self.policy_action_gradients(alpha, mean, sigma, action)[0]
+            action += update_flag * self.policy_gd_alpha * gradients
+            action = np.clip(action, self.action_min, self.action_max)
+
+            # stop if action diff. is small
+            stop_idx = [idx for idx in range(len(action)) if
+                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= self.policy_gd_stop]
+            update_flag[stop_idx] = 0
+            # print(update_flag)
+
+            ascent_count += 1
+
+        # print('ascent count:', ascent_count)
+        return action
+
+    def policy_action_gradients(self, alpha, mean, sigma, action):
+
+        # print(np.shape(alpha), type(self.temp_alpha))
+        # print(np.shape(mean), type(self.temp_mean))
+        # print(np.shape(sigma), type(self.temp_sigma))
+        # print(np.shape(action), type(self.temp_action))
+
+        return self.sess.run(self.policy_action_grads, feed_dict={
+            self.temp_alpha: alpha,
+            self.temp_mean: mean,
+            self.temp_sigma: sigma,
+            self.temp_action: action
+        })
 
     def train_expert(self, *args):
         # args (inputs, action, predicted_q_value)
@@ -237,6 +303,16 @@ class ActorExpert_Network(BaseNetwork):
                 best_mean.append(m[idx])
             best_mean = np.asarray(best_mean)
 
+            # print(np.shape(alpha))
+            # print(np.shape(mean))
+            # print(np.shape(sigma))
+            # print(np.shape(best_mean))
+            # exit()
+            # print('before', best_mean)
+            # best_mean = self.policy_gradient_ascent(np.squeeze(alpha, axis=2), np.squeeze(mean, axis=2), np.squeeze(sigma, axis=2), best_mean)
+            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            # print('after', best_mean)
+
         elif self.action_selection == 'highest_q_val':
             # mean: batchsize x num_modal x action_dim
             alpha, mean, sigma = self.sess.run([self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
@@ -265,6 +341,7 @@ class ActorExpert_Network(BaseNetwork):
 
         else:
             raise ValueError("Invalid value for config.action_selection")
+
         return best_mean
 
     def predict_action_target(self, *args):
@@ -272,7 +349,7 @@ class ActorExpert_Network(BaseNetwork):
         phase = args[1]
 
         # batchsize x num_modal x action_dim
-        alpha, mean = self.sess.run([self.target_action_prediction_alpha, self.target_action_prediction_mean], feed_dict={
+        alpha, mean, sigma = self.sess.run([self.target_action_prediction_alpha, self.target_action_prediction_mean, self.target_action_prediction_sigma], feed_dict={
             self.target_inputs: inputs,
             self.target_phase: phase
         })
@@ -284,6 +361,14 @@ class ActorExpert_Network(BaseNetwork):
             best_mean.append(m[idx])
         best_mean = np.asarray(best_mean)
 
+        # print(np.shape(alpha))
+        # print(np.shape(mean))
+        # print(np.shape(sigma))
+        # print(np.shape(best_mean))
+        # exit()
+        # print('before', best_mean)
+        best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+        # print('after', best_mean)
         return best_mean
 
     # Should return n actions
@@ -354,10 +439,10 @@ class ActorExpert_Network(BaseNetwork):
         return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
-        self.temp_alpha = alpha
-        self.temp_mean = mean
-        self.temp_sigma = sigma
+        self.saved_alpha = alpha
+        self.saved_mean = mean
+        self.saved_sigma = sigma
 
     def getModalStats(self):
-        return self.temp_alpha, self.temp_mean, self.temp_sigma
+        return self.saved_alpha, self.saved_mean, self.saved_sigma
 
