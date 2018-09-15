@@ -15,20 +15,24 @@
         "actor_l2_dim": [200],
         "expert_l2_dim": [200],
 
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "expert_lr": [1e-2, 1e-3, 1e-4],
+
         "rho": [1.0],
         "num_samples": [1],
         "num_modal": [2],
-
-        "gd_alpha": [1e-2],
-        "gd_max_steps": [10],
-        "gd_stop": [1e-3],
 
         "policy_gd_alpha": [1e-1],
         "policy_gd_max_steps": [50],
         "policy_gd_stop": [1e-3],
         "use_policy_gd": ["False"],
 
-        "actor_lr": [1e-3, 1e-4, 1e-5],
-        "expert_lr": [1e-2, 1e-3, 1e-4]
+        "gd_alpha": [1e-2],
+        "gd_max_steps": [10],
+        "gd_stop": [1e-3]
+
+
+
+
     }
 }
