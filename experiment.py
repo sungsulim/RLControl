@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 import tensorflow as tf
 
-output_ep_result_fq = 100  # print to console (not saved output) after this many episodes
+output_ep_result_fq = 1  # print to console (not saved output) after this many episodes
 save_maxQ_fq = -1  # plot cost-to-go after this many episodes
 plot_maxA_fq = -1  # plot maxA after this many episodes
 
@@ -39,8 +39,8 @@ class Experiment(object):
     def run(self):
 
         episode_count = 0
-
-        print("Start run at: " + str(datetime.now())+'\n')
+        start_run = datetime.now()
+        print("Start run at: " + str(start_run)+'\n')
         self.start_time = time.time()
         # pr.enable()
 
@@ -57,7 +57,7 @@ class Experiment(object):
                 elapsed_time = self.end_time - self.start_time
                 self.start_time = self.end_time
 
-                print("Train:: ep: "+ str(episode_count) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+                print("Train:: ep: " + str(episode_count) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
 
             if not force_terminated: 
                 self.train_rewards_per_episode.append(episode_reward)
@@ -70,8 +70,10 @@ class Experiment(object):
         
             episode_count += 1
 
-        self.train_environment.close() # clear environment memory
-        print("End run at: " + str(datetime.now())+'\n')
+        self.train_environment.close()  # clear environment memory
+        end_run = datetime.now()
+        print("End run at: " + str(end_run)+'\n')
+        print("Time taken: "+str(end_run - start_run))
         return self.train_rewards_per_episode, self.eval_mean_rewards_per_episode, self.eval_std_rewards_per_episode
 
     # Runs a single episode (TRAIN)
