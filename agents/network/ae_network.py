@@ -225,7 +225,7 @@ class ActorExpert_Network(BaseNetwork):
 
             ascent_count += 1
 
-        print('ascent count:', ascent_count)
+        # print('ascent count:', ascent_count)
         return action
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
@@ -314,7 +314,7 @@ class ActorExpert_Network(BaseNetwork):
             # best_mean = self.policy_gradient_ascent(np.squeeze(alpha, axis=2), np.squeeze(mean, axis=2), np.squeeze(sigma, axis=2), best_mean)
             old_best_mean = best_mean
             if self.use_policy_gd:
-                print('taking action')
+                # print('taking action')
                 best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
 
             # print('after', best_mean)
@@ -375,7 +375,7 @@ class ActorExpert_Network(BaseNetwork):
         # print('before', best_mean)
         old_best_mean = best_mean
         if self.use_policy_gd:
-            print("getting target")
+            # print("computing target")
             best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
         # print('after', best_mean)
         return best_mean

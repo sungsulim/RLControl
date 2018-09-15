@@ -125,7 +125,8 @@ def main():
         params_names += (key + '_')
 
     params = np.array(params)
-    name = prefix + params_names + 'Params.txt'
+    # name = prefix + params_names + 'Params.txt'
+    name = prefix + '_agent_' + 'Params.txt'
 
     params.tofile(name, sep=',', format='%s')
 
