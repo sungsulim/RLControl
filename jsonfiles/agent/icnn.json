@@ -5,10 +5,6 @@
         "norm_type": ["input_norm"],
         "exploration_policy": ["ou_noise"],
 
-        "ou_theta": [0.15],
-        "ou_mu": [0.0],
-        "ou_sigma": [0.2],
-
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
 

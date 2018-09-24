@@ -7,10 +7,6 @@
 
         "exploration_policy": ["none"],
 
-        "ou_theta": [0.15],
-        "ou_mu": [0.0],
-        "ou_sigma": [0.2],
-
         "shared_l1_dim": [200],
         "actor_l2_dim": [200],
         "expert_l2_dim": [200],

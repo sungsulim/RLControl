@@ -3,7 +3,7 @@ class Config:
     # default setting
     def __init__(self):
         
-        #self.parser = argparse.ArgumentParser()
+        # self.parser = argparse.ArgumentParser()
 
         self.norm = None
         self.exploration_policy = None
@@ -14,6 +14,11 @@ class Config:
 
         self.tau = 0.01
         self.gamma = 0.99
+
+        # if using OU noise for exploration
+        self.ou_theta = 0.15
+        self.ou_mu = 0.0
+        self.ou_sigma = 0.2
 
     # add custom setting
     def merge_config(self, custom_config):
