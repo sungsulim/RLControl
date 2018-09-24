@@ -67,7 +67,8 @@ class CriticNetwork(BaseNetwork):
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
             if self.norm_type is not 'none':
-                inputs = self.input_norm.normalize(inputs)
+                # inputs = self.input_norm.normalize(inputs)
+                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             outputs = self.network(inputs, action, phase)
 
