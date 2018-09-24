@@ -3,7 +3,7 @@ import random
 import numpy as np
 import tensorflow as tf
 
-from agents.base_agent import BaseAgent # for python3
+from agents.base_agent import BaseAgent  # for python3
 from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import actor_network
 from agents.network import critic_network
@@ -20,14 +20,16 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
 
         with self.graph.as_default():
             tf.set_random_seed(random_seed)
-            self.sess = tf.Session() 
-
-            # actor_layer_dim = [config.actor_l1_dim, config.actor_l2_dim]
-            # critic_layer_dim = [config.critic_l1_dim, config.critic_l2_dim]
+            self.sess = tf.Session()
 
             self.actor_network = actor_network.ActorNetwork(self.sess, self.input_norm, config)
             self.critic_network = critic_network.CriticNetwork(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
+
+            ######
+            self.actor_network.init_target_network()
+            self.critic_network.init_target_network()
+            ######
 
     def take_action(self, state, is_train, is_start):
 

@@ -18,7 +18,7 @@ class CriticNetwork(BaseNetwork):
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic')
 
         # Target network
-        self.target_inputs, self.target_phase, self.target_action, self.target_outputs = self.build_network(scope_name = 'target_critic')
+        self.target_inputs, self.target_phase, self.target_action, self.target_outputs = self.build_network(scope_name='target_critic')
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_critic')
         
         # Network target (y_i)
@@ -27,6 +27,9 @@ class CriticNetwork(BaseNetwork):
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
+
+        # Op for init. target network with identical parameter as the original network
+        self.init_target_net_params = [tf.assign(self.target_net_params[idx], self.net_params[idx]) for idx in range(len(self.target_net_params))]
 
         if self.norm_type == 'batch':
             # Batchnorm Ops and Vars
@@ -186,7 +189,10 @@ class CriticNetwork(BaseNetwork):
             self.predicted_q_value: args[2],
             self.phase: True
         })
-        
+
+    def init_target_network(self):
+        self.sess.run(self.init_target_net_params)
+
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 

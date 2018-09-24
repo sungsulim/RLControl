@@ -12,15 +12,18 @@ class ActorNetwork(BaseNetwork):
         self.input_norm = input_norm
 
         # Actor network
-        self.inputs, self.phase, self.outputs, self.scaled_outputs = self.build_network(scope_name = 'actor')
+        self.inputs, self.phase, self.outputs, self.scaled_outputs = self.build_network(scope_name='actor')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actor')
 
         # Target network
-        self.target_inputs, self.target_phase, self.target_outputs, self.target_scaled_outputs = self.build_network(scope_name ='target_actor')
+        self.target_inputs, self.target_phase, self.target_outputs, self.target_scaled_outputs = self.build_network(scope_name='target_actor')
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_actor')
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
+
+        # Op for init. target network with identical parameter as the original network
+        self.init_target_net_params = [tf.assign(self.target_net_params[idx], self.net_params[idx]) for idx in range(len(self.target_net_params))]
 
         # Temporary placeholder action gradient
         self.action_gradients = tf.placeholder(tf.float32, [None, self.action_dim])
@@ -119,6 +122,9 @@ class ActorNetwork(BaseNetwork):
             self.target_inputs: inputs,
             self.target_phase: phase,
         })
+
+    def init_target_network(self):
+        self.sess.run(self.init_target_net_params)
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])

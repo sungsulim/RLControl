@@ -21,7 +21,7 @@ class NAF_Network_Manager(BaseNetwork_Manager):
             self.network = naf_network.NAF_Network(self.sess, self.input_norm, config)
 
             self.sess.run(tf.global_variables_initializer())
-            self.sess.run(self.network.init_target_net_params)
+            self.network.init_target_network()
 
     '''return an action to take for each state'''
     def take_action(self, state, is_train, is_start):

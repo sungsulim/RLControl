@@ -41,6 +41,9 @@ class ActorExpert_Network(BaseNetwork):
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
 
+        # Op for init. target network with identical parameter as the original network
+        self.init_target_net_params = [tf.assign(self.target_net_params[idx], self.net_params[idx]) for idx in range(len(self.target_net_params))]
+
         # TODO: Currently doesn't support batchnorm
         if self.norm_type == 'batch':
             raise NotImplementedError
@@ -400,6 +403,9 @@ class ActorExpert_Network(BaseNetwork):
             sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
 
         return sampled_actions
+
+    def init_target_network(self):
+        self.sess.run(self.init_target_net_params)
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])

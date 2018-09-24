@@ -173,6 +173,9 @@ class NAF_Network(BaseNetwork):
 
         return sampled_action, covmat
 
+    def init_target_network(self):
+        self.sess.run(self.init_target_net_params)
+
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 

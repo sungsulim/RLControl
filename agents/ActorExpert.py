@@ -24,6 +24,9 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
             self.hydra_network = ae_network.ActorExpert_Network(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
 
+            self.hydra_network.init_target_network()
+
+
     def take_action(self, state, is_train, is_start):
 
         # greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
