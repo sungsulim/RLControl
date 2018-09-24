@@ -21,7 +21,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
         self.gd_max_steps = config.gd_max_steps
         self.gd_stop = config.gd_stop
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
-        self.action_selection = config.action_selection
 
         self.policy_gd_alpha = config.policy_gd_alpha
         self.policy_gd_max_steps = config.policy_gd_max_steps
@@ -310,59 +309,28 @@ class ActorExpert_Plus_Network(BaseNetwork):
         inputs = args[0]
         phase = args[1]
 
-        if self.action_selection == 'highest_alpha':
+        # alpha: batchsize x num_modal x 1
+        # mean: batchsize x num_modal x action_dim
+        alpha, mean, sigma = self.sess.run(
+            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
+                self.inputs: inputs,
+                self.phase: phase
+            })
 
-            # alpha: batchsize x num_modal x 1
-            # mean: batchsize x num_modal x action_dim
-            alpha, mean, sigma = self.sess.run(
-                [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                    self.inputs: inputs,
-                    self.phase: phase
-                })
+        self.setModalStats(alpha[0], mean[0], sigma[0])
 
-            self.setModalStats(alpha[0], mean[0], sigma[0])
+        max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
 
-            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        best_mean = []
+        for idx, m in zip(max_idx, mean):
+            best_mean.append(m[idx])
+        best_mean = np.asarray(best_mean)
 
-            best_mean = []
-            for idx, m in zip(max_idx, mean):
-                best_mean.append(m[idx])
-            best_mean = np.asarray(best_mean)
+        old_best_mean = best_mean
+        if self.use_policy_gd:
+            # print("taking action")
+            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
 
-            old_best_mean = best_mean
-            if self.use_policy_gd:
-                # print("taking action")
-                best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
-
-        elif self.action_selection == 'highest_q_val':
-            # mean: batchsize x num_modal x action_dim
-            alpha, mean, sigma = self.sess.run(
-                [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                    self.inputs: inputs,
-                    self.phase: phase
-                })
-
-            self.setModalStats(alpha[0], mean[0], sigma[0])
-
-            mean_reshaped = np.reshape(mean, (np.shape(mean)[0] * np.shape(mean)[1], np.shape(mean)[2]))
-
-            stacked_state_batch = None
-
-            for state in inputs:
-                stacked_one_state = np.tile(state, (self.num_modal, 1))
-
-                if stacked_state_batch is None:
-                    stacked_state_batch = stacked_one_state
-                else:
-                    stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-
-            q_prediction = np.expand_dims(self.predict_q(stacked_state_batch, mean_reshaped, True), axis=0)
-            q_prediction = np.squeeze(np.reshape(q_prediction, (np.shape(mean)[0], np.shape(mean)[1], -1)), axis=2)
-
-            best_mean = [mean[b][np.argmax(q_prediction[b])] for b in range(len(q_prediction))]
-
-        else:
-            raise ValueError("Invalid value for config.action_selection")
         return old_best_mean, best_mean
 
     def predict_action_target(self, *args):

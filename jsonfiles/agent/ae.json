@@ -2,7 +2,6 @@
     "agent": "ActorExpert",
 
     "sweeps": {
-        "action_selection": ["highest_alpha"],
         "norm_type": ["input_norm", "layer"],
 
         "exploration_policy": ["none"],
