@@ -93,6 +93,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         # Expert Update
 
         # TODO: Perhaps do GA on the policy function
+        # Currently using Target Actor
         next_action_batch_final_target = self.hydra_network.predict_action_target(next_state_batch, True)
 
         # batchsize * n
