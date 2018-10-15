@@ -2,6 +2,7 @@
     "agent": "QT_OPT",
 
     "sweeps": {
+
         "norm_type": ["input_norm", "layer"],
 
         "exploration_policy": ["none"],
@@ -10,9 +11,8 @@
         "qnet_l2_dim": [200],
 
         "qnet_lr": [1e-2, 1e-3, 1e-4],
-
-        "num_iter": [2],
         "num_samples": [64],
-        "top_m": [6]
+        "top_m": [6],
+        "num_iter": [2,4]
     }
 }

@@ -29,8 +29,9 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
             ######
 
     def take_action(self, state, is_train, is_start):
-        temp = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
-        chosen_action, greedy_action = temp[0][0], temp[1][0]
+        sample, mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
+        chosen_action = sample[0]
+        greedy_action = mean_std[0][0]
 
         if is_train:
 
@@ -45,7 +46,7 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
             if self.write_plot:
                 func1 = self.qt_opt_network.getQFunction(state)
 
-                # utils.plot_utils.plotFunction("QT_OPT", [func1], state, greedy_action, chosen_action, self.action_min,
+                # utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, chosen_action], self.action_min,
                 #                               self.action_max,
                 #                               display_title='ep: ' + str(
                 #                                   self.train_ep_count) + ', steps: ' + str(

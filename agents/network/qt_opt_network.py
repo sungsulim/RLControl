@@ -135,10 +135,10 @@ class QTOPTNetwork(BaseNetwork):
             # sample batch_num x num_samples: (n,64)
             # Make
             if action_samples_batch is None and mean_std_arr is None:
-                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples))
+                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
 
             else:
-                action_samples_batch = np.array([np.random.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
+                action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
             ## stack states
@@ -157,10 +157,11 @@ class QTOPTNetwork(BaseNetwork):
             selected_action_samples_batch = np.array([action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state in zip(action_samples_batch, selected_idxs)])
 
             # fit gaussian
-            mean_std_arr = np.array([norm.fit(action_samples) for action_samples in selected_action_samples_batch])
+            # mean_std_arr = np.array([norm.fit(action_samples) for action_samples in selected_action_samples_batch])
+            mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
 
         # return mean for each state
-        final_action_mean_batch = np.array([[mean] for (mean, std) in mean_std_arr])
+        final_action_mean_batch = np.array([mean for (mean, std) in mean_std_arr])
         return final_action_mean_batch
 
 
@@ -175,10 +176,10 @@ class QTOPTNetwork(BaseNetwork):
             # sample batch_num x num_samples: (n,64)
             # Make
             if action_samples_batch is None and mean_std_arr is None:
-                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples))
+                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
 
             else:
-                action_samples_batch = np.array([np.random.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
+                action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
             ## stack states
@@ -193,21 +194,17 @@ class QTOPTNetwork(BaseNetwork):
             # select top-m
             selected_idxs = list(map(lambda x: x.argsort()[::-1][:self.top_m], q_val))
 
-
             selected_action_samples_batch = np.array([action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state in zip(action_samples_batch, selected_idxs)])
 
             # fit gaussian
-            mean_std_arr = np.array([norm.fit(action_samples) for action_samples in selected_action_samples_batch])
+            # only 1D
+            # mean_std_arr = np.array([norm.fit(action_samples, axis=0) for action_samples in selected_action_samples_batch])
+            mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
 
         # sample 1 action for each state
-        final_action_samples_batch = np.array([np.random.normal(mean, std, size=1) for (mean, std) in mean_std_arr])
+        final_action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=1) for (mean, std) in mean_std_arr])[0]
 
-        # return mean for each state
-        final_action_mean_batch = np.array([[mean] for (mean, std) in mean_std_arr])
-
-        return final_action_samples_batch, final_action_mean_batch
-
-
+        return final_action_samples_batch, mean_std_arr
 
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
