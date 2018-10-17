@@ -44,6 +44,7 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
             if self.write_plot:
+
                 func1 = self.qt_opt_network.getQFunction(state)
 
                 # utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, chosen_action], self.action_min,
@@ -54,6 +55,8 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
                 #                               save_title='steps_' + str(self.train_global_steps),
                 #                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                 #                               show=False)
+                raise NotImplementedError
+
             return chosen_action
         else:
             if is_start:

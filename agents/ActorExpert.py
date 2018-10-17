@@ -114,43 +114,51 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         action_batch_init = self.hydra_network.sample_action(state_batch, True)
 
         # reshape (batchsize * n , action_dim)
-        action_batch_final = np.reshape(action_batch_init, (batch_size * self.num_samples, self.action_dim))
+        action_batch_final = action_batch_init
+        action_batch_final_reshaped = np.reshape(action_batch_final, (batch_size * self.num_samples, self.action_dim))
 
         # Currently using Current state batch instead of next state batch
         # (batchsize * n action values)
-        # restack states (batchsize * n, 1)
-        stacked_state_batch = None
+        # restack states (batchsize * n, state_dim)
 
-        for state in state_batch:
-            stacked_one_state = np.tile(state, (self.num_samples, 1))
+        # stacked_state_batch = None
+        #
+        # for state in state_batch:
+        #     stacked_one_state = np.tile(state, (self.num_samples, 1))
+        #
+        #     if stacked_state_batch is None:
+        #         stacked_state_batch = stacked_one_state
+        #     else:
+        #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
 
-            if stacked_state_batch is None:
-                stacked_state_batch = stacked_one_state
-            else:
-                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
+        stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
+        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
 
-        q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final, True)
+        q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
         q_val = np.reshape(q_val, (batch_size, self.num_samples))
-
-        action_batch_final = np.reshape(action_batch_final, (batch_size, self.num_samples, self.action_dim))
 
         # Find threshold : top (1-rho) percentile
         selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples*self.rho)], q_val))
 
-        action_list = []
-        for action, idx in zip(action_batch_final, selected_idxs):
-            action_list.append(action[idx])
+        # action_list = []
+        # for action, idx in zip(action_batch_final, selected_idxs):
+        #     action_list.append(action[idx])
+
+        action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
 
         # restack states (batchsize * top_idx_num, 1)
-        stacked_state_batch = None
-        for state in state_batch:
-            stacked_one_state = np.tile(state, (int(self.num_samples*self.rho), 1))
+        # stacked_state_batch = None
+        # for state in state_batch:
+        #     stacked_one_state = np.tile(state, (int(self.num_samples*self.rho), 1))
+        #
+        #     if stacked_state_batch is None:
+        #         stacked_state_batch = stacked_one_state
+        #     else:
+        #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
 
-            if stacked_state_batch is None:
-                stacked_state_batch = stacked_one_state
-            else:
-                stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-        
+        stacked_state_batch = np.array([np.tile(state, (int(self.num_samples*self.rho), 1)) for state in state_batch])
+        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples*self.rho), self.state_dim))
+
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples*self.rho), self.action_dim))
         self.hydra_network.train_actor(stacked_state_batch, action_list)
 
