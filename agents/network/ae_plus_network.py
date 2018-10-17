@@ -255,11 +255,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
 
-        # print(np.shape(alpha), type(self.temp_alpha))
-        # print(np.shape(mean), type(self.temp_mean))
-        # print(np.shape(sigma), type(self.temp_sigma))
-        # print(np.shape(action), type(self.temp_action))
-
         return self.sess.run(self.policy_action_grads, feed_dict={
             self.temp_alpha: alpha,
             self.temp_mean: mean,
@@ -324,14 +319,15 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
 
-        best_mean = []
-        for idx, m in zip(max_idx, mean):
-            best_mean.append(m[idx])
-        best_mean = np.asarray(best_mean)
+        # best_mean = []
+        # for idx, m in zip(max_idx, mean):
+        #     best_mean.append(m[idx])
+        # best_mean = np.asarray(best_mean)
+
+        best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
         old_best_mean = best_mean
         if self.use_policy_gd:
-            # print("taking action")
             best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
 
         return old_best_mean, best_mean
@@ -349,14 +345,14 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
 
-        best_mean = []
-        for idx, m in zip(max_idx, mean):
-            best_mean.append(m[idx])
-        best_mean = np.asarray(best_mean)
+        # best_mean = []
+        # for idx, m in zip(max_idx, mean):
+        #     best_mean.append(m[idx])
+        # best_mean = np.asarray(best_mean)
+        best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
         old_best_mean = best_mean
         if self.use_policy_gd:
-            # print("computing target")
             best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
 
         return best_mean
@@ -380,12 +376,16 @@ class ActorExpert_Plus_Network(BaseNetwork):
         self.setModalStats(alpha[0], mean[0], sigma[0])
 
         # for each transition in batch
-        sampled_actions = []
-        for prob, m, s in zip(alpha, mean, sigma):
-            modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
-            # print(modal_idx)
-            actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
-            sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
+        # sampled_actions = []
+        # for prob, m, s in zip(alpha, mean, sigma):
+        #     modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
+        #     # print(modal_idx)
+        #     actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
+        #     sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
+
+        # TODO: Check multi-dimensional action case. Is it sampling correctly
+        modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+        sampled_actions = [np.clip(np.random.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
 
         return sampled_actions
 
@@ -406,11 +406,14 @@ class ActorExpert_Plus_Network(BaseNetwork):
         assert (self.num_modal == np.shape(alpha)[1])
 
         # for each transition in batch
-        sampled_actions = []
-        for prob, m, s in zip(alpha, mean, sigma):
-            modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
-            actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
-            sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
+        # sampled_actions = []
+        # for prob, m, s in zip(alpha, mean, sigma):
+        #     modal_idx = np.random.choice(self.num_modal, self.num_samples, p=prob)
+        #     actions = list(map(lambda idx: np.random.normal(m[idx], s[idx]), modal_idx))
+        #     sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
+        # TODO: Check multi-dimensional action case. Is it sampling correctly
+        modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+        sampled_actions = [np.clip(np.random.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
 
         return sampled_actions
 
