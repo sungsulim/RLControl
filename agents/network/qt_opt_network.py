@@ -124,7 +124,49 @@ class QTOPTNetwork(BaseNetwork):
             self.target_phase: phase
         })
 
-    def predict_action(self, state_batch):
+    def iterate_cem_1dim(self, state_batch):
+        batch_size = len(state_batch)
+
+        action_samples_batch = None
+        mean_std_arr = None
+
+        for i in range(self.num_iter):
+
+            # sample batch_num x num_samples: (n,64)
+            # Make
+            if action_samples_batch is None and mean_std_arr is None:
+                action_samples_batch = np.random.uniform(self.action_min, self.action_max,
+                                                         size=(batch_size, self.num_samples))
+            else:
+                action_samples_batch = np.array(
+                    [np.random.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
+
+            # evaluate Q-val
+            ## stack states
+            stacked_state_batch = np.array(
+                [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
+            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+            ## reshape action samples
+            action_samples_batch_reshaped = np.reshape(action_samples_batch,
+                                                       (batch_size * self.num_samples, self.action_dim))
+
+            q_val = self.predict_q(stacked_state_batch, action_samples_batch_reshaped, True)
+            q_val = np.reshape(q_val, (batch_size, self.num_samples))
+
+            # select top-m
+            selected_idxs = list(map(lambda x: x.argsort()[::-1][:self.top_m], q_val))
+
+            selected_action_samples_batch = np.array(
+                [action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state
+                 in zip(action_samples_batch, selected_idxs)])
+
+            # fit gaussian
+            mean_std_arr = np.array([norm.fit(action_samples) for action_samples in selected_action_samples_batch])
+
+        return mean_std_arr
+
+    # Essentially same as iterate_cem_1dim(). Just calling different methods to handle multidimensions
+    def iterate_cem_multidim(self, state_batch):
         batch_size = len(state_batch)
 
         action_samples_batch = None
@@ -142,10 +184,12 @@ class QTOPTNetwork(BaseNetwork):
 
             # evaluate Q-val
             ## stack states
-            stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
+            stacked_state_batch = np.array(
+                [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
             stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
             ## reshape action samples
-            action_samples_batch_reshaped = np.reshape(action_samples_batch, (batch_size * self.num_samples, self.action_dim))
+            action_samples_batch_reshaped = np.reshape(action_samples_batch,
+                                                       (batch_size * self.num_samples, self.action_dim))
 
             q_val = self.predict_q(stacked_state_batch, action_samples_batch_reshaped, True)
             q_val = np.reshape(q_val, (batch_size, self.num_samples))
@@ -153,56 +197,36 @@ class QTOPTNetwork(BaseNetwork):
             # select top-m
             selected_idxs = list(map(lambda x: x.argsort()[::-1][:self.top_m], q_val))
 
-
-            selected_action_samples_batch = np.array([action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state in zip(action_samples_batch, selected_idxs)])
+            selected_action_samples_batch = np.array(
+                [action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state
+                 in zip(action_samples_batch, selected_idxs)])
 
             # fit gaussian
-            # mean_std_arr = np.array([norm.fit(action_samples) for action_samples in selected_action_samples_batch])
             mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
+
+        return mean_std_arr
+
+    def predict_action(self, state_batch):
 
         # return mean for each state
-        final_action_mean_batch = np.array([mean for (mean, std) in mean_std_arr])
+        if self.action_dim == 1:
+            mean_std_arr = self.iterate_cem_1dim(state_batch)
+            final_action_mean_batch = np.array([[mean] for (mean, std) in mean_std_arr])
+        else:
+            mean_std_arr = self.iterate_cem_multidim(state_batch)
+            final_action_mean_batch = np.array([mean for (mean, std) in mean_std_arr])
         return final_action_mean_batch
 
-
     def sample_action(self, state_batch):
-        batch_size = len(state_batch)
-
-        action_samples_batch = None
-        mean_std_arr = None
-
-        for i in range(self.num_iter):
-
-            # sample batch_num x num_samples: (n,64)
-            # Make
-            if action_samples_batch is None and mean_std_arr is None:
-                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
-
-            else:
-                action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
-
-            # evaluate Q-val
-            ## stack states
-            stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
-            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
-            ## reshape action samples
-            action_samples_batch_reshaped = np.reshape(action_samples_batch, (batch_size * self.num_samples, self.action_dim))
-
-            q_val = self.predict_q(stacked_state_batch, action_samples_batch_reshaped, True)
-            q_val = np.reshape(q_val, (batch_size, self.num_samples))
-
-            # select top-m
-            selected_idxs = list(map(lambda x: x.argsort()[::-1][:self.top_m], q_val))
-
-            selected_action_samples_batch = np.array([action_samples_for_state[selected_idx_for_state] for action_samples_for_state, selected_idx_for_state in zip(action_samples_batch, selected_idxs)])
-
-            # fit gaussian
-            # only 1D
-            # mean_std_arr = np.array([norm.fit(action_samples, axis=0) for action_samples in selected_action_samples_batch])
-            mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
 
         # sample 1 action for each state
-        final_action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=1) for (mean, std) in mean_std_arr])[0]
+        if self.action_dim == 1:
+            mean_std_arr = self.iterate_cem_1dim(state_batch)
+            final_action_samples_batch = np.array([np.random.normal(mean, std, size=1) for (mean, std) in mean_std_arr])
+            mean_std_arr = np.expand_dims(mean_std_arr, axis=2)
+        else:
+            mean_std_arr = self.iterate_cem_multidim(state_batch)
+            final_action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=1) for (mean, std) in mean_std_arr])[0]
 
         return final_action_samples_batch, mean_std_arr
 
