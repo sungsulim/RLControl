@@ -130,6 +130,11 @@ class QTOPTNetwork(BaseNetwork):
         action_samples_batch = None
         mean_std_arr = None
 
+        ## stack states
+        stacked_state_batch = np.array(
+            [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
+        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+
         for i in range(self.num_iter):
 
             # sample batch_num x num_samples: (n,64)
@@ -142,10 +147,6 @@ class QTOPTNetwork(BaseNetwork):
                     [np.random.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
-            ## stack states
-            stacked_state_batch = np.array(
-                [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
-            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
             ## reshape action samples
             action_samples_batch_reshaped = np.reshape(action_samples_batch,
                                                        (batch_size * self.num_samples, self.action_dim))
@@ -172,6 +173,11 @@ class QTOPTNetwork(BaseNetwork):
         action_samples_batch = None
         mean_std_arr = None
 
+        ## stack states
+        stacked_state_batch = np.array(
+            [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
+        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+
         for i in range(self.num_iter):
 
             # sample batch_num x num_samples: (n,64)
@@ -183,10 +189,7 @@ class QTOPTNetwork(BaseNetwork):
                 action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
-            ## stack states
-            stacked_state_batch = np.array(
-                [np.tile(state, (self.num_samples, 1)) for state in state_batch])  # 2 x 64 x 3
-            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+
             ## reshape action samples
             action_samples_batch_reshaped = np.reshape(action_samples_batch,
                                                        (batch_size * self.num_samples, self.action_dim))
