@@ -3,20 +3,20 @@ Data structure for Replay Buffer
 
 """
 from collections import deque, namedtuple
-import random
 import numpy as np
 
 Transition = namedtuple('Transition', ['state', 'action', 'reward', 'next_state', 'transition_gamma'])
 
+
 class ReplayBuffer(object):
 
-    def __init__(self, buffer_size):
+    def __init__(self, buffer_size, random_seed):
 
-        self.buffer_size = buffer_size
+        self.rng = np.random.RandomState(random_seed)
+        self.buffer_size = int(buffer_size)
         self.count = 0
         # Right side of deque contains newest experience
         self.buffer = deque()
-        
 
     def add(self, state, action, reward, next_state, transition_gamma):
         experience = Transition(state, action, reward, next_state, transition_gamma)
@@ -32,8 +32,9 @@ class ReplayBuffer(object):
 
     def sample_batch(self, batch_size):
         assert(self.count >= batch_size)
-        batch = random.sample(self.buffer, batch_size)
 
+        idx = self.rng.choice(range(self.count), size=batch_size, replace=False)
+        batch = [val for i, val in enumerate(self.buffer) if i in idx]
         return map(np.array, zip(*batch))
 
     def clear(self):

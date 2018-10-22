@@ -12,11 +12,11 @@ import utils.plot_utils
 
 
 class NAF_Network_Manager(BaseNetwork_Manager):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(NAF_Network_Manager, self).__init__(config)
-        
+
         with self.graph.as_default():
-            tf.set_random_seed(random_seed)
+            tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
             self.network = naf_network.NAF_Network(self.sess, self.input_norm, config)
 
@@ -86,14 +86,11 @@ class NAF_Network_Manager(BaseNetwork_Manager):
 
 
 class NAF(BaseAgent):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(NAF, self).__init__(config)
 
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-
         # Network Manager
-        self.network_manager = NAF_Network_Manager(config, random_seed=random_seed)
+        self.network_manager = NAF_Network_Manager(config)
 
     def start(self, state, is_train):
         return self.take_action(state, is_train, is_start=True)

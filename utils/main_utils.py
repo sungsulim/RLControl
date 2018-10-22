@@ -4,34 +4,34 @@ from collections import OrderedDict
 # Takes a string and returns and instance of an agent
 # [env] is an instance of an environment
 # [p] is a dictionary of agent parameters
-def create_agent(agent_string, config, seed):
+def create_agent(agent_string, config):
     if agent_string == "DDPG": 
         from agents.DDPG import DDPG
-        return DDPG(config, seed)
+        return DDPG(config)
 
     elif agent_string == "NAF":
         from agents.NAF import NAF
-        return NAF(config, seed)
+        return NAF(config)
 
     elif agent_string == "WireFitting":
         from agents.WireFitting import WireFitting
-        return WireFitting(config, seed)
+        return WireFitting(config)
 
     elif agent_string == "ICNN":
         from agents.ICNN import ICNN
-        return ICNN(config, seed)
+        return ICNN(config)
 
     elif agent_string == "ActorExpert":
         from agents.ActorExpert import ActorExpert
-        return ActorExpert(config, seed)
+        return ActorExpert(config)
 
     elif agent_string == "ActorExpert_Plus":
         from agents.ActorExpert_Plus import ActorExpert_Plus
-        return ActorExpert_Plus(config, seed)
+        return ActorExpert_Plus(config)
 
     elif agent_string == "QT_OPT":
         from agents.QT_OPT import QT_OPT
-        return QT_OPT(config, seed)
+        return QT_OPT(config)
 
     # elif agent_string == "AE_CCEM_separate":
     #     from agents.AE_CCEM_separate import AE_CCEM_separate

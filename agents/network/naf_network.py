@@ -7,6 +7,8 @@ class NAF_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(NAF_Network, self).__init__(sess, config, config.learning_rate)
 
+        self.rng = np.random.RandomState(config.random_seed)
+
         self.l1_dim = config.l1_dim
         self.l2_dim = config.l2_dim
 
@@ -168,7 +170,7 @@ class NAF_Network(BaseNetwork):
             print("error occurred!")
             exit()
 
-        sampled_action = np.random.multivariate_normal(greedy_action.reshape(-1), covmat)
+        sampled_action = self.rng.multivariate_normal(greedy_action.reshape(-1), covmat)
         sampled_action = np.clip(sampled_action, self.action_min, self.action_max)
 
         return sampled_action, covmat

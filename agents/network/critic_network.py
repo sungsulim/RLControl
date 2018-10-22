@@ -197,7 +197,6 @@ class CriticNetwork(BaseNetwork):
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
-
     def print_variables(self, variable_list):
         variable_names = [v.name for v in variable_list]
         values = self.sess.run(variable_names)

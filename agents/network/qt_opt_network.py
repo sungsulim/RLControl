@@ -9,6 +9,8 @@ class QTOPTNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(QTOPTNetwork, self).__init__(sess, config, config.qnet_lr)
 
+        self.rng = np.random.RandomState(config.random_seed)
+
         self.l1 = config.qnet_l1_dim
         self.l2 = config.qnet_l2_dim
 
@@ -140,11 +142,11 @@ class QTOPTNetwork(BaseNetwork):
             # sample batch_num x num_samples: (n,64)
             # Make
             if action_samples_batch is None and mean_std_arr is None:
-                action_samples_batch = np.random.uniform(self.action_min, self.action_max,
-                                                         size=(batch_size, self.num_samples))
+                action_samples_batch = self.rng.uniform(self.action_min, self.action_max,
+                                                        size=(batch_size, self.num_samples))
             else:
                 action_samples_batch = np.array(
-                    [np.random.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
+                    [self.rng.normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
             ## reshape action samples
@@ -183,10 +185,10 @@ class QTOPTNetwork(BaseNetwork):
             # sample batch_num x num_samples: (n,64)
             # Make
             if action_samples_batch is None and mean_std_arr is None:
-                action_samples_batch = np.random.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
+                action_samples_batch = self.rng.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
 
             else:
-                action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
+                action_samples_batch = np.array([self.rng.multivariate_normal(mean, std, size=self.num_samples) for (mean, std) in mean_std_arr])
 
             # evaluate Q-val
 
@@ -225,11 +227,11 @@ class QTOPTNetwork(BaseNetwork):
         # sample 1 action for each state
         if self.action_dim == 1:
             mean_std_arr = self.iterate_cem_1dim(state_batch)
-            final_action_samples_batch = np.array([np.random.normal(mean, std, size=1) for (mean, std) in mean_std_arr])
+            final_action_samples_batch = np.array([self.rng.normal(mean, std, size=1) for (mean, std) in mean_std_arr])
             mean_std_arr = np.expand_dims(mean_std_arr, axis=2)
         else:
             mean_std_arr = self.iterate_cem_multidim(state_batch)
-            final_action_samples_batch = np.array([np.random.multivariate_normal(mean, std, size=1) for (mean, std) in mean_std_arr])[0]
+            final_action_samples_batch = np.array([self.rng.multivariate_normal(mean, std, size=1) for (mean, std) in mean_std_arr])[0]
 
         return final_action_samples_batch, mean_std_arr
 

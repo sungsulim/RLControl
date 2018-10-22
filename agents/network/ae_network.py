@@ -7,6 +7,8 @@ class ActorExpert_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
 
+        self.rng = np.random.RandomState(config.random_seed)
+
         self.shared_layer_dim = config.shared_l1_dim
         self.actor_layer_dim = config.actor_l2_dim
         self.expert_layer_dim = config.expert_l2_dim
@@ -364,8 +366,8 @@ class ActorExpert_Network(BaseNetwork):
         #     sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
-        modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
-        sampled_actions = [np.clip(np.random.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
+        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
         return sampled_actions
 
     # Should return n actions
@@ -391,8 +393,8 @@ class ActorExpert_Network(BaseNetwork):
         #     sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
-        modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
-        sampled_actions = [np.clip(np.random.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
+        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
 
         return sampled_actions
 

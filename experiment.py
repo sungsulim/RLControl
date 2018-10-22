@@ -1,6 +1,4 @@
 import numpy as np
-import random
-
 from datetime import datetime
 import time
 import tensorflow as tf
@@ -14,10 +12,11 @@ class Experiment(object):
     def __init__(self, agent, train_environment, test_environment, seed, writer, write_log, write_plot):
         self.agent = agent
         self.train_environment = train_environment
-        self.train_environment.seed(seed)
+        self.train_environment.set_random_seed(seed)
 
         # for eval purpose
         self.test_environment = test_environment # copy.deepcopy(environment) # this didn't work for Box2D env
+        self.test_environment.set_random_seed(seed)
 
         self.train_rewards_per_episode = []        
         self.eval_mean_rewards_per_episode = []

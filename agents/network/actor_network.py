@@ -104,6 +104,7 @@ class ActorNetwork(BaseNetwork):
         return
 
     def predict(self, *args):
+
         # args [inputs, phase]
         inputs = args[0]
         phase = args[1]

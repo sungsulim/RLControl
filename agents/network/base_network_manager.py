@@ -6,6 +6,8 @@ from utils.running_mean_std import RunningMeanStd
 class BaseNetwork_Manager(object):
     def __init__(self, config):
 
+        self.random_seed = config.random_seed
+
         # Env config
         self.state_dim = config.state_dim
         self.state_min = config.state_min
@@ -42,7 +44,8 @@ class BaseNetwork_Manager(object):
         if config.exploration_policy == 'ou_noise':
             from utils.exploration_policy import OrnsteinUhlenbeckProcess
             self.use_external_exploration = True
-            self.exploration_policy = OrnsteinUhlenbeckProcess(self.action_dim,
+            self.exploration_policy = OrnsteinUhlenbeckProcess(self.random_seed,
+                                                               self.action_dim,
                                                                self.action_min,
                                                                self.action_max,
                                                                theta=config.ou_theta,
@@ -52,14 +55,15 @@ class BaseNetwork_Manager(object):
         elif config.exploration_policy == 'epsilon_greedy':
             from utils.exploration_policy import EpsilonGreedy
             self.use_external_exploration = True
-            self.exploration_policy = EpsilonGreedy(self.action_min, self.action_max,
+            self.exploration_policy = EpsilonGreedy(self.random_seed, self.action_min, self.action_max,
                                                     config.annealing_steps, config.min_epsilon, config.max_epsilon,
                                                     is_continuous=True)
 
         elif config.exploration_policy == 'random_uniform':
             from utils.exploration_policy import RandomUniform
             self.use_external_exploration = True
-            self.exploration_policy = RandomUniform(self.action_min, self.action_max, is_continuous=True)
+            self.exploration_policy = RandomUniform(self.random_seed, self.action_min, self.action_max,
+                                                    is_continuous=True)
 
         elif config.exploration_policy == 'none':
             self.use_external_exploration = False

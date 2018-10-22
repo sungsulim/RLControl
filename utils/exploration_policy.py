@@ -1,7 +1,10 @@
 import numpy as np
 
+
 class OrnsteinUhlenbeckProcess(object):
-    def __init__(self, action_dim, action_min, action_max, theta, mu, sigma):
+    def __init__(self, random_seed, action_dim, action_min, action_max, theta, mu, sigma):
+
+        self.rng = np.random.RandomState(random_seed)
 
         self.action_dim = action_dim
         self.action_min = action_min
@@ -14,7 +17,7 @@ class OrnsteinUhlenbeckProcess(object):
 
     def generate(self, greedy_action, step):
         # self.noise_t += self.theta * (self.mu - self.noise_t) + self.sigma * np.random.normal(np.zeros(self.action_dim), np.ones(self.action_dim))
-        self.noise_t += np.random.normal(self.mu * np.ones(self.action_dim), self.sigma * np.ones(self.action_dim)) - self.noise_t * self.theta
+        self.noise_t += self.rng.normal(self.mu * np.ones(self.action_dim), self.sigma * np.ones(self.action_dim)) - self.noise_t * self.theta
         return np.clip(greedy_action + self.noise_t, self.action_min, self.action_max)
 
     def reset(self):
@@ -22,7 +25,9 @@ class OrnsteinUhlenbeckProcess(object):
         
 
 class RandomUniform(object):
-    def __init__(self, action_min, action_max, is_continuous):
+    def __init__(self, random_seed, action_min, action_max, is_continuous):
+
+        self.rng = np.random.RandomState(random_seed)
 
         self.action_min = action_min
         self.action_max = action_max
@@ -30,14 +35,18 @@ class RandomUniform(object):
 
     def generate(self, greedy_action, step):
         if self.is_continuous:
-            return np.random.uniform(self.action_min, self.action_max)
+            return self.rng.uniform(self.action_min, self.action_max)
         else:
-            return np.random.choice(range(int(self.action_max - self.action_min + 1)))
+            return self.rng.choice(range(int(self.action_max - self.action_min + 1)))
+
     def reset(self):
         pass
 
+
 class EpsilonGreedy(object):
-    def __init__(self, action_min, action_max, annealing_steps, min_epsilon, max_epsilon, is_continuous):
+    def __init__(self, random_seed, action_min, action_max, annealing_steps, min_epsilon, max_epsilon, is_continuous):
+
+        self.rng = np.random.RandomState(random_seed)
 
         self.action_min = action_min
         self.action_max = action_max
@@ -52,11 +61,11 @@ class EpsilonGreedy(object):
     # generates next action
     def generate(self, greedy_action, step):
         epsilon = max(self.min_epsilon, self.epsilon_step * step + self.epsilon)
-        if np.random.random() < epsilon:
+        if self.rng.random_sample() < epsilon:
             if self.is_continuous:
-                return np.random.uniform(self.action_min, self.action_max)
+                return self.rng.uniform(self.action_min, self.action_max)
             else:
-                return np.random.choice(range(int(self.action_max - self.action_min + 1)))
+                return self.rng.choice(range(int(self.action_max - self.action_min + 1)))
         else:
             return greedy_action
 

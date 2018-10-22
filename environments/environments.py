@@ -74,8 +74,8 @@ class ContinuousEnvironment(object):
         # print('action_max', self.action_max)
         # exit()
 
-    def seed(self, seed):
-        self.instance.seed(seed)
+    def set_random_seed(self, random_seed):
+        self.instance.seed(random_seed)
 
 
     # Reset the environment for a new episode. return the initial state

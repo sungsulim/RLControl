@@ -14,11 +14,11 @@ import utils.plot_utils
 
 
 class QT_OPT_Network_Manager(BaseNetwork_Manager):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(QT_OPT_Network_Manager, self).__init__(config)
 
         with self.graph.as_default():
-            tf.set_random_seed(random_seed)
+            tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
 
             self.qt_opt_network = qt_opt_network.QTOPTNetwork(self.sess, self.input_norm, config)
@@ -91,14 +91,11 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
 
 class QT_OPT(BaseAgent):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(QT_OPT, self).__init__(config)
 
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-
         # Network Manager
-        self.network_manager = QT_OPT_Network_Manager(config, random_seed=random_seed)
+        self.network_manager = QT_OPT_Network_Manager(config)
 
     def start(self, state, is_train):
         return self.take_action(state, is_train, is_start=True)

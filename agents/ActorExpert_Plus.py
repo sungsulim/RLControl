@@ -11,15 +11,17 @@ import utils.plot_utils
 
 
 class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(ActorExpert_Plus_Network_Manager, self).__init__(config)
+
+        self.rng = np.random.RandomState(config.random_seed)
 
         # Cross Entropy Method Params
         self.rho = config.rho
         self.num_samples = config.num_samples
 
         with self.graph.as_default():
-            tf.set_random_seed(random_seed)
+            tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
             self.hydra_network = ae_plus_network.ActorExpert_Plus_Network(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
@@ -45,7 +47,7 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                 sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
 
                 # Choose one random action among n actions
-                idx = np.random.randint(len(sampled_actions))
+                idx = self.rng.randint(len(sampled_actions))
                 chosen_action = sampled_actions[idx]
 
             self.train_global_steps += 1
@@ -172,14 +174,11 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
 
 
 class ActorExpert_Plus(BaseAgent):
-    def __init__(self, config, random_seed):
+    def __init__(self, config):
         super(ActorExpert_Plus, self).__init__(config)
 
-        np.random.seed(random_seed)
-        random.seed(random_seed)
-
         # Network Manager
-        self.network_manager = ActorExpert_Plus_Network_Manager(config, random_seed=random_seed)
+        self.network_manager = ActorExpert_Plus_Network_Manager(config)
 
     def start(self, state, is_train):
         return self.take_action(state, is_train, is_start=True)

@@ -63,6 +63,7 @@ def main():
 
     # set Random Seed (for training)
     RANDOM_SEED = RUN_NUM
+    arg_params['random_seed'] = RANDOM_SEED
 
     # create save directory
     save_dir = './results/' + env_json['environment'] + 'results/'
@@ -82,7 +83,7 @@ def main():
     config.merge_config(arg_params)
 
     # initialize agent
-    agent = create_agent(agent_json['agent'], config, RANDOM_SEED)
+    agent = create_agent(agent_json['agent'], config)
 
     # monitor/render
     if args.monitor or args.render:

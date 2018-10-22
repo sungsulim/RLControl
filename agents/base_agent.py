@@ -17,7 +17,7 @@ class BaseAgent(object):
         self.action_min = config.action_min
         self.action_max = config.action_max
 
-        self.replay_buffer = ReplayBuffer(config.buffer_size)
+        self.replay_buffer = ReplayBuffer(config.buffer_size, config.random_seed)
         self.batch_size = config.batch_size
         self.warmup_steps = config.warmup_steps
         self.gamma = config.gamma
@@ -26,7 +26,6 @@ class BaseAgent(object):
         self.write_log = config.write_log
         self.write_plot = config.write_plot
 
-        self.seed = None
         self.network_manager = None
         self.writer = config.writer
         self.config = config
