@@ -5,6 +5,7 @@ from agents.network.base_network import BaseNetwork
 class ActorNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorNetwork, self).__init__(sess, config, config.actor_lr)
+        #tf.set_random_seed(config.random_seed)
 
         self.l1 = config.actor_l1_dim
         self.l2 = config.actor_l2_dim
@@ -52,6 +53,7 @@ class ActorNetwork(BaseNetwork):
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
             self.optimize = tf.train.AdamOptimizer(self.learning_rate).apply_gradients(zip(self.actor_gradients, self.net_params))
+
 
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):

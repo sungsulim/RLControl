@@ -30,7 +30,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
         greedy_action = greedy_action[0]
 
         for point_x in x:
-            point_y1 = np.squeeze(func1([point_x]))  # reduce dimension
+            point_y1 = np.squeeze(func1(point_x))  # reduce dimension
             point_y2 = func2(point_x)
 
             if point_y1 > max_point_y:

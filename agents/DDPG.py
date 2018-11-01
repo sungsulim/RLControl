@@ -18,6 +18,7 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
     def __init__(self, config):
         super(DDPG_Network_Manager, self).__init__(config)
 
+
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -116,7 +117,7 @@ class DDPG(BaseAgent):
 
     def take_action(self, state, is_train, is_start):
         if is_train and self.replay_buffer.get_size() < self.warmup_steps:
-            action = np.random.uniform(self.action_min, self.action_max)
+            action = np.random.uniform(self.action_min, self.action_max)  # never used
         else:
             action = self.network_manager.take_action(state, is_train, is_start)
         return action

@@ -26,6 +26,9 @@ class BaseNetwork(object):
 
         self.norm_type = config.norm_type
 
+    def set_session(self, session):
+        self.session = session
+
     def build_network(self, scope_name):
         """
         build network.

@@ -95,8 +95,8 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         # Expert Update
 
         # TODO: Perhaps do GA on the policy function
-        # Currently using Target Actor
-        next_action_batch_final_target = self.hydra_network.predict_action_target(next_state_batch, True)
+        # Use original Actor
+        _, next_action_batch_final_target = self.hydra_network.predict_action(next_state_batch, True)
 
         # batchsize * n
         target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
@@ -118,20 +118,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         # reshape (batchsize * n , action_dim)
         action_batch_final = action_batch_init
         action_batch_final_reshaped = np.reshape(action_batch_final, (batch_size * self.num_samples, self.action_dim))
-
-        # Currently using Current state batch instead of next state batch
-        # (batchsize * n action values)
-        # restack states (batchsize * n, state_dim)
-
-        # stacked_state_batch = None
-        #
-        # for state in state_batch:
-        #     stacked_one_state = np.tile(state, (self.num_samples, 1))
-        #
-        #     if stacked_state_batch is None:
-        #         stacked_state_batch = stacked_one_state
-        #     else:
-        #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
 
         stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
         stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))

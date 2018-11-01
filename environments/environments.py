@@ -194,15 +194,14 @@ class Bimodal1DEnvironment(object):
         # print('actMin', self.actMin)
         # exit()
         
-    def seed(self, seed):
-        # No randomness in this env
+    def set_random_seed(self, random_seed):
         pass
 
     # Reset the environment for a new episode. return the initial state
     def reset(self):
+
         # starts at 0.
         self.state = np.array([0.])
-        #self.state = np.array([np.random.uniform(low=-0.1, high=0.1)])
         return self.state
 
     def step(self, action):

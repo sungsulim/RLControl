@@ -7,6 +7,7 @@ class CriticNetwork(BaseNetwork):
 
     def __init__(self, sess, input_norm, config):
         super(CriticNetwork, self).__init__(sess, config, config.critic_lr)
+        #tf.set_random_seed(config.random_seed)
 
         self.l1 = config.critic_l1_dim
         self.l2 = config.critic_l2_dim
