@@ -28,7 +28,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
             self.hydra_network.init_target_network()
 
-
     def take_action(self, state, is_train, is_start):
 
         # greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
@@ -152,10 +151,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         # Update target networks
         self.hydra_network.update_target_network()
-
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
 
 
 class ActorExpert(BaseAgent):

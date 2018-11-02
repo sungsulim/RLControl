@@ -168,10 +168,6 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
         # Update target networks
         self.hydra_network.update_target_network()
 
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
-
 
 class ActorExpert_Plus(BaseAgent):
     def __init__(self, config):

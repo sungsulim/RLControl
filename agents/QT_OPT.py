@@ -84,10 +84,6 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
         self.qt_opt_network.update_target_network()
 
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
-
 
 class QT_OPT(BaseAgent):
     def __init__(self, config):

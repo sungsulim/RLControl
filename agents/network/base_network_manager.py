@@ -79,4 +79,9 @@ class BaseNetwork_Manager(object):
         raise NotImplementedError
 
     def reset(self):
-        raise NotImplementedError
+
+        self.train_ep_count = 0
+        self.eval_ep_count = 0
+
+        if self.exploration_policy:
+            self.exploration_policy.reset()

@@ -19,8 +19,8 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
         super(PartialInputConvex_Network_Manager, self).__init__(config)
 
         self.rng = np.random.RandomState(config.random_seed)
-        self.inference_max_steps = config.inference_max_steps
 
+        self.inference_max_steps = config.inference_max_steps
         self.inference = config.inference_type
 
         with self.graph.as_default():
@@ -116,10 +116,6 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
 
         # Update target networks
         self.entropy_network.update_target_network()
-
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
 
 
 class PICNN(BaseAgent):

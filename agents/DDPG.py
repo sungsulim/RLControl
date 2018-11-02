@@ -8,8 +8,6 @@ from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import actor_network
 from agents.network import critic_network
 
-from utils.running_mean_std import RunningMeanStd
-
 from experiment import write_summary
 import utils.plot_utils
 
@@ -17,7 +15,6 @@ import utils.plot_utils
 class DDPG_Network_Manager(BaseNetwork_Manager):
     def __init__(self, config):
         super(DDPG_Network_Manager, self).__init__(config)
-
 
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
@@ -96,10 +93,6 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
         # Update target networks
         self.actor_network.update_target_network()
         self.critic_network.update_target_network()
-
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
 
 
 class DDPG(BaseAgent):

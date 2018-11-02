@@ -32,6 +32,7 @@ class NAF_Network_Manager(BaseNetwork_Manager):
         if is_train:
             if is_start:
                 self.train_ep_count += 1
+            self.train_global_steps += 1
 
             if self.use_external_exploration:
                 chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
@@ -41,7 +42,6 @@ class NAF_Network_Manager(BaseNetwork_Manager):
                 chosen_action, covmat = self.network.sample_action(np.expand_dims(state, 0), greedy_action)
                 # chosen_action = chosen_action[0]
 
-            self.train_global_steps += 1
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
@@ -78,11 +78,6 @@ class NAF_Network_Manager(BaseNetwork_Manager):
         self.network.train(state_batch, action_batch, target_q)
         # self.sess.run(self.optimize, feed_dict={self.state_input: state.reshape(-1, self.state_dim), self.action_input: action.reshape(-1, self.action_dim), self.target_q_input: target_q.reshape(-1), self.phase: True})
         self.network.update_target_network()
-
-    def reset(self):
-        if self.exploration_policy:
-            self.exploration_policy.reset()
-
 
 
 class NAF(BaseAgent):
