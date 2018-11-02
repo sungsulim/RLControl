@@ -1,5 +1,4 @@
 from __future__ import print_function
-import random
 import numpy as np
 import tensorflow as tf
 
@@ -92,46 +91,6 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
 class QT_OPT(BaseAgent):
     def __init__(self, config):
-        super(QT_OPT, self).__init__(config)
-
-        # Network Manager
-        self.network_manager = QT_OPT_Network_Manager(config)
-
-    def start(self, state, is_train):
-        return self.take_action(state, is_train, is_start=True)
-
-    def step(self, state, is_train):
-        return self.take_action(state, is_train, is_start=False)
-
-    def take_action(self, state, is_train, is_start):
-        if is_train and self.replay_buffer.get_size() < self.warmup_steps:
-            action = np.random.uniform(self.action_min, self.action_max)
-        else:
-            action = self.network_manager.take_action(state, is_train, is_start)
-        return action
-
-    def update(self, state, next_state, reward, action, is_terminal, is_truncated):
-
-        if not is_truncated:
-            if not is_terminal:
-                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
-            else:
-                self.replay_buffer.add(state, action, reward, next_state, 0.0)
-
-        if self.norm_type is not 'none':
-            self.network_manager.input_norm.update(np.array([state]))
-        self.learn()
-    
-    def learn(self):
-
-        if self.replay_buffer.get_size() > max(self.warmup_steps, self.batch_size):
-            state, action, reward, next_state, gamma = self.replay_buffer.sample_batch(self.batch_size)
-            self.network_manager.update_network(state, action, next_state, reward, gamma)
-        else:
-            return
-
-    def reset(self):
-        self.network_manager.reset()
-
-
+        network_manager = QT_OPT_Network_Manager(config)
+        super(QT_OPT, self).__init__(config, network_manager)
 

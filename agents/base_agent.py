@@ -1,10 +1,11 @@
 from utils.replaybuffer import ReplayBuffer
+import numpy as np
 
 
 # Agent interface
 # Takes an environment (just so we can get some details from the environment like the number of observables and actions)
 class BaseAgent(object):
-    def __init__(self, config):
+    def __init__(self, config, network_manager):
 
         self.norm_type = config.norm_type
 
@@ -26,30 +27,40 @@ class BaseAgent(object):
         self.write_log = config.write_log
         self.write_plot = config.write_plot
 
-        self.network_manager = None
+        self.network_manager = network_manager
         self.writer = config.writer
         self.config = config
 
     def start(self, state, is_train):
-        raise NotImplementedError
+        return self.take_action(state, is_train, is_start=True)
 
     def step(self, state, is_train):
-        raise NotImplementedError
+        return self.take_action(state, is_train, is_start=False)
+
+    def take_action(self, state, is_train, is_start):
+        return self.network_manager.take_action(state, is_train, is_start)
 
     def get_value(self, s, a):
         raise NotImplementedError
     
     def update(self, state, next_state, reward, action, is_terminal, is_truncated):
-        raise NotImplementedError
+        if not is_truncated:
+            if not is_terminal:
+                self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+            else:
+                self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-    # Sets the random seed for the agent
-    def set_seed(self, seed):
-        raise NotImplementedError
+        if self.norm_type is not 'none':
+            self.network_manager.input_norm.update(np.array([state]))
+        self.learn()
+
+    def learn(self):
+        if self.replay_buffer.get_size() > max(self.warmup_steps, self.batch_size):
+            state, action, reward, next_state, gamma = self.replay_buffer.sample_batch(self.batch_size)
+            self.network_manager.update_network(state, action, next_state, reward, gamma)
+        else:
+            return
 
     # Resets the agent between episodes. Should primarily be used to clear traces or other temporally linked parameters
     def reset(self):
-        raise NotImplementedError
-
-
-
-
+        self.network_manager.reset()
