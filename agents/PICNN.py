@@ -1,10 +1,7 @@
 from __future__ import print_function
 
-
-import random
 import numpy as np
 import tensorflow as tf
-from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 
 from agents.base_agent import BaseAgent
@@ -43,7 +40,7 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
             action_init = np.clip(action_init, 0.0001, 0.9999)
 
         elif self.inference == 'adam':
-            action_init = np.expand_dims(np.random.uniform(self.action_min, self.action_max), 0)
+            action_init = np.expand_dims(self.rng.uniform(self.action_min, self.action_max), 0)
         else:
             print('Do not know this inference method!')
             exit()
@@ -89,10 +86,10 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
         batch_size = np.shape(state_batch)[0]
 
         if self.inference == 'bundle_entropy':
-            next_action_batch_init_target = np.tile((np.random.uniform(self.action_min, self.action_max) - self.action_min) * 1.0 / (self.action_max - self.action_min), (batch_size, 1))
+            next_action_batch_init_target = np.tile((self.rng.uniform(self.action_min, self.action_max) - self.action_min) * 1.0 / (self.action_max - self.action_min), (batch_size, 1))
             next_action_batch_init_target = np.clip(next_action_batch_init_target, 0.0001, 0.9999)
         elif self.inference == 'adam':
-            next_action_batch_init_target = np.tile(np.random.uniform(self.action_min, self.action_max), (batch_size, 1))
+            next_action_batch_init_target = np.tile(self.rng.uniform(self.action_min, self.action_max), (batch_size, 1))
         else:
             print('Do not know this inference method!')
             exit()
