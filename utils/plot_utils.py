@@ -210,7 +210,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
         # else:
         #     top_margin = 1.0
 
-    elif agent_name == 'ICNN':
+    elif agent_name == 'PICNN':
         func1 = func_list[0]
         for point_x in x:
             point_y1 = np.squeeze(func1([point_x]))  # reduce dimension

@@ -6,30 +6,23 @@ import matplotlib.pyplot as plt
 
 
 class EntropyNetwork(BaseNetwork):
+    def __init__(self, sess, input_norm, config):
+        super(EntropyNetwork, self).__init__(sess, config, config.learning_rate)
 
-    def __init__(self, sess, input_norm, layer_dim, state_dim, state_min, state_max, action_dim, action_min, action_max, learning_rate, tau, inference, norm_type):
-        super(EntropyNetwork, self).__init__(sess, state_dim, action_dim, learning_rate, tau)
+        self.rng = np.random.RandomState(config.random_seed)
 
-        self.l1 = layer_dim[0]
-        self.l2 = layer_dim[1]
-        self.action_dim = action_dim
-
-        self.state_min = state_min
-        self.state_max = state_max
-
-        self.action_min = action_min
-        self.action_max = action_max
+        self.l1_dim = config.l1_dim
+        self.l2_dim = config.l2_dim
 
         self.input_norm = input_norm
-        self.norm_type = norm_type
 
-        self.inference = inference
+        # picnn specific params
+        self.inference = config.inference_type
+        self.actionRange = self.action_max - self.action_min
 
-        self.actionRange = action_max - action_min
-
-        # Critic network
+        # Q network
         # notice here outputs is -1.0 * qvalue, not qvalue directly! f_outputs is outputs - entropy and is only for bunddle entropy optimization
-        self.inputs, self.phase, self.action, self.outputs, self.f_outputs = self.build_network(scope_name = 'critic')
+        self.inputs, self.phase, self.action, self.outputs, self.f_outputs = self.build_network(scope_name='critic')
         self.qvalue = -1.0 * self.outputs
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic') # tf.trainable_variables()[num_actor_vars:]
         self.wz_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='critic/zub')
@@ -46,10 +39,12 @@ class EntropyNetwork(BaseNetwork):
         # Obtained from the target networks
         self.predicted_q_value = tf.placeholder(tf.float32, [None, 1])
 
-
         # Op for periodically updating target network with online network weights
-        self.update_target_net_params  = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
+        self.update_target_net_params = [tf.assign_add(self.target_net_params[idx], self.tau * (self.net_params[idx] - self.target_net_params[idx])) for idx in range(len(self.target_net_params))]
 
+        # Op for init. target network with identical parameter as the original network
+        self.init_target_net_params = [tf.assign(self.target_net_params[idx], self.net_params[idx]) for idx in
+                                       range(len(self.target_net_params))]
 
         if self.norm_type == 'batch':
             # Batchnorm Ops and Vars
@@ -59,13 +54,13 @@ class EntropyNetwork(BaseNetwork):
             self.batchnorm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='critic/batchnorm')
             self.target_batchnorm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, scope='target_critic/batchnorm')
 
-            self.update_target_batchnorm_params = [tf.assign(self.target_batchnorm_vars[idx], \
-                                                self.batchnorm_vars[idx]) for idx in range(len(self.target_batchnorm_vars)) \
-                                                if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0') or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
-
+            self.update_target_batchnorm_params = [tf.assign(self.target_batchnorm_vars[idx],
+                                                             self.batchnorm_vars[idx]) for idx in range(len(self.target_batchnorm_vars))
+                                                   if self.target_batchnorm_vars[idx].name.endswith('moving_mean:0')
+                                                   or self.target_batchnorm_vars[idx].name.endswith('moving_variance:0')]
 
         else:
-            assert (self.norm_type == 'none' or self.norm_type == 'input_norm')
+            assert (self.norm_type == 'none' or self.norm_type == 'layer' or self.norm_type == 'input_norm')
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
@@ -85,12 +80,12 @@ class EntropyNetwork(BaseNetwork):
     def build_network(self, scope_name):
         with tf.variable_scope(scope_name):
 
-            inputs = tf.placeholder(tf.float32, shape=(None,self.state_dim))
+            inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim))
             phase = tf.placeholder(tf.bool)
-
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
-            if self.norm_type == 'input_norm' or self.norm_type == 'layer':
+            # TODO: merge this into one function
+            if self.norm_type is not 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             if self.norm_type == 'layer':
@@ -112,117 +107,111 @@ class EntropyNetwork(BaseNetwork):
     def layer_norm_network(self, inputs, action, phase):
         # TODO: make codes of the PICNN more compact. It can now only learn two layers, make it learnable in the case of multiple layers.
 
-        u1 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
-                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                                biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True))
+        u1 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
+                                               weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),
+                                               # tf.truncated_normal_initializer(),
+                                               weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                               biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
+
         u1 = tf.contrib.layers.layer_norm(u1, center=True, scale=True, activation_fn=tf.nn.relu)
 
-        u2 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        u2 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
+                                               weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),
+                                               # tf.truncated_normal_initializer(),
+                                               weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                               biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
+
+        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
+                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),
+                                                 # tf.truncated_normal_initializer(),
+                                                 weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True))
+
+        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-
-
-        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                                biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True))
-
-        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None, \
-                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                                biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True))
-        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1, activation_fn=None, \
-                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                    factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
-                                                 biases_initializer = None)
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                 biases_initializer=None)
 
         z1 = tf.contrib.layers.layer_norm(yub0 + wub0, center=True, scale=True, activation_fn=tf.nn.relu)
 
-        wub1 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        wub1 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub1 = tf.contrib.layers.fully_connected(u1, self.l1, activation_fn=tf.nn.relu, \
+        zub1 = tf.contrib.layers.fully_connected(u1, self.l1_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l1), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2_dim, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l1_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_0")
 
-        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         z2 = tf.contrib.layers.layer_norm(zub1 + yub1 + wub1, center=True, scale=True, activation_fn=tf.nn.relu)
 
 
-        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None, \
+        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub2 = tf.contrib.layers.fully_connected(u2, self.l2, activation_fn=tf.nn.relu, \
+        zub2 = tf.contrib.layers.fully_connected(u2, self.l2_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_1")
 
-        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         f_outputs = zub2 + yub2 + wub2
@@ -234,85 +223,85 @@ class EntropyNetwork(BaseNetwork):
         net = tf.contrib.layers.batch_norm(inputs, fused=True, center=True, scale=True, activation_fn=None,
                                            is_training=phase, scope='batchnorm_0')
 
-        u1 = tf.contrib.layers.fully_connected(net, self.l1, activation_fn=None, \
+        u1 = tf.contrib.layers.fully_connected(net, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
         # bn -> relu
-        u1 = tf.contrib.layers.batch_norm(u1,  fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
+        u1 = tf.contrib.layers.batch_norm(u1,  fused=True, center=True, scale=True, activation_fn=tf.nn.relu,
                                            is_training=phase, scope='batchnorm_1')
 
 
-        u2 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        u2 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
 
-        wub0 = tf.contrib.layers.fully_connected(net, self.l1, activation_fn=None, \
+        wub0 = tf.contrib.layers.fully_connected(net, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        yub0 = tf.contrib.layers.fully_connected(net, self.action_dim, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(net, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = False)
 
-        z1 = tf.contrib.layers.batch_norm(yub0 + wub0, fused=True, center=True, scale=True, activation_fn=tf.nn.relu, \
+        z1 = tf.contrib.layers.batch_norm(yub0 + wub0, fused=True, center=True, scale=True, activation_fn=tf.nn.relu,
                                            is_training=phase, scope='batchnorm_2')
 
-        wub1 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        wub1 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub1 = tf.contrib.layers.fully_connected(u1, self.l1, activation_fn=tf.nn.relu, \
+        zub1 = tf.contrib.layers.fully_connected(u1, self.l1_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l1), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2_dim, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l1_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_0")
 
-        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         # bn -> relu
@@ -321,38 +310,38 @@ class EntropyNetwork(BaseNetwork):
         z2 = tf.nn.relu(zub1 + yub1 + wub1)
 
 
-        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None, \
+        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub2 = tf.contrib.layers.fully_connected(u2, self.l2, activation_fn=tf.nn.relu, \
+        zub2 = tf.contrib.layers.fully_connected(u2, self.l2_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_1")
 
-        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         f_outputs = zub2 + yub2 + wub2
@@ -361,123 +350,122 @@ class EntropyNetwork(BaseNetwork):
 
     def no_norm_network(self, inputs, action, phase):
 
-        u1 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=tf.nn.relu, \
+        u1 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
 
-        u2 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        u2 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
 
-        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1, activation_fn=None, \
+        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1, activation_fn=None, \
+        yub0 = tf.contrib.layers.fully_connected(action * yub0, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         z1 = tf.nn.relu(yub0 + wub0)
 
-        wub1 = tf.contrib.layers.fully_connected(u1, self.l2, activation_fn=None, \
+        wub1 = tf.contrib.layers.fully_connected(u1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub1 = tf.contrib.layers.fully_connected(u1, self.l1, activation_fn=tf.nn.relu, \
+        zub1 = tf.contrib.layers.fully_connected(u1, self.l1_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l1), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub1 = tf.contrib.layers.fully_connected(z1 * zub1, self.l2_dim, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval=tf.sqrt(3.0 / self.l1_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_0")
 
-        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(u1, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2, activation_fn=None, \
+        yub1 = tf.contrib.layers.fully_connected(action * yub1, self.l2_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         z2 = tf.nn.relu(zub1 + yub1 + wub1)
 
 
-        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None, \
+        wub2 = tf.contrib.layers.fully_connected(u2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        zub2 = tf.contrib.layers.fully_connected(u2, self.l2, activation_fn=tf.nn.relu, \
+        zub2 = tf.contrib.layers.fully_connected(u2, self.l2_dim, activation_fn=tf.nn.relu,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None, \
-                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2), dtype=tf.float32),
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+        zub2 = tf.contrib.layers.fully_connected(z2 * zub2, 1, activation_fn=None,
+                                                weights_initializer=tf.random_uniform_initializer(minval = 0, maxval = tf.sqrt(3.0 / self.l2_dim), dtype=tf.float32),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None, scope = "zub_1")
 
-        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(u2, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
-        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None, \
+        yub2 = tf.contrib.layers.fully_connected(action * yub2, 1, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
-                                                # tf.truncated_normal_initializer(), \
-                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01), \
+                                                # tf.truncated_normal_initializer(),
+                                                weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                  biases_initializer = None)
 
         f_outputs = zub2 + yub2 + wub2
 
         return f_outputs
-
 
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
@@ -489,7 +477,6 @@ class EntropyNetwork(BaseNetwork):
         })
         self.sess.run(self.project)
         return res
-
 
     def predict(self, *args):
         # args  (inputs, action, phase)
@@ -535,8 +522,8 @@ class EntropyNetwork(BaseNetwork):
 
         num = action_init.shape[0]
 
-        #print('state:', state)
-        #print('action', action_init)
+        # print('state:', state)
+        # print('action', action_init)
 
         action = action_init
 
@@ -765,6 +752,9 @@ class EntropyNetwork(BaseNetwork):
             self.target_phase: is_training
         })
 
+    def init_target_network(self):
+        self.sess.run(self.init_target_net_params)
+
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
@@ -860,12 +850,10 @@ class EntropyNetwork(BaseNetwork):
                                                                    self.action: np.expand_dims(action, 0),
                                                                    self.phase: False})
 
-
-
     # for bundle_entropy, mapping [0, 1] to real range of actions
     def mapAction(self, act):
-        return self.actionRange * act + self.action_min
+        return np.clip(self.actionRange * act + self.action_min, self.action_min, self.action_max)
 
     # for bundle_entropy, mapping real range of actions to [0, 1]
     def rmapAction(self, act):
-        return  (act - self.action_min) / self.actionRange
+        return (act - self.action_min) / self.actionRange

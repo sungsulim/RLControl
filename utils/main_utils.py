@@ -17,9 +17,9 @@ def create_agent(agent_string, config):
         from agents.WireFitting import WireFitting
         return WireFitting(config)
 
-    elif agent_string == "ICNN":
-        from agents.ICNN import ICNN
-        return ICNN(config)
+    elif agent_string == "PICNN":
+        from agents.PICNN import PICNN
+        return PICNN(config)
 
     elif agent_string == "ActorExpert":
         from agents.ActorExpert import ActorExpert
