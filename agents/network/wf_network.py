@@ -85,7 +85,7 @@ class WireFitting_Network(BaseNetwork):
             '''
             w_init = tf.random_uniform_initializer(minval=-1., maxval=1.)
             interim_actions = slim.fully_connected(state_hidden2_norm, self.app_points * self.action_dim,
-                                                activation_fn=tf.nn.tanh, weights_initializer=w_init) * self.action_max
+                                                activation_fn=tf.nn.tanh, weights_initializer=w_init) # * self.action_max
             # print 'interim action shape is :: ', interim_actions.shape
             # w_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
             interim_q_values = slim.fully_connected(state_hidden2_norm, self.app_points, activation_fn=None,
@@ -99,7 +99,7 @@ class WireFitting_Network(BaseNetwork):
             maxind_nd = tf.concat([tf.reshape(rowinds, [-1, 1]), tf.reshape(maxind, [-1, 1])], axis=1)
             # print 'max id shape is :: ', maxind_nd.shape
 
-            best_action = tf.gather_nd(tf.reshape(interim_actions, [-1, self.app_points, self.action_dim]), maxind_nd)
+            best_action = tf.gather_nd(tf.reshape(interim_actions, [-1, self .app_points, self.action_dim]), maxind_nd)
 
         return state_input, phase, interim_actions, interim_q_values, max_q_val, best_action
 
