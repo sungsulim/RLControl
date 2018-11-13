@@ -74,10 +74,9 @@ class WireFitting_Network(BaseNetwork):
                 state_input = tf.clip_by_value(self.input_norm.normalize(state_input), self.state_min, self.state_max)
 
             state_hidden1 = slim.fully_connected(state_input, self.l1_dim, activation_fn=None)
-            state_hidden1_norm = self.apply_norm(state_hidden1, activation_fn=tf.nn.relu, phase=True,
-                                                 layer_num=1)  ## TODO: Hacky way. Not using batchnorm so just set phase to True. (Need to implement self.phase in the class)
+            state_hidden1_norm = self.apply_norm(state_hidden1, activation_fn=tf.nn.relu, phase=phase, layer_num=1)
             state_hidden2 = slim.fully_connected(state_hidden1_norm, self.l2_dim, activation_fn=None)
-            state_hidden2_norm = self.apply_norm(state_hidden2, activation_fn=tf.nn.relu, phase=True, layer_num=2)
+            state_hidden2_norm = self.apply_norm(state_hidden2, activation_fn=tf.nn.relu, phase=phase, layer_num=2)
 
             # state_hidden2_val = slim.fully_connected(state_hidden1, n_hidden1, activation_fn = tf.nn.relu)
             '''
@@ -112,10 +111,10 @@ class WireFitting_Network(BaseNetwork):
             # print 'reshaped tiled action shape is :: ', reshaped_action_input.shape
             reshaped_action_output = tf.reshape(interim_actions, [-1, self.app_points, self.action_dim])
             # distance is b * n mat, n is number of points to do interpolation
-            act_distance = tf.reduce_sum(tf.square(reshaped_action_input - reshaped_action_output), axis = 2)
+            act_distance = tf.reduce_sum(tf.square(reshaped_action_input - reshaped_action_output), axis=2)
             w_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
             smooth_c = tf.nn.sigmoid(tf.get_variable("smooth_c", [1, self.app_points], initializer=w_init, dtype=self.dtype))
-            q_distance = smooth_c*(tf.reshape(max_q, [-1,1]) - interim_qvalues)
+            q_distance = smooth_c*(tf.reshape(max_q, [-1, 1]) - interim_qvalues)
             distance = act_distance + q_distance + self.smooth_eps
             # distance = tf.add(distance, self.smooth_eps)
             weight = 1.0/distance
@@ -123,14 +122,7 @@ class WireFitting_Network(BaseNetwork):
             weightsum = tf.reduce_sum(weight, axis=1, keep_dims=True)
             weight_final = weight/weightsum
             q_val = tf.reduce_sum(tf.multiply(weight_final, interim_qvalues), axis=1)
-
         return action_input, q_val
-
-    # TODO Later
-    def network(self, inputs, action, phase):
-
-        pass
-
 
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
@@ -144,11 +136,13 @@ class WireFitting_Network(BaseNetwork):
     def predict_action(self, *args):
 
         inputs = args[0]
-        best_action, actions = self.sess.run([self.best_action, self.interim_actions],
-                                      {self.state_input: inputs.reshape(-1, self.state_dim), self.phase: False})
-        # print bestact.shape, acts.shape
+        best_action, actions = self.sess.run([self.best_action, self.interim_actions], feed_dict={
+            self.state_input: inputs.reshape(-1, self.state_dim), self.phase: False
+        })
+
         return best_action.reshape(-1), actions.reshape(self.app_points, self.action_dim)
 
+    # TODO: This isn't used, and hasn't been verified
     def predict_q_target(self, *args):
         return self.sess.run(self.target_q_val, feed_dict={
             self.state_input: args[0],
