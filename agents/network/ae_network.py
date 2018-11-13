@@ -21,12 +21,19 @@ class ActorExpert_Network(BaseNetwork):
         self.num_samples = config.num_samples
         self.num_modal = config.num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
+
         self.policy_gd_alpha = config.policy_gd_alpha
         self.policy_gd_max_steps = config.policy_gd_max_steps
         self.policy_gd_stop = config.policy_gd_stop
+
         self.use_policy_gd = False
         if config.use_policy_gd == "True":
             self.use_policy_gd = True
+
+        self.use_uniform_sampling = False
+        if config.use_uniform_sampling == "True":
+            self.use_uniform_sampling = True
+            self.uniform_sampling_ratio = config.uniform_sampling_ratio
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
@@ -404,9 +411,11 @@ class ActorExpert_Network(BaseNetwork):
                            in zip(modal_idx_list, mean, sigma)]
 
         # uniform sampling TODO: Optimize this
-        for j in range(len(sampled_actions)):
-            for i in range(10):
-                sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
+        if self.use_uniform_sampling:
+            for j in range(len(sampled_actions)):
+                for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
+                    sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
+
         return sampled_actions
 
     # Should return n actions
