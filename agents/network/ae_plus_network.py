@@ -31,6 +31,10 @@ class ActorExpert_Plus_Network(BaseNetwork):
         if config.use_policy_gd == "True":
             self.use_policy_gd = True
 
+        self.use_uniform_sampling = False
+        if config.use_uniform_sampling == "True":
+            self.use_uniform_sampling = True
+            self.uniform_sampling_ratio = config.uniform_sampling_ratio
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
@@ -222,9 +226,11 @@ class ActorExpert_Plus_Network(BaseNetwork):
         # y: batch x action_dim
         result = self.tf_normal(y, mu, sigma)
 
-        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+        # Modified to do equal weighting
+        result = tf.scalar_mul(1.0 / self.num_modal, result)  # tf.multiply(result, tf.squeeze(alpha, axis=2))
+
         result = tf.reduce_sum(result, 1, keepdims=True)
-        result = -tf.log(result)
+        result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
 
         return tf.reduce_mean(result)
 
@@ -319,7 +325,8 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         self.setModalStats(alpha[0], mean[0], sigma[0])
 
-        max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        # max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
 
         # best_mean = []
         # for idx, m in zip(max_idx, mean):
@@ -345,7 +352,8 @@ class ActorExpert_Plus_Network(BaseNetwork):
                                                 self.target_phase: phase
                                             })
 
-        max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        # max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
 
         # best_mean = []
         # for idx, m in zip(max_idx, mean):
@@ -386,8 +394,15 @@ class ActorExpert_Plus_Network(BaseNetwork):
         #     sampled_actions.append(np.clip(actions, self.action_min, self.action_max))
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
-        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
-        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s in zip(modal_idx_list, mean, sigma)]
+        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
+        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
+                           in zip(modal_idx_list, mean, sigma)]
+
+        # uniform sampling TODO: Optimize this
+        if self.use_uniform_sampling:
+            for j in range(len(sampled_actions)):
+                for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
+                    sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
 
         return sampled_actions
 
@@ -460,7 +475,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
     def getQFunction(self, state):
         return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
-                                                                          self.action: np.expand_dims(action, 0),
+                                                                          self.action: np.expand_dims([action], 0),
                                                                           self.phase: False})
 
     def getPolicyFunction(self, alpha, mean, sigma):
@@ -469,8 +484,11 @@ class ActorExpert_Plus_Network(BaseNetwork):
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
-        return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-                                                         np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        # return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
+        #                                                  np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
+            np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
+            np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
         self.saved_alpha = alpha
