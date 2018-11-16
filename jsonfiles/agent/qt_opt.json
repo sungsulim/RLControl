@@ -13,6 +13,6 @@
         "qnet_lr": [1e-2, 1e-3, 1e-4],
         "num_samples": [64],
         "top_m": [6],
-        "num_iter": [2,4]
+        "num_iter": [2]
     }
 }
