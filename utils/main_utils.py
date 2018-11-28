@@ -33,6 +33,10 @@ def create_agent(agent_string, config):
         from agents.QT_OPT import QT_OPT
         return QT_OPT(config)
 
+    elif agent_string == "ActorCritic":
+        from agents.ActorCritic import ActorCritic
+        return ActorCritic(config)
+
     # elif agent_string == "AE_CCEM_separate":
     #     from agents.AE_CCEM_separate import AE_CCEM_separate
     #     return AE_CCEM_separate(env, config, seed)
