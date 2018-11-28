@@ -11,6 +11,7 @@
 
         "actor_lr": [1e-3, 1e-4, 1e-5],
         "critic_lr": [1e-2, 1e-3, 1e-4],
-        "num_modal": [2]
+        "num_modal": [2],
+        "num_samples": [30]
     }
 }

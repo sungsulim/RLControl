@@ -18,6 +18,7 @@ class ActorCritic_Network(BaseNetwork):
 
         # ac specific params
         self.num_modal = config.num_modal
+        self.num_samples = config.num_samples
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
         # original network
@@ -283,7 +284,7 @@ class ActorCritic_Network(BaseNetwork):
 
         return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
 
-    # Should return n actions
+    # Should return 1 action
     def sample_action(self, *args):
         # args [inputs]
 
@@ -306,6 +307,34 @@ class ActorCritic_Network(BaseNetwork):
         # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
         modal_idx_list = [self.rng.choice(self.num_modal) for _ in alpha]
+        sampled_action = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
+                           in zip(modal_idx_list, mean, sigma)]
+
+        return sampled_action
+
+    # Should return n actions
+    def sample_multiple_actions(self, *args):
+        # args [inputs]
+
+        inputs = args[0]
+        phase = args[1]
+
+        # batchsize x action_dim
+        alpha, mean, sigma = self.sess.run(
+            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
+                self.inputs: inputs,
+                self.phase: phase
+            })
+
+        alpha = np.squeeze(alpha, axis=2)
+
+        self.setModalStats(alpha[0], mean[0], sigma[0])
+
+        # TODO: Check multi-dimensional action case. Is it sampling correctly
+        # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
+        # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+
+        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                            in zip(modal_idx_list, mean, sigma)]
 
