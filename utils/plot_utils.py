@@ -20,7 +20,52 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
     max_point_x = x_min
     max_point_y = np.float('-inf')
 
-    if agent_name == 'ActorExpert':
+    if agent_name == 'ActorCritic':
+        func1, func2 = func_list[0], func_list[1]
+
+        mean_0 = greedy_action[1][0]
+        mean_1 = greedy_action[1][1]
+
+        old_greedy_action = greedy_action[0]
+        greedy_action = greedy_action[0]
+
+        for point_x in x:
+            point_y1 = np.squeeze(func1(point_x))  # reduce dimension
+            point_y2 = func2(point_x)
+
+            if point_y1 > max_point_y:
+                max_point_x = point_x
+                max_point_y = point_y1
+
+            y1.append(point_y1)
+            y2.append(point_y2)
+
+        ax[0].plot(x, y1, linewidth=linewidth)
+        ax[1].plot(x, y2, linewidth=linewidth)
+
+        if grid:
+            ax[0].grid(True)
+            ax[1].grid(True)
+            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axvline(x=mean_0[0], linewidth=1.5, color='grey')
+            ax[1].axvline(x=mean_1[0], linewidth=1.5, color='grey')
+            ax[1].axvline(x=old_greedy_action[0], linewidth=1.5, color='pink')
+            ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
+            ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
+
+        if display_title:
+            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
+            fig.suptitle(display_title, fontsize=11, fontweight='bold')
+            top_margin = 0.95
+
+            mode_string = ""
+            for i in range(len(greedy_action)):
+                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
+            ax[1].set_title("greedy actions: " + mode_string)
+        else:
+            top_margin = 1.0
+
+    elif agent_name == 'ActorExpert':
         func1, func2 = func_list[0], func_list[1]
 
         mean_0 = greedy_action[2][0]

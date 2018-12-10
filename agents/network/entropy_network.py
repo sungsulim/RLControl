@@ -92,7 +92,6 @@ class EntropyNetwork(BaseNetwork):
                 f_outputs = self.layer_norm_network(inputs, action, phase)
 
             elif self.norm_type == 'batch':
-                assert (self.input_norm is None)
                 f_outputs = self.batch_norm_network(inputs, action, phase)
 
             else:
@@ -219,11 +218,12 @@ class EntropyNetwork(BaseNetwork):
         return f_outputs
 
     def batch_norm_network(self, inputs, action, phase):
-        # state input -> bn
-        net = tf.contrib.layers.batch_norm(inputs, fused=True, center=True, scale=True, activation_fn=None,
-                                           is_training=phase, scope='batchnorm_0')
+        # Removed BN for state inputs. Doing input_norm at the beginning
+        # # state input -> bn
+        # net = tf.contrib.layers.batch_norm(inputs, fused=True, center=True, scale=True, activation_fn=None,
+        #                                    is_training=phase, scope='batchnorm_0')
 
-        u1 = tf.contrib.layers.fully_connected(net, self.l1_dim, activation_fn=None,
+        u1 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(),
@@ -245,7 +245,7 @@ class EntropyNetwork(BaseNetwork):
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
 
-        wub0 = tf.contrib.layers.fully_connected(net, self.l1_dim, activation_fn=None,
+        wub0 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(),
@@ -253,7 +253,7 @@ class EntropyNetwork(BaseNetwork):
                                                 biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True))
 
-        yub0 = tf.contrib.layers.fully_connected(net, self.action_dim, activation_fn=None,
+        yub0 = tf.contrib.layers.fully_connected(inputs, self.action_dim, activation_fn=None,
                                                 weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                     factor=1.0, mode="FAN_IN", uniform=True),
                                                 # tf.truncated_normal_initializer(),
@@ -554,7 +554,7 @@ class EntropyNetwork(BaseNetwork):
                     action[u] = np.clip(action[u], 0.03, 0.97)
                 else:
                     lam[u] = np.array([1])
-                    #print('G:',G[u][0])
+                    # print('G:',G[u][0])
                     action[u] = 1 / (1 + np.exp(G[u][0]))
                     #print('a:', action[u])
                     action[u] = np.clip(action[u], 0.03, 0.97)
