@@ -1,0 +1,17 @@
+{
+    "agent": "ActorCritic",
+    "sweeps": {
+        "norm_type": ["input_norm", "layer"],
+
+        "exploration_policy": ["none"],
+
+        "shared_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "critic_l2_dim": [200],
+
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "critic_lr": [1e-2, 1e-3, 1e-4],
+        "num_modal": [2],
+        "num_samples": [30]
+    }
+}
