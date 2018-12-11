@@ -45,7 +45,7 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
             print('Do not know this inference method!')
             exit()
 
-        greedy_action = self.entropy_network.alg_opt(np.expand_dims(state, 0), action_init, self.inference_max_steps)[0]
+        greedy_action = self.entropy_network.alg_opt(np.expand_dims(state, 0), action_init, self.inference_max_steps, False)[0]
 
         if is_train:
             if is_start:
@@ -94,7 +94,7 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
             print('Do not know this inference method!')
             exit()
 
-        next_action_batch_final_target = self.entropy_network.alg_opt_target(next_state_batch, next_action_batch_init_target, self.inference_max_steps)
+        next_action_batch_final_target = self.entropy_network.alg_opt_target(next_state_batch, next_action_batch_init_target, self.inference_max_steps, False)
 
         # compute target
         target_q = self.entropy_network.predict_target(next_state_batch, next_action_batch_final_target, True)

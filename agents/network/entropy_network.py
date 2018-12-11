@@ -511,14 +511,14 @@ class EntropyNetwork(BaseNetwork):
             self.target_phase: args[2]
         })
 
-    def alg_opt(self, state, action_init, inference_max_step):
+    def alg_opt(self, state, action_init, inference_max_step, is_training):
         #print('param:', self.sess.run(self.net_params))
         if self.inference == 'bundle_entropy':
-            return self.bundle_entropy(state, action_init, inference_max_step)
+            return self.bundle_entropy(state, action_init, inference_max_step, is_training)
         elif self.inference == 'adam':
-            return self.adam(state, action_init, inference_max_step)
+            return self.adam(state, action_init, inference_max_step, is_training)
 
-    def bundle_entropy(self, state, action_init, inference_max_step):
+    def bundle_entropy(self, state, action_init, inference_max_step, is_training):
 
         num = action_init.shape[0]
 
@@ -534,8 +534,8 @@ class EntropyNetwork(BaseNetwork):
 
         finished = set([])
         for t in range(inference_max_step):
-            fi = self.f_predict(state, self.mapAction(action), False)[:, 0]
-            gi = self.actionRange * self.f_action_gradients(state, self.mapAction(action), False)[0]
+            fi = self.f_predict(state, self.mapAction(action), is_training)[:, 0]
+            gi = self.actionRange * self.f_action_gradients(state, self.mapAction(action), is_training)[0]
             Gi = gi
             hi = fi - np.sum(gi * action, axis=1)
             for u in range(num):
@@ -574,7 +574,7 @@ class EntropyNetwork(BaseNetwork):
         #print(t)
         return self.mapAction(action)
 
-    def adam(self, obs, act, inference_max_step):
+    def adam(self, obs, act, inference_max_step, is_training):
         b1 = 0.9
         b2 = 0.999
         lam = 0.5
@@ -586,8 +586,8 @@ class EntropyNetwork(BaseNetwork):
         act_best, a_diff, f_best = [None] * 3
         #print("sample")
         for i in range(inference_max_step):
-            f = -1 * self.predict(obs, act, False)
-            g = self.action_gradients(obs, act, False)[0]
+            f = -1 * self.predict(obs, act, is_training)
+            g = self.action_gradients(obs, act, is_training)[0]
             if i == 0:
                 act_best = act.copy()
                 f_best = f.copy()
@@ -620,13 +620,13 @@ class EntropyNetwork(BaseNetwork):
         #print('  + Warning: Adam did not converge.')
         return act_best
 
-    def alg_opt_target(self, state, action_init, inference_max_step):
+    def alg_opt_target(self, state, action_init, inference_max_step, is_training):
         if self.inference == 'bundle_entropy':
-            return self.bundle_entropy_target(state, action_init, inference_max_step)
+            return self.bundle_entropy_target(state, action_init, inference_max_step, is_training)
         elif self.inference == 'adam':
-            return self.adam_target(state, action_init, inference_max_step)
+            return self.adam_target(state, action_init, inference_max_step, is_training)
 
-    def bundle_entropy_target(self, state, action_init, inference_max_step):
+    def bundle_entropy_target(self, state, action_init, inference_max_step, is_training):
 
         num = action_init.shape[0]
 
@@ -640,8 +640,8 @@ class EntropyNetwork(BaseNetwork):
 
         finished = set([])
         for t in range(inference_max_step):
-            fi = self.f_predict_target(state, self.mapAction(action), False)[:, 0]
-            gi = self.actionRange * self.f_action_gradients_target(state, self.mapAction(action), False)[0]
+            fi = self.f_predict_target(state, self.mapAction(action), is_training)[:, 0]
+            gi = self.actionRange * self.f_action_gradients_target(state, self.mapAction(action), is_training)[0]
             Gi = gi
             hi = fi - np.sum(gi * action, axis=1)
             for u in range(num):
@@ -678,7 +678,7 @@ class EntropyNetwork(BaseNetwork):
         #print(t)
         return self.mapAction(action)
 
-    def adam_target(self, obs, act, inference_max_step):
+    def adam_target(self, obs, act, inference_max_step, is_training):
         b1 = 0.9
         b2 = 0.999
         lam = 0.5
@@ -690,8 +690,8 @@ class EntropyNetwork(BaseNetwork):
         b1t, b2t = 1., 1.
         act_best, a_diff, f_best = [None] * 3
         for i in range(inference_max_step):
-            f = -1 * self.predict_target(obs, act, False)
-            g = self.action_gradients_target(obs, act, False)[0]
+            f = -1 * self.predict_target(obs, act, is_training)
+            g = self.action_gradients_target(obs, act, is_training)[0]
             if i == 0:
                 act_best = act.copy()
                 f_best = f.copy()
