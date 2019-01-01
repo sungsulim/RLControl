@@ -61,9 +61,13 @@ class ActorCritic_Network(BaseNetwork):
             self.critic_optimize = tf.train.AdamOptimizer(self.learning_rate[1]).minimize(self.critic_loss)
 
             # Actor update
-            self.actor_loss = self.get_lossfunc(self.action_prediction_alpha, self.action_prediction_sigma,
+            self.actor_loss_ll = self.get_lossfunc_ll(self.action_prediction_alpha, self.action_prediction_sigma,
                                                 self.action_prediction_mean, self.actions, self.q_val)
-            self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss)
+            self.actor_optimize_ll = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_ll)
+
+            self.actor_loss_cem = self.get_lossfunc_cem(self.action_prediction_alpha, self.action_prediction_sigma,
+                                                self.action_prediction_mean, self.actions)
+            self.actor_optimize_cem = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_cem)
 
         # # Get the gradient of the policy w.r.t. the action
         self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
@@ -202,7 +206,7 @@ class ActorCritic_Network(BaseNetwork):
 
         return alpha, mean, sigma, action, result
 
-    def get_lossfunc(self, alpha, sigma, mu, y, q_val):
+    def get_lossfunc_ll(self, alpha, sigma, mu, y, q_val):
         # alpha: batch x num_modal x 1
         # sigma: batch x num_modal x action_dim
         # mu: batch x num_modal x action_dim
@@ -216,6 +220,21 @@ class ActorCritic_Network(BaseNetwork):
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
 
         result = tf.multiply(result, q_val)
+
+        return tf.reduce_mean(result)
+
+    def get_lossfunc_cem(self, alpha, sigma, mu, y):
+        # alpha: batch x num_modal x 1
+        # sigma: batch x num_modal x action_dim
+        # mu: batch x num_modal x action_dim
+        # y: batch x action_dim
+        result = self.tf_normal(y, mu, sigma)
+
+        # Modified to do equal weighting
+        result = tf.scalar_mul(1.0 / self.num_modal, result) # tf.multiply(result, tf.squeeze(alpha, axis=2))
+
+        result = tf.reduce_sum(result, 1, keepdims=True)
+        result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
 
         return tf.reduce_mean(result)
 
@@ -242,12 +261,20 @@ class ActorCritic_Network(BaseNetwork):
             self.phase: True
         })
 
-    def train_actor(self, *args):
+    def train_actor_ll(self, *args):
         # args [inputs, actions, phase]
-        return self.sess.run(self.actor_optimize, feed_dict={
+        return self.sess.run(self.actor_optimize_ll, feed_dict={
             self.inputs: args[0],
             self.actions: args[1],
             self.q_val: args[2],
+            self.phase: True
+        })
+
+    def train_actor_cem(self, *args):
+        # args [inputs, actions, phase]
+        return self.sess.run(self.actor_optimize_cem, feed_dict={
+            self.inputs: args[0],
+            self.actions: args[1],
             self.phase: True
         })
 
