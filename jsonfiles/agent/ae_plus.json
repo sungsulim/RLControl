@@ -17,7 +17,7 @@
         "num_samples": [1],
         "num_modal": [2],
 
-        "use_uniform_sampling": ["False", "True"],
+        "use_uniform_sampling": ["False"],
         "uniform_sampling_ratio": [0.2],
 
         "policy_gd_alpha": [1e-1],
