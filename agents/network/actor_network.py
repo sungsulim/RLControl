@@ -7,7 +7,6 @@ class ActorNetwork(BaseNetwork):
         super(ActorNetwork, self).__init__(sess, config, config.actor_lr)
         #tf.set_random_seed(config.random_seed)
 
-        self.action_scale = config.action_max[0]  # assuming action range is symmetrical around 0
         self.l1 = config.actor_l1_dim
         self.l2 = config.actor_l2_dim
 
@@ -95,7 +94,7 @@ class ActorNetwork(BaseNetwork):
                                                     weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
                                                     weights_regularizer=None, # tf.contrib.layers.l2_regularizer(0.001), \
                                                     biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-        return outputs * self.action_scale
+        return outputs
 
     def train(self, *args):
 
