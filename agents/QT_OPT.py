@@ -45,16 +45,16 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
             if self.write_plot:
 
                 func1 = self.qt_opt_network.getQFunction(state)
+                func2 = self.qt_opt_network.getPolicyFunction(mean_std[0][0], mean_std[0][1])
 
-                # utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, chosen_action], self.action_min,
-                #                               self.action_max,
-                #                               display_title='ep: ' + str(
-                #                                   self.train_ep_count) + ', steps: ' + str(
-                #                                   self.train_global_steps),
-                #                               save_title='steps_' + str(self.train_global_steps),
-                #                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
-                #                               show=False)
-                raise NotImplementedError
+                utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, greedy_action, chosen_action, self.action_min,
+                                              self.action_max,
+                                              display_title='ep: ' + str(
+                                                  self.train_ep_count) + ', steps: ' + str(
+                                                  self.train_global_steps),
+                                              save_title='steps_' + str(self.train_global_steps),
+                                              save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
+                                              show=False)
 
             return chosen_action
         else:

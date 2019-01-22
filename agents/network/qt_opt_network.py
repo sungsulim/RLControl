@@ -261,6 +261,13 @@ class QTOPTNetwork(BaseNetwork):
 
     def getQFunction(self, state):
         return lambda action: self.sess.run(self.outputs, {self.inputs: np.expand_dims(state, 0), 
-                                            self.action: np.expand_dims(action, 0), 
+                                            self.action: np.expand_dims([action], 0),
                                             self.phase: False})
 
+    def getPolicyFunction(self, mean, std):
+        mean = np.squeeze(mean)
+        sigma = np.squeeze(std)
+
+        return lambda action: np.multiply(
+            np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
+            np.exp(-np.square(action - mean) / (2.0 * np.square(sigma))))
