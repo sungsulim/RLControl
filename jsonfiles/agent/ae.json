@@ -23,6 +23,7 @@
         "policy_gd_alpha": [1e-1],
         "policy_gd_max_steps": [50],
         "policy_gd_stop": [1e-3],
-        "use_policy_gd": ["False"]
+        "use_policy_gd": ["False"],
+        "equal_modal_selection": ["False"]
     }
 }
