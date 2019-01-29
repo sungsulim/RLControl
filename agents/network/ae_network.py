@@ -163,7 +163,7 @@ class ActorExpert_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.scalar_mul(2.0, action_prediction_sigma))
+        action_prediction_sigma = tf.exp(tf.scalar_mul(1.0, action_prediction_sigma))
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
