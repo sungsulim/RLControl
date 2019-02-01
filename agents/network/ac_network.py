@@ -8,6 +8,9 @@ class ActorCritic_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorCritic_Network, self).__init__(sess, config, [config.actor_lr, config.critic_lr])
 
+        self.sigma_scale = config.sigma_scale
+        self.equal_modal_selection = config.equal_modal_selection
+
         self.rng = np.random.RandomState(config.random_seed)
 
         self.shared_layer_dim = config.shared_l1_dim
@@ -148,7 +151,7 @@ class ActorCritic_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.scalar_mul(1.0, action_prediction_sigma))
+        action_prediction_sigma = tf.exp(tf.scalar_mul(self.sigma_scale, action_prediction_sigma))
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -214,7 +217,10 @@ class ActorCritic_Network(BaseNetwork):
         result = self.tf_normal(y, mu, sigma)
 
         # Modified to do equal weighting
-        result = tf.scalar_mul(1.0 / self.num_modal, result) # tf.multiply(result, tf.squeeze(alpha, axis=2))
+        if self.equal_modal_selection:
+            result = tf.scalar_mul(1.0 / self.num_modal, result)
+        else:
+            tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
@@ -231,7 +237,10 @@ class ActorCritic_Network(BaseNetwork):
         result = self.tf_normal(y, mu, sigma)
 
         # Modified to do equal weighting
-        result = tf.scalar_mul(1.0 / self.num_modal, result) # tf.multiply(result, tf.squeeze(alpha, axis=2))
+        if self.equal_modal_selection:
+            result = tf.scalar_mul(1.0 / self.num_modal, result)
+        else:
+            tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
@@ -333,9 +342,13 @@ class ActorCritic_Network(BaseNetwork):
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
         # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
-        modal_idx_list = [self.rng.choice(self.num_modal) for _ in alpha]
+        if self.equal_modal_selection:
+            modal_idx_list = [self.rng.choice(self.num_modal) for _ in alpha]
+        else:
+            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+
         sampled_action = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
-                           in zip(modal_idx_list, mean, sigma)]
+                          in zip(modal_idx_list, mean, sigma)]
 
         return sampled_action
 
@@ -361,7 +374,11 @@ class ActorCritic_Network(BaseNetwork):
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
         # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
-        modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
+        if self.equal_modal_selection:
+            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
+        else:
+            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                            in zip(modal_idx_list, mean, sigma)]
 
@@ -410,10 +427,14 @@ class ActorCritic_Network(BaseNetwork):
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
-        # return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
-        return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
-            np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-            np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        if self.equal_modal_selection:
+            return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
+                np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
+                np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        else:
+            return lambda action: np.sum(alpha * np.multiply(
+                np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
+                np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
         self.saved_alpha = alpha
