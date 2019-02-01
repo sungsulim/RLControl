@@ -28,6 +28,7 @@
         "gd_alpha": [1e-2],
         "gd_max_steps": [10],
         "gd_stop": [1e-3],
-        "equal_modal_selection": ["False"]
+        "equal_modal_selection": ["True"],
+        "sigma_scale": [1.0]
     }
 }

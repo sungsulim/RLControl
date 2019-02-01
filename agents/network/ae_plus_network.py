@@ -7,6 +7,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Plus_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
 
+        self.sigma_scale = config.sigma_scale
         self.equal_modal_selection = config.equal_modal_selection
         self.rng = np.random.RandomState(config.random_seed)
 
@@ -161,7 +162,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.scalar_mul(1.0, action_prediction_sigma))
+        action_prediction_sigma = tf.exp(tf.scalar_mul(self.sigma_scale, action_prediction_sigma))
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
@@ -228,7 +229,10 @@ class ActorExpert_Plus_Network(BaseNetwork):
         result = self.tf_normal(y, mu, sigma)
 
         # Modified to do equal weighting
-        result = tf.scalar_mul(1.0 / self.num_modal, result)  # tf.multiply(result, tf.squeeze(alpha, axis=2))
+        if self.equal_modal_selection:
+            result = tf.scalar_mul(1.0 / self.num_modal, result)
+        else:
+            tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
