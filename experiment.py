@@ -32,31 +32,30 @@ class Experiment(object):
         self.write_log = write_log
         self.write_plot = write_plot
 
-        self.start_time = None
-        self.end_time = None
+        self.cum_train_time = 0.0
+        self.cum_eval_time = 0.0
 
     def run(self):
 
         episode_count = 0
+
+        # For total time
         start_run = datetime.now()
         print("Start run at: " + str(start_run)+'\n')
-        self.start_time = time.time()
-        # pr.enable()
 
         # evaluate once at beginning
-        self.eval()
+        self.cum_eval_time += self.eval()
         
         while self.total_step_count < self.train_environment.TOTAL_STEPS_LIMIT:
             # runs a single episode and returns the accumulated reward for that episode
-            episode_reward, num_steps, force_terminated = self.run_episode_train(is_train=True)
+            train_start_time = time.time()
+            episode_reward, num_steps, force_terminated, eval_session_time = self.run_episode_train(is_train=True)
+            train_end_time = time.time()
 
-            if output_ep_result_fq != -1 and episode_count % output_ep_result_fq == 0:
+            train_ep_time = train_end_time - train_start_time - eval_session_time
 
-                self.end_time = time.time()
-                elapsed_time = self.end_time - self.start_time
-                self.start_time = self.end_time
-
-                print("Train:: ep: " + str(episode_count) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+            self.cum_train_time += train_ep_time
+            print("Train:: ep: " + str(episode_count) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(train_ep_time)))
 
             if not force_terminated: 
                 self.train_rewards_per_episode.append(episode_reward)
@@ -70,14 +69,20 @@ class Experiment(object):
             episode_count += 1
 
         self.train_environment.close()  # clear environment memory
+
         end_run = datetime.now()
         print("End run at: " + str(end_run)+'\n')
-        print("Time taken: "+str(end_run - start_run))
+        print("Total Time taken: "+str(end_run - start_run) + '\n')
+        print("Training Time: " + time.strftime("%H:%M:%S", time.gmtime(self.cum_train_time)))
+        print("Evaluation Time: " + time.strftime("%H:%M:%S", time.gmtime(self.cum_eval_time)))
+
         return self.train_rewards_per_episode, self.eval_mean_rewards_per_episode, self.eval_std_rewards_per_episode
 
     # Runs a single episode (TRAIN)
     def run_episode_train(self, is_train):
-        
+
+        eval_session_time = 0.0
+
         obs = self.train_environment.reset()
         self.agent.reset()  # Need to be careful in Agent not to reset the weight
 
@@ -113,28 +118,30 @@ class Experiment(object):
             obs = obs_n
 
             if self.total_step_count % self.train_environment.eval_interval == 0:
-                self.eval()
+                eval_session_time += self.eval()
 
         # check if this episode is finished because of Total Training Step Limit
         if not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT):
             force_terminated = True
         else:
             force_terminated = False
-        return episode_reward, episode_step_count, force_terminated
+        return episode_reward, episode_step_count, force_terminated, eval_session_time
 
     def eval(self):
         temp_rewards_per_episode = []
 
-        for i in range(self.test_environment.eval_episodes):
-            episode_reward, num_steps = self.run_episode_eval(self.test_environment, is_train=False)
+        eval_session_time = 0.0
 
+        for i in range(self.test_environment.eval_episodes):
+            eval_start_time = time.time()
+            episode_reward, num_steps = self.run_episode_eval(self.test_environment, is_train=False)
+            eval_end_time = time.time()
             temp_rewards_per_episode.append(episode_reward)
 
-            self.end_time = time.time()
-            elapsed_time = self.end_time - self.start_time
-            self.start_time = self.end_time
+            eval_elapsed_time = eval_end_time - eval_start_time
 
-            print("=== EVAL :: ep: " + str(i) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(elapsed_time)))
+            eval_session_time += eval_elapsed_time
+            print("=== EVAL :: ep: " + str(i) + ", r: " + str(episode_reward) + ", n_steps: " + str(num_steps) + ", elapsed: " + time.strftime("%H:%M:%S", time.gmtime(eval_elapsed_time)))
 
         mean = np.mean(temp_rewards_per_episode)
 
@@ -143,6 +150,10 @@ class Experiment(object):
 
         if self.write_log:
             write_summary(self.writer, self.total_step_count, mean, "eval/episode_reward/no_noise")
+
+        self.cum_eval_time += eval_session_time
+
+        return eval_session_time
 
     # Runs a single episode (EVAL)
     def run_episode_eval(self, test_env, is_train):
