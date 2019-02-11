@@ -20,11 +20,17 @@
         "use_uniform_sampling": ["False", "True"],
         "uniform_sampling_ratio": [0.2],
 
+        "use_policy_gd": ["False"],
         "policy_gd_alpha": [1e-1],
         "policy_gd_max_steps": [50],
         "policy_gd_stop": [1e-3],
-        "use_policy_gd": ["False"],
+
         "equal_modal_selection": ["True", "False"],
-        "sigma_scale": [2.0]
+        "sigma_scale": [2.0],
+
+        "use_better_q_gd": ["False"],
+        "better_q_gd_alpha": [1e-2],
+        "better_q_gd_max_steps": [10],
+        "better_q_gd_stop": [1e-3]
     }
 }

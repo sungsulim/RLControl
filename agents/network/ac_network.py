@@ -8,9 +8,6 @@ class ActorCritic_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorCritic_Network, self).__init__(sess, config, [config.actor_lr, config.critic_lr])
 
-        self.sigma_scale = config.sigma_scale
-        self.equal_modal_selection = config.equal_modal_selection
-
         self.rng = np.random.RandomState(config.random_seed)
 
         self.shared_layer_dim = config.shared_l1_dim
@@ -23,6 +20,12 @@ class ActorCritic_Network(BaseNetwork):
         self.num_modal = config.num_modal
         self.num_samples = config.num_samples
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
+
+        self.sigma_scale = config.sigma_scale
+
+        self.equal_modal_selection = False
+        if config.equal_modal_selection == "True":
+            self.equal_modal_selection = True
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(

@@ -7,8 +7,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Plus_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
 
-        self.sigma_scale = config.sigma_scale
-        self.equal_modal_selection = config.equal_modal_selection
         self.rng = np.random.RandomState(config.random_seed)
 
         self.shared_layer_dim = config.shared_l1_dim
@@ -37,6 +35,19 @@ class ActorExpert_Plus_Network(BaseNetwork):
         if config.use_uniform_sampling == "True":
             self.use_uniform_sampling = True
             self.uniform_sampling_ratio = config.uniform_sampling_ratio
+
+        self.sigma_scale = config.sigma_scale
+
+        self.equal_modal_selection = False
+        if config.equal_modal_selection == "True":
+            self.equal_modal_selection = True
+
+        self.use_better_q_gd = False
+        if config.use_better_q_gd == "True":
+            self.use_better_q_gd = True
+            self.better_q_gd_alpha = config.better_q_gd_alpha
+            self.better_q_gd_max_steps = config.better_q_gd_max_steps
+            self.better_q_gd_stop = config.better_q_gd_stop
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
@@ -216,17 +227,22 @@ class ActorExpert_Plus_Network(BaseNetwork):
         action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name='temp_action')
 
         result = self.tf_normal(action, mean, sigma)
-        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+
+        if self.equal_modal_selection:
+            result = tf.scalar_mul(1.0 / self.num_modal, result)
+        else:
+            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+
         result = tf.reduce_sum(result, 1, keepdims=True)
 
         return alpha, mean, sigma, action, result
 
-    def get_lossfunc(self, alpha, sigma, mu, y):
+    def get_lossfunc(self, alpha, sigma, mean, action):
         # alpha: batch x num_modal x 1
         # sigma: batch x num_modal x action_dim
-        # mu: batch x num_modal x action_dim
-        # y: batch x action_dim
-        result = self.tf_normal(y, mu, sigma)
+        # mean: batch x num_modal x action_dim
+        # action: batch x action_dim
+        result = self.tf_normal(action, mean, sigma)
 
         # Modified to do equal weighting
         if self.equal_modal_selection:
@@ -273,6 +289,49 @@ class ActorExpert_Plus_Network(BaseNetwork):
             self.temp_mean: mean,
             self.temp_sigma: sigma,
             self.temp_action: action
+        })
+
+    def q_gradient_ascent(self, state, action_init, is_training, is_better_q_gd=False):
+
+        if is_better_q_gd:
+            gd_alpha = self.better_q_gd_alpha
+            gd_max_steps = self.better_q_gd_max_steps
+            gd_stop = self.better_q_gd_stop
+
+        else:
+            gd_alpha = self.gd_alpha
+            gd_max_steps = self.gd_max_steps
+            gd_stop = self.gd_stop
+
+        action = np.copy(action_init)
+
+        ascent_count = 0
+        update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
+
+        while np.any(update_flag > 0) and ascent_count < gd_max_steps:
+            action_old = np.copy(action)
+
+            gradients = self.q_action_gradients(state, action, is_training)[0]
+            action += update_flag * gd_alpha * gradients
+            action = np.clip(action, self.action_min, self.action_max)
+
+            # stop if action diff. is small
+            stop_idx = [idx for idx in range(len(action)) if
+                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= gd_stop]
+            update_flag[stop_idx] = 0
+            # print(update_flag)
+
+            ascent_count += 1
+
+        # print('ascent count:', ascent_count)
+        return action
+
+    def q_action_gradients(self, inputs, action, is_training):
+
+        return self.sess.run(self.action_grads, feed_dict={
+            self.inputs: inputs,
+            self.action: action,
+            self.phase: is_training
         })
 
     def train_expert(self, *args):
@@ -407,39 +466,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
-
-    def gradient_ascent(self, state, action_init, is_training):
-
-        action = np.copy(action_init)
-
-        ascent_count = 0
-        update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
-
-        while np.any(update_flag > 0) and ascent_count < self.gd_max_steps:
-            action_old = np.copy(action)
-
-            gradients = self.action_gradients(state, action, is_training)[0]
-            action += update_flag * self.gd_alpha * gradients
-            action = np.clip(action, self.action_min, self.action_max)
-
-            # stop if action diff. is small
-            stop_idx = [idx for idx in range(len(action)) if
-                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= self.gd_stop]
-            update_flag[stop_idx] = 0
-            # print(update_flag)
-
-            ascent_count += 1
-
-        # print('ascent count:', ascent_count)
-        return action
-
-    def action_gradients(self, inputs, action, is_training):
-
-        return self.sess.run(self.action_grads, feed_dict={
-            self.inputs: inputs,
-            self.action: action,
-            self.phase: is_training
-        })
 
     def getQFunction(self, state):
         return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),

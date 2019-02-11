@@ -30,18 +30,13 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
 
     def take_action(self, state, is_train, is_start):
 
-        # greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
-        old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
-
-        old_greedy_action = old_greedy_action[0]
-        greedy_action = greedy_action[0]
-
         if is_train:
             if is_start:
                 self.train_ep_count += 1
 
             if self.use_external_exploration:
-                chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
+                # chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
+                raise NotImplementedError  # this shouldn't happen though
             else:
                 # single state so first idx
                 sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
@@ -68,6 +63,14 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                 func1 = self.hydra_network.getQFunction(state)
                 func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
+                old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+
+                if self.hydra_network.use_better_q_gd:
+                    greedy_action = self.hydra_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True, is_better_q_gd=True)
+
+                old_greedy_action = old_greedy_action[0]
+                greedy_action = greedy_action[0]
+
                 utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, [greedy_action, old_greedy_action, mean], chosen_action,
                                               self.action_min, self.action_max,
                                               display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(
@@ -76,6 +79,16 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                                               show=False)
         else:
+
+            old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+
+            if self.hydra_network.use_better_q_gd:
+                greedy_action = self.hydra_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True,
+                                                                     is_better_q_gd=True)
+
+            old_greedy_action = old_greedy_action[0]
+            greedy_action = greedy_action[0]
+
             if is_start:
                 self.eval_ep_count += 1
 
@@ -92,9 +105,13 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
         batch_size = np.shape(state_batch)[0]
 
         # Expert Update
+        # Perhaps do GA on the Q function
+        _, next_action_batch_init_target = self.hydra_network.predict_action(next_state_batch, True)
 
-        # TODO: Perhaps do GA on the policy function
-        _, next_action_batch_final_target = self.hydra_network.predict_action(next_state_batch, True)
+        if self.hydra_network.use_better_q_gd:
+            next_action_batch_final_target = self.hydra_network.q_gradient_ascent(next_state_batch, next_action_batch_init_target, True, is_better_q_gd=True)
+        else:
+            next_action_batch_final_target = next_action_batch_init_target
 
         # batchsize * n
         target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
@@ -134,7 +151,7 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
 
 
         # Gradient Ascent
-        action_batch_final_reshaped = self.hydra_network.gradient_ascent(stacked_state_batch, action_batch_init_reshaped, True)  # do ascent on original network
+        action_batch_final_reshaped = self.hydra_network.q_gradient_ascent(stacked_state_batch, action_batch_init_reshaped, True)  # do ascent on original network
 
         q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
         q_val = np.reshape(q_val, (batch_size, self.num_samples))
