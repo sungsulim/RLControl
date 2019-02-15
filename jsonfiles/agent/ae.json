@@ -26,9 +26,9 @@
         "policy_gd_stop": [1e-3],
 
         "equal_modal_selection": ["False"],
-        "sigma_scale": [2.0],
+        "sigma_scale": [1.0],
 
-        "use_better_q_gd": ["False", "True"],
+        "use_better_q_gd": ["False"],
         "better_q_gd_alpha": [1e-2],
         "better_q_gd_max_steps": [10],
         "better_q_gd_stop": [1e-3]
