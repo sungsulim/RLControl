@@ -1,7 +1,7 @@
 {
     "agent": "ActorCritic",
     "sweeps": {
-        "critic_update": ["expected", "sampled"],
+        "critic_update": ["expected"],
         "actor_update": ["ll", "cem"],
 
         "norm_type": ["input_norm", "layer"],
@@ -18,7 +18,7 @@
         "num_samples": [30],
         "rho": [0.2],
 
-        "equal_modal_selection": ["True"],
+        "equal_modal_selection": ["False"],
         "sigma_scale": [1.0]
     }
 }
