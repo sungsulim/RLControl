@@ -416,28 +416,28 @@ class ActorExpert_Network(BaseNetwork):
 
         return old_best_mean, best_mean
 
-    def predict_action_target(self, *args):
-        inputs = args[0]
-        phase = args[1]
-
-        # batchsize x num_modal x action_dim
-        alpha, mean, sigma = self.sess.run([self.target_action_prediction_alpha, self.target_action_prediction_mean,
-                                            self.target_action_prediction_sigma], feed_dict={
-            self.target_inputs: inputs,
-            self.target_phase: phase
-        })
-
-        if self.equal_modal_selection:
-            max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
-        else:
-            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
-
-        best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
-
-        old_best_mean = best_mean
-        if self.use_policy_gd:
-            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
-        return old_best_mean, best_mean
+    # def predict_action_target(self, *args):
+    #     inputs = args[0]
+    #     phase = args[1]
+    #
+    #     # batchsize x num_modal x action_dim
+    #     alpha, mean, sigma = self.sess.run([self.target_action_prediction_alpha, self.target_action_prediction_mean,
+    #                                         self.target_action_prediction_sigma], feed_dict={
+    #         self.target_inputs: inputs,
+    #         self.target_phase: phase
+    #     })
+    #
+    #     if self.equal_modal_selection:
+    #         max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
+    #     else:
+    #         max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+    #
+    #     best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
+    #
+    #     old_best_mean = best_mean
+    #     if self.use_policy_gd:
+    #         best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+    #     return old_best_mean, best_mean
 
     # Should return n actions
     def sample_action(self, *args):

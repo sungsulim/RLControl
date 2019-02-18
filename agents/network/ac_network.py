@@ -27,6 +27,14 @@ class ActorCritic_Network(BaseNetwork):
         if config.equal_modal_selection == "True":
             self.equal_modal_selection = True
 
+        self.actor_update = config.actor_update
+
+        self.use_uniform_sampling = False
+        if config.use_uniform_sampling == "True":
+            self.use_uniform_sampling = True
+            self.uniform_sampling_ratio = config.uniform_sampling_ratio
+
+
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
             scope_name='actorcritic')
@@ -217,6 +225,8 @@ class ActorCritic_Network(BaseNetwork):
         # sigma: batch x num_modal x action_dim
         # mu: batch x num_modal x action_dim
         # y: batch x action_dim
+        # q_val: batch x 1
+
         result = self.tf_normal(y, mu, sigma)
 
         # Modified to do equal weighting
@@ -227,17 +237,16 @@ class ActorCritic_Network(BaseNetwork):
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
-
         result = tf.multiply(result, q_val)
 
         return tf.reduce_mean(result)
 
-    def get_lossfunc_cem(self, alpha, sigma, mu, y):
+    def get_lossfunc_cem(self, alpha, sigma, mean, action):
         # alpha: batch x num_modal x 1
         # sigma: batch x num_modal x action_dim
-        # mu: batch x num_modal x action_dim
-        # y: batch x action_dim
-        result = self.tf_normal(y, mu, sigma)
+        # mean: batch x num_modal x action_dim
+        # action: batch x action_dim
+        result = self.tf_normal(action, mean, sigma)
 
         # Modified to do equal weighting
         if self.equal_modal_selection:
@@ -350,10 +359,10 @@ class ActorCritic_Network(BaseNetwork):
         else:
             modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
-        sampled_action = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
+        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                           in zip(modal_idx_list, mean, sigma)]
 
-        return sampled_action
+        return sampled_actions
 
     # Should return n actions
     def sample_multiple_actions(self, *args):
@@ -385,6 +394,12 @@ class ActorCritic_Network(BaseNetwork):
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                            in zip(modal_idx_list, mean, sigma)]
 
+        # uniform sampling TODO: Optimize this
+        if self.actor_update == "cem" and self.use_uniform_sampling:
+            for j in range(len(sampled_actions)):
+                for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
+                    sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
+
         return sampled_actions
 
     def predict_action(self, *args):
@@ -401,13 +416,10 @@ class ActorCritic_Network(BaseNetwork):
 
         self.setModalStats(alpha[0], mean[0], sigma[0])
 
-        # max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
-        max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
-
-        # best_mean = []
-        # for idx,m in zip(max_idx, mean):
-        #     best_mean.append(m[idx])
-        # best_mean = np.asarray(best_mean)
+        if self.equal_modal_selection:
+            max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
+        else:
+            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
 
         best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 

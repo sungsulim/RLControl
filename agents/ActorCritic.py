@@ -114,6 +114,13 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             target_q = np.reshape(target_q, (batch_size, 1))
             target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
+        elif self.critic_update == "mean":
+            # Use original Actor
+            next_action_batch_final_target = self.hydra_network.predict_action(next_state_batch, True)
+
+            # batchsize * n
+            target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
+
         else:
             raise ValueError("Invalid self.critic_update config")
 
@@ -179,6 +186,9 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             # normal Actor update (I think this is wrong, because action_batch is according to old policy)
             # q_val_batch = self.hydra_network.predict_q(state_batch, action_batch, True)
             # self.hydra_network.train_actor_ll(state_batch, action_batch, q_val_batch)
+
+        else:
+            raise ValueError("Invalid  self.actor_update config")
 
         # Update target networks
         self.hydra_network.update_target_network()
