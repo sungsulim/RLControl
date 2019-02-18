@@ -19,35 +19,51 @@ class ActorExpert_Plus_Network(BaseNetwork):
         self.rho = config.rho
         self.num_samples = config.num_samples
         self.num_modal = config.num_modal
+        self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
+
+        # GA config during CEM
         self.gd_alpha = config.gd_alpha
         self.gd_max_steps = config.gd_max_steps
         self.gd_stop = config.gd_stop
-        self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
-        self.policy_gd_alpha = config.policy_gd_alpha
-        self.policy_gd_max_steps = config.policy_gd_max_steps
-        self.policy_gd_stop = config.policy_gd_stop
-        self.use_policy_gd = False
-        if config.use_policy_gd == "True":
-            self.use_policy_gd = True
+        self.sigma_scale = 1.0  # config.sigma_scale
 
         self.use_uniform_sampling = False
         if config.use_uniform_sampling == "True":
             self.use_uniform_sampling = True
-            self.uniform_sampling_ratio = config.uniform_sampling_ratio
-
-        self.sigma_scale = config.sigma_scale
-
-        self.equal_modal_selection = False
-        if config.equal_modal_selection == "True":
-            self.equal_modal_selection = True
+            self.uniform_sampling_ratio = 0.2  # config.uniform_sampling_ratio
 
         self.use_better_q_gd = False
         if config.use_better_q_gd == "True":
             self.use_better_q_gd = True
-            self.better_q_gd_alpha = config.better_q_gd_alpha
-            self.better_q_gd_max_steps = config.better_q_gd_max_steps
-            self.better_q_gd_stop = config.better_q_gd_stop
+            self.better_q_gd_alpha = 1e-2  # config.better_q_gd_alpha
+            self.better_q_gd_max_steps = 10  # config.better_q_gd_max_steps
+            self.better_q_gd_stop = 1e-3  # config.better_q_gd_stop
+
+        # Removed from config
+        # "better_q_gd_alpha": [1e-2],
+        # "better_q_gd_max_steps": [10],
+        # "better_q_gd_stop": [1e-3],
+
+        # currently not used
+        self.use_policy_gd = False
+        # if config.use_policy_gd == "True":
+        #     self.use_policy_gd = True
+        #     self.policy_gd_alpha = config.policy_gd_alpha
+        #     self.policy_gd_max_steps = config.policy_gd_max_steps
+        #     self.policy_gd_stop = config.policy_gd_stop
+
+        # Removed from config
+        # "use_policy_gd": ["False"],
+        # "policy_gd_alpha": [1e-1],
+        # "policy_gd_max_steps": [50],
+        # "policy_gd_stop": [1e-3],
+
+        self.equal_modal_selection = False
+        # if config.equal_modal_selection == "True":
+        #     self.equal_modal_selection = True
+
+
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
