@@ -36,6 +36,9 @@ class ActorExpert_Network(BaseNetwork):
             self.better_q_gd_max_steps = 10  # config.better_q_gd_max_steps
             self.better_q_gd_stop = 1e-3  # config.better_q_gd_stop
 
+            self.during_qlearning = config.during_qlearning
+            self.during_evaluation = config.during_evaluation
+
         # Removed from config
         # "better_q_gd_alpha": [1e-2],
         # "better_q_gd_max_steps": [10],

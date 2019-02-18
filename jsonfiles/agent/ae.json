@@ -18,6 +18,9 @@
         "num_modal": [2],
 
         "use_uniform_sampling": ["True"],
-        "use_better_q_gd": ["False"]
+        "use_better_q_gd": ["True"],
+
+        "during_qlearning": ["mean", "mean_w_ga"],
+        "during_evaluation": ["mean", "mean_w_ga"]
     }
 }
