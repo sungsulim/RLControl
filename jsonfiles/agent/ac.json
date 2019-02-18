@@ -1,8 +1,8 @@
 {
     "agent": "ActorCritic",
     "sweeps": {
-        "critic_update": ["mean"],
-        "actor_update": ["ll"],
+        "critic_update": ["mean", "expected", "sampled"],
+        "actor_update": ["ll", "cem"],
 
         "norm_type": ["input_norm", "layer"],
 

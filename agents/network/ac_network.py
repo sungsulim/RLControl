@@ -358,7 +358,7 @@ class ActorCritic_Network(BaseNetwork):
         if self.equal_modal_selection:
             modal_idx_list = [self.rng.choice(self.num_modal) for _ in alpha]
         else:
-            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+            modal_idx_list = [self.rng.choice(self.num_modal, p=prob) for prob in alpha]
 
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                           in zip(modal_idx_list, mean, sigma)]
