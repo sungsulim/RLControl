@@ -20,9 +20,8 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         self.num_samples = config.num_samples
         self.rho = config.rho
 
-        self.critic_update = config.critic_update
-        self.actor_update = config.actor_update
-
+        self.critic_update = config.critic_update  # expected, sampled, mean(AE)
+        self.actor_update = config.actor_update  # cem(with uniform sampling), ll
 
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)

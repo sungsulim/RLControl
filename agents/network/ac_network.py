@@ -17,23 +17,24 @@ class ActorCritic_Network(BaseNetwork):
         self.input_norm = input_norm
 
         # ac specific params
+        self.actor_update = config.actor_update
+
         self.num_modal = config.num_modal
         self.num_samples = config.num_samples
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
-        self.sigma_scale = config.sigma_scale
+        self.sigma_scale = 1.0  # config.sigma_scale
 
-        self.equal_modal_selection = False
-        if config.equal_modal_selection == "True":
-            self.equal_modal_selection = True
 
-        self.actor_update = config.actor_update
 
         self.use_uniform_sampling = False
         if config.use_uniform_sampling == "True":
             self.use_uniform_sampling = True
-            self.uniform_sampling_ratio = config.uniform_sampling_ratio
+            self.uniform_sampling_ratio = 0.2  # config.uniform_sampling_ratio
 
+        self.equal_modal_selection = False
+        # if config.equal_modal_selection == "True":
+        #     self.equal_modal_selection = True
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(

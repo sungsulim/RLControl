@@ -19,10 +19,6 @@
         "num_samples": [30],
         "num_modal": [2],
 
-        "use_uniform_sampling": ["True"],
-        "uniform_sampling_ratio": [0.2],
-
-        "equal_modal_selection": ["False"],
-        "sigma_scale": [1.0]
+        "use_uniform_sampling": ["True"]
     }
 }
