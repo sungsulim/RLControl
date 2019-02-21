@@ -23,6 +23,10 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         self.critic_update = config.critic_update  # expected, sampled, mean(AE)
         self.actor_update = config.actor_update  # cem(with uniform sampling), ll
 
+        self.use_uniform_weighted_samples = False
+        if config.use_uniform_weighted_samples == "True":
+            self.use_uniform_weighted_samples = True
+
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -44,7 +48,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
                 chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
             else:
                 # single state so first idx
-                sampled_actions = self.hydra_network.sample_multiple_actions(np.expand_dims(state, 0), False)[0]
+                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False, do_multiple_sample=True)[0]
 
                 # Choose one random action among n actions
                 idx = self.rng.randint(len(sampled_actions))
@@ -86,7 +90,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
         # Modified Actor-Critic
         if self.critic_update == "expected":
-            next_action_batch = self.hydra_network.sample_multiple_actions(next_state_batch, True)
+            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, do_multiple_sample=True)
             next_action_batch_reshaped = np.reshape(next_action_batch, (batch_size * self.num_samples, self.action_dim))
 
             stacked_next_state_batch = np.array(
@@ -100,7 +104,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
         elif self.critic_update == "sampled":
-            next_action_batch = self.hydra_network.sample_action(next_state_batch, True)
+            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, do_multiple_sample=False)
 
             next_action_batch_reshaped = np.reshape(next_action_batch, (batch_size * 1, self.action_dim))
 
@@ -138,7 +142,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         # Actor Update
         # CEM update
         if self.actor_update == "cem":
-            action_batch_init = self.hydra_network.sample_multiple_actions(state_batch, True)
+            action_batch_init = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=True)
 
             # reshape (batchsize * n , action_dim)
             action_batch_final = action_batch_init
@@ -166,19 +170,39 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         elif self.actor_update == "ll":
             # for each transition, sample again?
             # shape: (batchsize , n actions, action_dim)
-            action_batch_new = self.hydra_network.sample_multiple_actions(state_batch, True)
-            action_batch_new_picked = np.array([a[0] for a in action_batch_new])
 
-            # reshape (batchsize * n , action_dim)
-            action_batch_new_reshaped = np.reshape(action_batch_new, (batch_size * self.num_samples, self.action_dim))
+            if self.use_uniform_weighted_samples:
+                action_batch_new_picked = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=False)
 
-            stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+                q_val_picked = self.hydra_network.predict_q(state_batch, action_batch_new_picked, True)
 
-            q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, action_batch_new_reshaped, True)
-            q_val_batch = np.reshape(q_val_batch_reshaped, (batch_size, self.num_samples))
-            q_val_picked = np.array([[b[0]] for b in q_val_batch])
-            q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
+                action_batch_uniform_sampled = self.hydra_network.sample_uniform_action(batch_size)
+                action_batch_uniform_sampled_reshaped = np.reshape(action_batch_uniform_sampled, (batch_size * self.num_samples, self.action_dim))
+
+                stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
+                stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+                q_val_baseline = self.hydra_network.predict_q(stacked_state_batch, action_batch_uniform_sampled_reshaped, True)
+                q_val_baseline = np.reshape(q_val_baseline, (batch_size, self.num_samples))
+                q_val_mean = np.mean(q_val_baseline, axis=1, keepdims=True)
+
+
+            # default
+            else:
+                action_batch_new = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=True)
+                action_batch_new_picked = np.array([a[0] for a in action_batch_new])
+
+                # reshape (batchsize * n , action_dim)
+                action_batch_new_reshaped = np.reshape(action_batch_new,
+                                                       (batch_size * self.num_samples, self.action_dim))
+
+                stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
+                stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+
+                q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, action_batch_new_reshaped,
+                                                                    True)
+                q_val_batch = np.reshape(q_val_batch_reshaped, (batch_size, self.num_samples))
+                q_val_picked = np.array([[b[0]] for b in q_val_batch])
+                q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
 
             self.hydra_network.train_actor_ll(state_batch, action_batch_new_picked, q_val_picked - q_val_mean)
 
