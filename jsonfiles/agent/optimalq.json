@@ -1,0 +1,15 @@
+{
+    "agent": "OptimalQ",
+
+    "sweeps": {
+        "norm_type": ["input_norm", "layer"],
+        "exploration_policy": ["ou_noise"],
+
+        "l1_dim": [200],
+        "l2_dim": [200],
+
+        "learning_rate": [1e-2, 1e-3, 1e-4],
+
+        "discretization": [1e-4]
+    }
+}
