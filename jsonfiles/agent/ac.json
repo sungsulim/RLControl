@@ -20,6 +20,8 @@
         "num_modal": [2],
 
         "use_uniform_sampling": ["True"],
-        "use_uniform_weighted_samples": ["True"]
+        "use_uniform_weighted_samples": ["True"],
+
+        "sample_for_eval": ["False"]
     }
 }

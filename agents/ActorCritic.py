@@ -27,6 +27,10 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         if config.use_uniform_weighted_samples == "True":
             self.use_uniform_weighted_samples = True
 
+        self.sample_for_eval = False
+        if config.sample_for_eval == "True":
+            self.sample_for_eval = True
+
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -74,7 +78,17 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             if is_start:
                 self.eval_ep_count += 1
 
-            chosen_action = greedy_action
+            if self.sample_for_eval:
+                # single state so first idx
+                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False, do_multiple_sample=True)[0]
+
+                # Choose one random action among n actions
+                idx = self.rng.randint(len(sampled_actions))
+                chosen_action = sampled_actions[idx]
+
+            else:
+                chosen_action = greedy_action
+
             self.eval_global_steps += 1
 
             if self.write_log:

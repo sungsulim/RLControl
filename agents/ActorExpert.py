@@ -20,6 +20,10 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         self.rho = config.rho
         self.num_samples = config.num_samples
 
+        self.sample_for_eval = False
+        if config.sample_for_eval == "True":
+            self.sample_for_eval = True
+
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -30,6 +34,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
     def take_action(self, state, is_train, is_start):
 
+        # Train
         if is_train:
             if is_start:
                 self.train_ep_count += 1
@@ -78,21 +83,29 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                                               show=False)
+
+        # Eval
         else:
+            if self.sample_for_eval:
+                # single state so first idx
+                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
 
-            old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+                # Choose one random action among n actions
+                idx = self.rng.randint(len(sampled_actions))
+                chosen_action = sampled_actions[idx]
 
-            if self.hydra_network.use_better_q_gd:
-                greedy_action = self.hydra_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True,
-                                                                     is_better_q_gd=True)
+            else:
+                _, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
 
-            old_greedy_action = old_greedy_action[0]
-            greedy_action = greedy_action[0]
+                if self.hydra_network.use_better_q_gd:
+                    greedy_action = self.hydra_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True,
+                                                                         is_better_q_gd=True)
+
+                greedy_action = greedy_action[0]
+                chosen_action = greedy_action
 
             if is_start:
                 self.eval_ep_count += 1
-
-            chosen_action = greedy_action
             self.eval_global_steps += 1
 
             if self.write_log:
