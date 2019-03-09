@@ -17,7 +17,7 @@
         "num_samples": [30],
         "num_modal": [2],
 
-        "use_uniform_sampling": ["True"],
+        "use_uniform_sampling": ["False"],
         "use_better_q_gd": ["False"],
 
         "sample_for_eval": ["False"]
