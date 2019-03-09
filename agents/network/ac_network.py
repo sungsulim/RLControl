@@ -234,7 +234,7 @@ class ActorCritic_Network(BaseNetwork):
         if self.equal_modal_selection:
             result = tf.scalar_mul(1.0 / self.num_modal, result)
         else:
-            tf.multiply(result, tf.squeeze(alpha, axis=2))
+            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
@@ -253,7 +253,7 @@ class ActorCritic_Network(BaseNetwork):
         if self.equal_modal_selection:
             result = tf.scalar_mul(1.0 / self.num_modal, result)
         else:
-            tf.multiply(result, tf.squeeze(alpha, axis=2))
+            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
