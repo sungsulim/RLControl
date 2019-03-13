@@ -44,11 +44,13 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 raise NotImplementedError  # this shouldn't happen though
             else:
                 # single state so first idx
-                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
+                # single sample so first idx
+                # sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
-                # Choose one random action among n actions
-                idx = self.rng.randint(len(sampled_actions))
-                chosen_action = sampled_actions[idx]
+                # # Choose one random action among n actions
+                # idx = self.rng.randint(len(sampled_actions))
+                # chosen_action = sampled_actions[idx]
 
             self.train_global_steps += 1
 
@@ -88,11 +90,12 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         else:
             if self.sample_for_eval:
                 # single state so first idx
-                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
+                # single action so first idx
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
-                # Choose one random action among n actions
-                idx = self.rng.randint(len(sampled_actions))
-                chosen_action = sampled_actions[idx]
+                # # Choose one random action among n actions
+                # idx = self.rng.randint(len(sampled_actions))
+                # chosen_action = sampled_actions[idx]
 
             else:
                 _, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
@@ -143,14 +146,15 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         # for each transition, n sampled actions
         # shape: (batchsize , n actions, action_dim)
-        action_batch_init = self.hydra_network.sample_action(state_batch, True)
+        action_batch_init = self.hydra_network.sample_action(state_batch, True, is_single_sample=False)
 
         # reshape (batchsize * n , action_dim)
         action_batch_final = action_batch_init
         action_batch_final_reshaped = np.reshape(action_batch_final, (batch_size * self.num_samples, self.action_dim))
 
-        stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+        # stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
+        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
+        stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
 
         q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
         q_val = np.reshape(q_val, (batch_size, self.num_samples))
@@ -174,8 +178,9 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         #     else:
         #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
 
-        stacked_state_batch = np.array([np.tile(state, (int(self.num_samples*self.rho), 1)) for state in state_batch])
-        stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples*self.rho), self.state_dim))
+        # stacked_state_batch = np.array([np.tile(state, (int(self.num_samples*self.rho), 1)) for state in state_batch])
+        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples*self.rho), self.state_dim))
+        stacked_state_batch = np.repeat(state_batch, int(self.num_samples*self.rho), axis=0)
 
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples*self.rho), self.action_dim))
         self.hydra_network.train_actor(stacked_state_batch, action_list)

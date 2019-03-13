@@ -414,7 +414,7 @@ class ActorExpert_Network(BaseNetwork):
                 self.inputs: inputs,
                 self.phase: phase
             })
-        self.setModalStats(alpha[0], mean[0], sigma[0])
+        # self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if self.equal_modal_selection:
             max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
@@ -453,11 +453,8 @@ class ActorExpert_Network(BaseNetwork):
     #     return old_best_mean, best_mean
 
     # Should return n actions
-    def sample_action(self, *args):
+    def sample_action(self, inputs, phase, is_single_sample):
         # args [inputs]
-
-        inputs = args[0]
-        phase = args[1]
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
@@ -468,19 +465,25 @@ class ActorExpert_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        self.setModalStats(alpha[0], mean[0], sigma[0])
+        # self.setModalStats(alpha[0], mean[0], sigma[0])
 
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
-        if self.equal_modal_selection:
-            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
+
+        if is_single_sample:
+            num_samples = 1
         else:
-            modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+            num_samples = self.num_samples
+
+        if self.equal_modal_selection:
+            modal_idx_list = [self.rng.choice(self.num_modal, num_samples) for _ in alpha]
+        else:
+            modal_idx_list = [self.rng.choice(self.num_modal, num_samples, p=prob) for prob in alpha]
 
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                            in zip(modal_idx_list, mean, sigma)]
 
         # uniform sampling TODO: Optimize this
-        if self.use_uniform_sampling:
+        if self.use_uniform_sampling and not is_single_sample:
             for j in range(len(sampled_actions)):
                 for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
                     sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
