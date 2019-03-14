@@ -52,11 +52,8 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
                 chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
             else:
                 # single state so first idx
-                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False, do_multiple_sample=True)[0]
-
-                # Choose one random action among n actions
-                idx = self.rng.randint(len(sampled_actions))
-                chosen_action = sampled_actions[idx]
+                # single sample so first idx
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0]
 
             self.train_global_steps += 1
 
@@ -80,11 +77,8 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             if self.sample_for_eval:
                 # single state so first idx
-                sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False, do_multiple_sample=True)[0]
-
-                # Choose one random action among n actions
-                idx = self.rng.randint(len(sampled_actions))
-                chosen_action = sampled_actions[idx]
+                # single sample so first idx
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0]
 
             else:
                 chosen_action = greedy_action
@@ -104,13 +98,12 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
         # Modified Actor-Critic
         if self.critic_update == "expected":
-            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, do_multiple_sample=True)
+            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=False)
             next_action_batch_reshaped = np.reshape(next_action_batch, (batch_size * self.num_samples, self.action_dim))
 
-            stacked_next_state_batch = np.array(
-                [np.tile(next_state, (self.num_samples, 1)) for next_state in next_state_batch])
-            stacked_next_state_batch = np.reshape(stacked_next_state_batch,
-                                                  (batch_size * self.num_samples, self.state_dim))
+            # stacked_next_state_batch = np.array([np.tile(next_state, (self.num_samples, 1)) for next_state in next_state_batch])
+            # stacked_next_state_batch = np.reshape(stacked_next_state_batch, (batch_size * self.num_samples, self.state_dim))
+            stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
 
             # batchsize * n
             target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
@@ -118,16 +111,14 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
         elif self.critic_update == "sampled":
-            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, do_multiple_sample=False)
-
+            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=True)
             next_action_batch_reshaped = np.reshape(next_action_batch, (batch_size * 1, self.action_dim))
 
-            stacked_next_state_batch = np.array(
-                [np.tile(next_state, (1, 1)) for next_state in next_state_batch])
-            stacked_next_state_batch = np.reshape(stacked_next_state_batch, (batch_size * 1, self.state_dim))
+            # useless
+            # stacked_next_state_batch = np.repeat(next_state_batch, 1, axis=0)
 
             # batchsize * n
-            target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
+            target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_reshaped, True)
             target_q = np.reshape(target_q, (batch_size, 1))
             target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
@@ -153,17 +144,16 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
         predicted_q_val, _ = self.hydra_network.train_critic(state_batch, action_batch, y_i)
 
+        stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
+
         # Actor Update
         # CEM update
         if self.actor_update == "cem":
-            action_batch_init = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=True)
+            action_batch_init = self.hydra_network.sample_action(state_batch, True, is_single_sample=False)
 
             # reshape (batchsize * n , action_dim)
             action_batch_final = action_batch_init
             action_batch_final_reshaped = np.reshape(action_batch_final, (batch_size * self.num_samples, self.action_dim))
-
-            stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-            stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
 
             q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
             q_val = np.reshape(q_val, (batch_size, self.num_samples))
@@ -186,15 +176,14 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             # shape: (batchsize , n actions, action_dim)
 
             if self.use_uniform_weighted_samples:
-                action_batch_new_picked = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=False)
+                # batch_size x action_dim
+                action_batch_new_picked = self.hydra_network.sample_action(state_batch, True, is_single_sample=True)
 
                 q_val_picked = self.hydra_network.predict_q(state_batch, action_batch_new_picked, True)
 
                 action_batch_uniform_sampled = self.hydra_network.sample_uniform_action(batch_size)
                 action_batch_uniform_sampled_reshaped = np.reshape(action_batch_uniform_sampled, (batch_size * self.num_samples, self.action_dim))
 
-                stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-                stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
                 q_val_baseline = self.hydra_network.predict_q(stacked_state_batch, action_batch_uniform_sampled_reshaped, True)
                 q_val_baseline = np.reshape(q_val_baseline, (batch_size, self.num_samples))
                 q_val_mean = np.mean(q_val_baseline, axis=1, keepdims=True)
@@ -202,15 +191,13 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             # default
             else:
-                action_batch_new = self.hydra_network.sample_action(state_batch, True, do_multiple_sample=True)
+                # batch_size x num_samples x action_dim
+                action_batch_new = self.hydra_network.sample_action(state_batch, True, is_single_sample=False)
                 action_batch_new_picked = np.array([a[0] for a in action_batch_new])
 
                 # reshape (batchsize * n , action_dim)
                 action_batch_new_reshaped = np.reshape(action_batch_new,
                                                        (batch_size * self.num_samples, self.action_dim))
-
-                stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-                stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
 
                 q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, action_batch_new_reshaped,
                                                                     True)

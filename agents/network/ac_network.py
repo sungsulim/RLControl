@@ -336,7 +336,7 @@ class ActorCritic_Network(BaseNetwork):
         return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
 
     # return sampled actions
-    def sample_action(self, inputs, phase, do_multiple_sample):
+    def sample_action(self, inputs, phase, is_single_sample):
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
@@ -353,21 +353,26 @@ class ActorCritic_Network(BaseNetwork):
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
         # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
-        if do_multiple_sample:
-            size = self.num_samples
+        if is_single_sample:
+            num_samples = None
         else:
-            size = None
+            num_samples = self.num_samples
+
+        # if do_multiple_sample:
+        #     size = self.num_samples
+        # else:
+        #     size = 1
 
         if self.equal_modal_selection:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=size) for _ in alpha]
+            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples) for _ in alpha]
         else:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=size, p=prob) for prob in alpha]
+            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples, p=prob) for prob in alpha]
 
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                           in zip(modal_idx_list, mean, sigma)]
 
         # uniform sampling TODO: Optimize this
-        if self.actor_update == "cem" and self.use_uniform_sampling and do_multiple_sample:
+        if self.actor_update == "cem" and self.use_uniform_sampling and not is_single_sample:
             for j in range(len(sampled_actions)):
                 for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
                     sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
