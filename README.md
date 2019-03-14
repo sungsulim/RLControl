@@ -1,5 +1,6 @@
 # RLControl
-Implementation of Continuous Control RL Algorithms
+Implementation of Continuous Control RL Algorithms.
+Currently under maintenance. Will finalize and update README and repo sometime April 2019!
 
 ## Available Algorithms
 * Value-based methods
