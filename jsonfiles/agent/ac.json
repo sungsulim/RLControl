@@ -22,6 +22,7 @@
         "use_uniform_sampling": ["False"],
         "use_uniform_weighted_samples": ["False"],
 
-        "sample_for_eval": ["False"]
+        "sample_for_eval": ["False"],
+	"equal_modal_selection": ["True","False"]
     }
 }

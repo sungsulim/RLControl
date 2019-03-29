@@ -33,8 +33,8 @@ class ActorCritic_Network(BaseNetwork):
             self.uniform_sampling_ratio = 0.2  # config.uniform_sampling_ratio
 
         self.equal_modal_selection = False
-        # if config.equal_modal_selection == "True":
-        #     self.equal_modal_selection = True
+        if config.equal_modal_selection == "True":
+            self.equal_modal_selection = True
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
@@ -347,7 +347,7 @@ class ActorCritic_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        # self.setModalStats(alpha[0], mean[0], sigma[0])
+        self.setModalStats(alpha[0], mean[0], sigma[0])
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
