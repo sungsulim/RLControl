@@ -61,6 +61,15 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
+                alpha, mean, sigma = self.hydra_network.getModalStats()
+
+                write_summary(self.writer, self.train_global_steps, alpha[0], tag='train/alpha0')
+                write_summary(self.writer, self.train_global_steps, alpha[1], tag='train/alpha1')
+                write_summary(self.writer, self.train_global_steps, mean[0], tag='train/mean0')
+                write_summary(self.writer, self.train_global_steps, mean[1], tag='train/mean1')
+                write_summary(self.writer, self.train_global_steps, sigma[0], tag='train/sigma0')
+                write_summary(self.writer, self.train_global_steps, sigma[1], tag='train/sigma1')
+
             if self.write_plot:
                 alpha, mean, sigma = self.hydra_network.getModalStats()
                 func1 = self.hydra_network.getQFunction(state)
@@ -88,6 +97,13 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             if self.write_log:
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+
+                # alpha, mean, sigma = self.hydra_network.getModalStats()
+                #
+                # write_summary(self.writer, self.eval_global_steps, alpha[0], tag='eval/alpha0')
+                # write_summary(self.writer, self.eval_global_steps, alpha[1], tag='eval/alpha1')
+                # write_summary(self.writer, self.eval_global_steps, mean, tag='eval/mean')
+                # write_summary(self.writer, self.eval_global_steps, sigma, tag='eval/sigma')
 
         return chosen_action
 

@@ -347,7 +347,7 @@ class ActorCritic_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        self.setModalStats(alpha[0], mean[0], sigma[0])
+        #self.setModalStats(alpha[0], mean[0], sigma[0])
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
@@ -422,12 +422,14 @@ class ActorCritic_Network(BaseNetwork):
                 self.phase: phase
             })
 
+        alpha = np.squeeze(alpha, axis=2)
+
         self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if self.equal_modal_selection:
             max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
         else:
-            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+            max_idx = np.argmax(alpha, axis=1)
 
         best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
