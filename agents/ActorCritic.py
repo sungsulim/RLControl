@@ -134,8 +134,8 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             # batchsize * n
             target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_reshaped, True)
-            target_q = np.reshape(target_q, (self.batch_size, 1))
-            target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
+            # target_q = np.reshape(target_q, (self.batch_size, 1))
+            # target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
         elif self.critic_update == "mean":
             # Use original Actor
