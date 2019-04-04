@@ -2,11 +2,27 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 import environments.environments
-
+import logging
 
 class ActorExpert_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
+
+        # tf.logging.set_verbosity(tf.logging.INFO)
+
+        # # get TF logger
+        # self.log = logging.getLogger('tensorflow')
+        # self.log.setLevel(logging.INFO)
+        #
+        # # create formatter and add it to the handlers
+        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        #
+        # # create file handler which logs even debug messages
+        # self.fh = logging.FileHandler('tensorflow.log')
+        # self.fh.setLevel(logging.INFO)
+        # self.fh.setFormatter(formatter)
+        # self.log.addHandler(self.fh)
+
 
         self.rng = np.random.RandomState(config.random_seed)
 
@@ -326,6 +342,10 @@ class ActorExpert_Network(BaseNetwork):
 
         action = np.copy(action_init)
 
+        # initial q_val
+        # init_q_val = self.predict_q(state, action_init, False)
+        # init_q_val_target = self.predict_q_target(state, action_init, False)
+
         ascent_count = 0
         update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
 
@@ -343,6 +363,18 @@ class ActorExpert_Network(BaseNetwork):
             # print(update_flag)
 
             ascent_count += 1
+
+        # final q val
+        # final_q_val = self.predict_q(state, action, False)
+        final_q_val_target = self.predict_q_target(state, action, False)
+
+        # q_val_improv = final_q_val - init_q_val
+        # q_val_target_improv = final_q_val_target - final_q_val
+
+        # tf.logging.info("q_gradient_ascent avg. improvement: {}".format(np.mean(q_val_improv[q_val_improv > 0.0])))
+
+        # if np.any(q_val_improv < 0.0):
+        #     tf.logging.info("no improvement: {}".format(q_val_improv[q_val_improv < 0.0]))
 
         # print('ascent count:', ascent_count)
         return action
