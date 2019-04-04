@@ -114,6 +114,7 @@ class ActorExpert_Network(BaseNetwork):
 
         # Get the gradient of the expert w.r.t. the action
         self.action_grads = tf.gradients(self.q_prediction, self.action)
+        self.target_action_grads = tf.gradients(self.target_q_prediction, self.target_action)
 
         # # Get the gradient of the policy w.r.t. the action
         self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
@@ -347,11 +348,50 @@ class ActorExpert_Network(BaseNetwork):
         # print('ascent count:', ascent_count)
         return action
 
+    def target_q_gradient_ascent(self, state, action_init, is_training, is_better_q_gd=False):
+
+        assert is_better_q_gd
+
+        gd_alpha = self.better_q_gd_alpha
+        gd_max_steps = self.better_q_gd_max_steps
+        gd_stop = self.better_q_gd_stop
+
+        action = np.copy(action_init)
+
+        ascent_count = 0
+        update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
+
+        while np.any(update_flag > 0) and ascent_count < gd_max_steps:
+            action_old = np.copy(action)
+
+            gradients = self.target_q_action_gradients(state, action, is_training)[0]
+            action += update_flag * gd_alpha * gradients
+            action = np.clip(action, self.action_min, self.action_max)
+
+            # stop if action diff. is small
+            stop_idx = [idx for idx in range(len(action)) if
+                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= gd_stop]
+            update_flag[stop_idx] = 0
+            # print(update_flag)
+
+            ascent_count += 1
+
+        # print('ascent count:', ascent_count)
+        return action
+
     def q_action_gradients(self, inputs, action, is_training):
 
         return self.sess.run(self.action_grads, feed_dict={
             self.inputs: inputs,
             self.action: action,
+            self.phase: is_training
+        })
+
+    def target_q_action_gradients(self, inputs, action, is_training):
+
+        return self.sess.run(self.target_action_grads, feed_dict={
+            self.target_inputs: inputs,
+            self.target_action: action,
             self.phase: is_training
         })
 

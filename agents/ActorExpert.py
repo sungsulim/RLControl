@@ -114,7 +114,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         _, next_action_batch_init_target = self.hydra_network.predict_action(next_state_batch, True)
 
         if self.hydra_network.use_better_q_gd and self.hydra_network.during_qlearning == "mean_w_ga":
-            next_action_batch_final_target = self.hydra_network.q_gradient_ascent(next_state_batch, next_action_batch_init_target, True, is_better_q_gd=True)
+            next_action_batch_final_target = self.hydra_network.target_q_gradient_ascent(next_state_batch, next_action_batch_init_target, True, is_better_q_gd=True)
         else:
             assert self.hydra_network.during_qlearning == "mean"
             next_action_batch_final_target = next_action_batch_init_target
