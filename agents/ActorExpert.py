@@ -14,6 +14,14 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
     def __init__(self, config):
         super(ActorExpert_Network_Manager, self).__init__(config)
 
+        # Temporary bug for debugging (Only for Bimodal1DEnv)
+
+        self.last_q_update_action_batch = None
+        self.last_pi_sample_action_batch = None
+        self.last_pi_update_action_batch = None
+
+        ######
+
         self.rng = np.random.RandomState(config.random_seed)
 
         # Cross Entropy Method Params
@@ -79,7 +87,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 greedy_action = greedy_action[0]
 
                 # utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, greedy_action, chosen_action,
-                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, [greedy_action, old_greedy_action, mean], chosen_action,
+                utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, [greedy_action, old_greedy_action, mean], [chosen_action, self.last_q_update_action_batch, self.last_pi_sample_action_batch, self.last_pi_update_action_batch],
                                               self.action_min, self.action_max,
                                               display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
                                               save_title='steps_' + str(self.train_global_steps),
@@ -142,6 +150,9 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         predicted_q_val, _ = self.hydra_network.train_expert(state_batch, action_batch, y_i)
 
+        if self.write_plot:
+            self.last_q_update_action_batch = action_batch
+
         # Actor Update
 
         # for each transition, n sampled actions
@@ -172,6 +183,10 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples*self.rho), self.action_dim))
         self.hydra_network.train_actor(stacked_state_batch, action_list)
+
+        if self.write_plot:
+            self.last_pi_sample_action_batch = action_batch_final_reshaped
+            self.last_pi_update_action_batch = action_list
 
         # Update target networks
         self.hydra_network.update_target_network()

@@ -20,6 +20,9 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
     max_point_x = x_min
     max_point_y = np.float('-inf')
 
+    y_min = -0.7
+    y_max = 2.0
+    ax[0].set_ylim([y_min, y_max])
     if agent_name == 'ActorCritic':
         func1, func2 = func_list[0], func_list[1]
 
@@ -66,6 +69,14 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             top_margin = 1.0
 
     elif agent_name == 'ActorExpert':
+
+        # Temporary debugging
+        last_q_update_action_batch = expl_action[1]
+        last_pi_sample_action_batch = expl_action[2]
+        last_pi_update_action_batch = expl_action[3]
+        expl_action = expl_action[0]
+        #####
+
         func1, func2 = func_list[0], func_list[1]
 
         mean_0 = greedy_action[2][0]
@@ -88,10 +99,11 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
         ax[0].plot(x, y1, linewidth=linewidth)
         ax[1].plot(x, y2, linewidth=linewidth)
 
+
         if grid:
             ax[0].grid(True)
             ax[1].grid(True)
-            ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
+            ax[1].axhline(y=0, linewidth=1.0, color='darkslategrey')
             ax[1].axvline(x=mean_0[0], linewidth=1.5, color='grey')
             ax[1].axvline(x=mean_1[0], linewidth=1.5, color='grey')
             ax[1].axvline(x=old_greedy_action[0], linewidth=1.5, color='pink')
@@ -106,9 +118,20 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             mode_string = ""
             for i in range(len(greedy_action)):
                 mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
-            ax[1].set_title("greedy actions: " + mode_string)
+            ax[1].set_title("greedy actions: {}".format(mode_string))
         else:
             top_margin = 1.0
+
+        if (last_q_update_action_batch is not None) and (last_pi_sample_action_batch is not None) and (last_pi_update_action_batch is not None):
+            last_q_update_action_batch = np.squeeze(last_q_update_action_batch)
+            last_pi_sample_action_batch = np.squeeze(last_pi_sample_action_batch)
+            last_pi_update_action_batch = np.squeeze(last_pi_update_action_batch)
+
+
+            ax[0].scatter(last_q_update_action_batch, np.ones(len(last_q_update_action_batch)) * -0.5, 10, 'blue')
+
+            ax[1].scatter(last_pi_sample_action_batch, np.zeros(len(last_pi_sample_action_batch)), 10, 'blue')
+            ax[1].scatter(last_pi_update_action_batch, np.zeros(len(last_pi_update_action_batch)), 6, 'red')
 
     elif agent_name == 'ActorExpert_Plus':
         func1, func2 = func_list[0], func_list[1]
