@@ -2,7 +2,7 @@
     "agent": "ActorExpert_Plus",
 
     "sweeps": {
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
 
         "exploration_policy": ["none"],
 
@@ -13,9 +13,9 @@
         "actor_lr": [1e-3, 1e-4, 1e-5],
         "expert_lr": [1e-2, 1e-3, 1e-4],
 
-        "rho": [1.0],
-        "num_samples": [1],
-        "num_modal": [2],
+        "rho": [0.6],
+        "num_samples": [10],
+        "num_modal": [1],
 
         "use_uniform_sampling": ["False"],
         "use_better_q_gd": ["False"],
