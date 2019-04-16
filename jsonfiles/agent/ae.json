@@ -2,9 +2,9 @@
     "agent": "ActorExpert",
 
     "sweeps": {
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none"],
+        "exploration_policy": ["ou_noise"],
 
         "shared_l1_dim": [200],
         "actor_l2_dim": [200],

@@ -35,7 +35,8 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                 self.train_ep_count += 1
 
             if self.use_external_exploration:
-                # chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
+                _, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+                chosen_action = self.exploration_policy.generate(greedy_action[0], self.train_global_steps)
                 raise NotImplementedError  # this shouldn't happen though
             else:
                 # single state so first idx

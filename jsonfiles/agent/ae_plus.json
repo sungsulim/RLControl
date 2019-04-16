@@ -2,9 +2,9 @@
     "agent": "ActorExpert_Plus",
 
     "sweeps": {
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none"],
+        "exploration_policy": ["ou_noise"],
 
         "shared_l1_dim": [200],
         "actor_l2_dim": [200],
@@ -13,8 +13,8 @@
         "actor_lr": [1e-3, 1e-4, 1e-5],
         "expert_lr": [1e-2, 1e-3, 1e-4],
 
-        "rho": [1.0],
-        "num_samples": [1],
+        "rho": [0.6],
+        "num_samples": [10],
         "num_modal": [2],
 
         "use_uniform_sampling": ["False"],
