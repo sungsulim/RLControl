@@ -15,6 +15,6 @@
         "top_m": [6],
         "num_iter": [2],
 
-        "num_modal": [2]
+        "num_modal": [2,1]
     }
 }
