@@ -305,6 +305,10 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
         func1, func2 = func_list[0], func_list[1]
 
+        greedy_action, modal_mean = greedy_action
+
+        greedy_action = greedy_action[0]
+
         for point_x in x:
             point_y1 = np.squeeze(func1(point_x))  # reduce dimension
             point_y2 = func2(point_x)
@@ -323,7 +327,11 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[0].grid(True)
             ax[1].grid(True)
             ax[1].axhline(y=0, linewidth=1.5, color='darkslategrey')
-            ax[1].axvline(x=greedy_action[0], linewidth=1.5, color='red')
+
+            for mean in modal_mean:
+                ax[1].axvline(x=mean, linewidth=1.5, color='grey')
+
+            ax[1].axvline(x=greedy_action, linewidth=1.5, color='red')
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
@@ -332,9 +340,9 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             top_margin = 0.95
 
             mode_string = ""
-            for i in range(len(greedy_action)):
-                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
-            ax[1].set_title("greedy actions: " + mode_string)
+            for i in range(len(modal_mean)):
+                mode_string += "{:.2f}".format(np.squeeze(modal_mean[i])) + ", "
+            ax[1].set_title("modal means: " + mode_string)
         else:
             top_margin = 1.0
 
