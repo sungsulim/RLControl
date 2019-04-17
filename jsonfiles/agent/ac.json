@@ -1,10 +1,10 @@
 {
     "agent": "ActorCritic",
     "sweeps": {
-        "critic_update": ["sampled", "mean"],
-        "actor_update": ["ll", "cem"],
+        "critic_update": ["sampled"],
+        "actor_update": ["ll"],
 
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
 
         "exploration_policy": ["none"],
 
@@ -23,6 +23,6 @@
         "use_uniform_weighted_samples": ["False"],
 
         "sample_for_eval": ["False"],
-	"equal_modal_selection": ["False"]
+	    "equal_modal_selection": ["False"]
     }
 }

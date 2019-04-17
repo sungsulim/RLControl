@@ -38,10 +38,12 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         if is_train:
             if is_start:
                 self.train_ep_count += 1
+            self.train_global_steps += 1
 
             if self.use_external_exploration:
-                # chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
-                raise NotImplementedError  # this shouldn't happen though
+                _, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
+                chosen_action = self.exploration_policy.generate(greedy_action[0], self.train_global_steps)
+
             else:
                 # single state so first idx
                 # single sample so first idx
@@ -51,8 +53,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 # # Choose one random action among n actions
                 # idx = self.rng.randint(len(sampled_actions))
                 # chosen_action = sampled_actions[idx]
-
-            self.train_global_steps += 1
 
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')

@@ -4,7 +4,7 @@
     "sweeps": {
         "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none"],
+        "exploration_policy": ["ou_noise"],
 
         "shared_l1_dim": [200],
         "actor_l2_dim": [200],
@@ -15,7 +15,8 @@
 
         "rho": [0.6],
         "num_samples": [10],
-        "num_modal": [1],
+
+        "num_modal": [2],
 
         "use_uniform_sampling": ["False"],
         "use_better_q_gd": ["False"],
