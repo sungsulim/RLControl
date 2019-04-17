@@ -253,9 +253,11 @@ class QTOPTNetwork(BaseNetwork):
 
         gmm_batch = self.iterate_cem_multidim(state_batch)
         final_action_samples_batch = np.array([gmm.sample(n_samples=1)[0] for gmm in gmm_batch])
-        mean_std_arr = [(gmm.means_, gmm.covariances_) for gmm in gmm_batch]
+        final_action_mean_batch = np.array([gmm.means_[np.argmax(gmm.weights_)] for gmm in gmm_batch])
 
-        return final_action_samples_batch, mean_std_arr
+        weight_mean_std_arr = [(gmm.weights_, gmm.means_, gmm.covariances_) for gmm in gmm_batch]
+
+        return final_action_samples_batch, final_action_mean_batch, weight_mean_std_arr
 
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
@@ -286,10 +288,18 @@ class QTOPTNetwork(BaseNetwork):
                                             self.action: np.expand_dims([action], 0),
                                             self.phase: False})
 
-    def getPolicyFunction(self, mean, std):
-        mean = np.squeeze(mean)
-        sigma = np.squeeze(std)
+    def getPolicyFunction(self, weight_mean_std_arr):
 
-        return lambda action: np.multiply(
-            np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-            np.exp(-np.square(action - mean) / (2.0 * np.square(sigma))))
+        weight, mean, std = weight_mean_std_arr
+        # weight = np.squeeze(weight)
+        mean = np.squeeze(mean, axis=1)
+        std = np.squeeze(std, axis=1)
+        # print('std: {}'.format(std))
+
+        if len(weight) == len(mean) == len(std) == 2:
+            return lambda action: np.sum(weight * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(std))), np.exp(
+                -np.square(action - mean) / (2.0 * np.square(std)))))
+        else:
+            return lambda action: np.multiply(
+                np.sqrt(1.0 / (2 * np.pi * np.square(std[0]))),
+                np.exp(-np.square(action - mean[0]) / (2.0 * np.square(std[0]))))

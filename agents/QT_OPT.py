@@ -29,12 +29,12 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
     def take_action(self, state, is_train, is_start):
 
-
         if is_train:
 
-            sample, mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
+            sample, greedy_action, weight_mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
             chosen_action = sample[0][0]
-            greedy_action = mean_std[0][0] ## This is changed to a gaussian mixture so is not a single greedy action
+            greedy_action = greedy_action[0]
+            means = weight_mean_std[0][1] ## This is changed to a gaussian mixture so is not a single mean
 
             if is_start:
                 self.train_ep_count += 1
@@ -46,12 +46,11 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
 
-                raise NotImplementedError
                 # TODO: Check plotting function
                 func1 = self.qt_opt_network.getQFunction(state)
-                func2 = self.qt_opt_network.getPolicyFunction(mean_std[0][0], mean_std[0][1])
+                func2 = self.qt_opt_network.getPolicyFunction(weight_mean_std[0])
 
-                utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, greedy_action, chosen_action, self.action_min,
+                utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, means], chosen_action, self.action_min,
                                               self.action_max,
                                               display_title='ep: ' + str(
                                                   self.train_ep_count) + ', steps: ' + str(
