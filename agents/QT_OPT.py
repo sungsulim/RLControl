@@ -32,9 +32,15 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
         if is_train:
 
             sample, greedy_action, weight_mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
-            chosen_action = sample[0][0]
+
             greedy_action = greedy_action[0]
-            means = weight_mean_std[0][1] ## This is changed to a gaussian mixture so is not a single mean
+            means = weight_mean_std[0][1]
+
+            if self.use_external_exploration:
+                chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
+
+            else:
+                chosen_action = sample[0][0]
 
             if is_start:
                 self.train_ep_count += 1
