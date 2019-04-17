@@ -222,7 +222,7 @@ class QTOPTNetwork(BaseNetwork):
             # old method
             # mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
 
-            gmm_batch = [GaussianMixture(n_components=self.num_modal, random_state=self.rng).fit(action_samples) for action_samples in selected_action_samples_batch]
+            gmm_batch = [GaussianMixture(n_components=self.num_modal, random_state=self.rng, covariance_type="diag").fit(action_samples) for action_samples in selected_action_samples_batch]
 
         return gmm_batch
 
