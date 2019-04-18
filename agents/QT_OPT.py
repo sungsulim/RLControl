@@ -31,10 +31,10 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
         if is_train:
 
-            sample, greedy_action, weight_mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
+            sample, greedy_action, weight_mean_var = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
 
             greedy_action = greedy_action[0]
-            means = weight_mean_std[0][1]
+            means = weight_mean_var[0][1]
 
             if self.use_external_exploration:
                 chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
@@ -54,7 +54,7 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
                 # TODO: Check plotting function
                 func1 = self.qt_opt_network.getQFunction(state)
-                func2 = self.qt_opt_network.getPolicyFunction(weight_mean_std[0])
+                func2 = self.qt_opt_network.getPolicyFunction(weight_mean_var[0])
 
                 utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, means], chosen_action, self.action_min,
                                               self.action_max,

@@ -2,8 +2,7 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 from scipy.stats import norm
-
-from sklearn.mixture import GaussianMixture
+from utils.boundedvar_gaussian_mixture import BoundedVarGaussianMixture
 
 
 class QTOPTNetwork(BaseNetwork):
@@ -222,7 +221,7 @@ class QTOPTNetwork(BaseNetwork):
             # old method
             # mean_std_arr = [(np.mean(action_samples, axis=0), np.cov(action_samples, rowvar=0)) for action_samples in selected_action_samples_batch]
 
-            gmm_batch = [GaussianMixture(n_components=self.num_modal, random_state=self.rng, covariance_type="diag").fit(action_samples) for action_samples in selected_action_samples_batch]
+            gmm_batch = [BoundedVarGaussianMixture(n_components=self.num_modal, random_state=self.rng, covariance_type="diag").fit(action_samples) for action_samples in selected_action_samples_batch]
 
         return gmm_batch
 
@@ -255,9 +254,9 @@ class QTOPTNetwork(BaseNetwork):
         final_action_samples_batch = np.array([gmm.sample(n_samples=1)[0] for gmm in gmm_batch])
         final_action_mean_batch = np.array([gmm.means_[np.argmax(gmm.weights_)] for gmm in gmm_batch])
 
-        weight_mean_std_arr = [(gmm.weights_, gmm.means_, gmm.covariances_) for gmm in gmm_batch]
+        weight_mean_var_arr = [(gmm.weights_, gmm.means_, gmm.covariances_) for gmm in gmm_batch]
 
-        return final_action_samples_batch, final_action_mean_batch, weight_mean_std_arr
+        return final_action_samples_batch, final_action_mean_batch, weight_mean_var_arr
 
     def train(self, *args):
         # args (inputs, action, predicted_q_value, phase)
@@ -288,18 +287,25 @@ class QTOPTNetwork(BaseNetwork):
                                             self.action: np.expand_dims([action], 0),
                                             self.phase: False})
 
-    def getPolicyFunction(self, weight_mean_std_arr):
+    def getPolicyFunction(self, weight_mean_var_arr):
 
-        weight, mean, std = weight_mean_std_arr
+        weight, mean, var = weight_mean_var_arr
         # weight = np.squeeze(weight)
         mean = np.squeeze(mean, axis=1)
-        std = np.squeeze(std, axis=1)
+        var = np.squeeze(var, axis=1)
         # print('std: {}'.format(std))
 
-        if len(weight) == len(mean) == len(std) == 2:
-            return lambda action: np.sum(weight * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(std))), np.exp(
-                -np.square(action - mean) / (2.0 * np.square(std)))))
+        if len(weight) == len(mean) == len(var) == 2:
+            return lambda action: np.sum(weight * np.multiply(np.sqrt(1.0 / (2 * np.pi * var)), np.exp(
+                -np.square(action - mean) / (2.0 * var))))
         else:
             return lambda action: np.multiply(
-                np.sqrt(1.0 / (2 * np.pi * np.square(std[0]))),
-                np.exp(-np.square(action - mean[0]) / (2.0 * np.square(std[0]))))
+                np.sqrt(1.0 / (2 * np.pi * var[0])),
+                np.exp(-np.square(action - mean[0]) / (2.0 * var[0])))
+
+
+# # clipping variance to match AE methods
+# def clipVar(gmm):
+#     gmm.covariances_ = np.clip(gmm.covariances_, np.exp(-2), np.exp(2))
+#
+#     return gmm
