@@ -26,6 +26,8 @@ class BaseNetwork(object):
 
         self.norm_type = config.norm_type
 
+        self.writer = config.writer
+
     def set_session(self, session):
         self.session = session
 

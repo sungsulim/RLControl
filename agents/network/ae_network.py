@@ -2,11 +2,28 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 import environments.environments
-
+import logging
 
 class ActorExpert_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
+
+        # tf.logging.set_verbosity(tf.logging.INFO)
+
+        self.write_log = config.write_log
+        if self.write_log:
+            # get TF logger
+            self.log = logging.getLogger('tensorflow')
+            self.log.setLevel(logging.INFO)
+
+            # create formatter and add it to the handlers
+            formatter = logging.Formatter('%(levelname)s - %(message)s')
+
+            # create file handler which logs even debug messages
+            self.fh = logging.FileHandler('{}.log'.format(self.writer.get_logdir()))
+            self.fh.setLevel(logging.INFO)
+            self.fh.setFormatter(formatter)
+            self.log.addHandler(self.fh)
 
         self.rng = np.random.RandomState(config.random_seed)
 
@@ -344,6 +361,23 @@ class ActorExpert_Network(BaseNetwork):
             # print(update_flag)
 
             ascent_count += 1
+
+        if self.write_log:
+            # initial q_val
+            init_q_val = self.predict_q(state, action_init, False)
+            # init_q_val_target = self.predict_q_target(state, action_init, False)
+
+            # final q val
+            final_q_val = self.predict_q(state, action, False)
+            # final_q_val_target = self.predict_q_target(state, action, False)
+
+            q_val_improv = final_q_val - init_q_val
+            # q_val_target_improv = final_q_val_target - final_q_val
+
+            tf.logging.info("q_gradient_ascent max. improvement: {}, max_ascent_count: {}".format(np.max(q_val_improv[q_val_improv > 0.0]), ascent_count))
+
+            if np.any(q_val_improv < 0.0):
+                tf.logging.info("no improvement: {}".format(q_val_improv[q_val_improv < 0.0]))
 
         # print('ascent count:', ascent_count)
         return action
