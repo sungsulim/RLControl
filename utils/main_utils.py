@@ -29,6 +29,10 @@ def create_agent(agent_string, config):
         from agents.ActorExpert_Plus import ActorExpert_Plus
         return ActorExpert_Plus(config)
 
+    elif agent_string == "ActorExpert_PICNN":
+        from agents.ActorExpert_PICNN import ActorExpert_PICNN
+        return ActorExpert_PICNN(config)
+
     elif agent_string == "QT_OPT":
         from agents.QT_OPT import QT_OPT
         return QT_OPT(config)

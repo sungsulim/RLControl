@@ -28,11 +28,19 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
             ######
 
     def take_action(self, state, is_train, is_start):
-        sample, mean_std = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
-        chosen_action = sample[0]
-        greedy_action = mean_std[0][0]
 
         if is_train:
+
+            sample, greedy_action, weight_mean_var = self.qt_opt_network.sample_action(np.expand_dims(state, 0))
+
+            greedy_action = greedy_action[0]
+            means = weight_mean_var[0][1]
+
+            if self.use_external_exploration:
+                chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
+
+            else:
+                chosen_action = sample[0][0]
 
             if is_start:
                 self.train_ep_count += 1
@@ -44,10 +52,11 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
 
+                # TODO: Check plotting function
                 func1 = self.qt_opt_network.getQFunction(state)
-                func2 = self.qt_opt_network.getPolicyFunction(mean_std[0][0], mean_std[0][1])
+                func2 = self.qt_opt_network.getPolicyFunction(weight_mean_var[0])
 
-                utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, greedy_action, chosen_action, self.action_min,
+                utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, means], chosen_action, self.action_min,
                                               self.action_max,
                                               display_title='ep: ' + str(
                                                   self.train_ep_count) + ', steps: ' + str(
@@ -58,12 +67,13 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
             return chosen_action
         else:
+            greedy_action = self.qt_opt_network.predict_action(np.expand_dims(state, 0))[0]
             if is_start:
                 self.eval_ep_count += 1
             self.eval_global_steps += 1
 
             if self.write_log:
-                write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
+                write_summary(self.writer, self.eval_global_steps, greedy_action[0], tag='eval/action_taken')
 
             return greedy_action
 

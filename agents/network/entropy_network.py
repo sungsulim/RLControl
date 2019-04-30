@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 class EntropyNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
-        super(EntropyNetwork, self).__init__(sess, config, config.learning_rate)
+        super(EntropyNetwork, self).__init__(sess, config, config.expert_lr)
 
         self.rng = np.random.RandomState(config.random_seed)
 
@@ -468,7 +468,7 @@ class EntropyNetwork(BaseNetwork):
         return f_outputs
 
     def train(self, *args):
-        # args (inputs, action, predicted_q_value, phase)
+        # args (inputs, action, predicted_q_value)
         res = self.sess.run([self.qvalue, self.optimize], feed_dict={
             self.inputs: args[0],
             self.action: args[1],

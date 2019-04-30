@@ -33,8 +33,8 @@ class ActorCritic_Network(BaseNetwork):
             self.uniform_sampling_ratio = 0.2  # config.uniform_sampling_ratio
 
         self.equal_modal_selection = False
-        # if config.equal_modal_selection == "True":
-        #     self.equal_modal_selection = True
+        if config.equal_modal_selection == "True":
+            self.equal_modal_selection = True
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
@@ -336,7 +336,7 @@ class ActorCritic_Network(BaseNetwork):
         return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
 
     # return sampled actions
-    def sample_action(self, inputs, phase, do_multiple_sample):
+    def sample_action(self, inputs, phase, is_single_sample):
 
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
@@ -347,27 +347,32 @@ class ActorCritic_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        # self.setModalStats(alpha[0], mean[0], sigma[0])
+        #self.setModalStats(alpha[0], mean[0], sigma[0])
 
         # TODO: Check multi-dimensional action case. Is it sampling correctly
         # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
         # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
 
-        if do_multiple_sample:
-            size = self.num_samples
+        if is_single_sample:
+            num_samples = None
         else:
-            size = None
+            num_samples = self.num_samples
+
+        # if do_multiple_sample:
+        #     size = self.num_samples
+        # else:
+        #     size = 1
 
         if self.equal_modal_selection:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=size) for _ in alpha]
+            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples) for _ in alpha]
         else:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=size, p=prob) for prob in alpha]
+            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples, p=prob) for prob in alpha]
 
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                           in zip(modal_idx_list, mean, sigma)]
 
         # uniform sampling TODO: Optimize this
-        if self.actor_update == "cem" and self.use_uniform_sampling and do_multiple_sample:
+        if self.actor_update == "cem" and self.use_uniform_sampling and not is_single_sample:
             for j in range(len(sampled_actions)):
                 for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
                     sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
@@ -417,12 +422,14 @@ class ActorCritic_Network(BaseNetwork):
                 self.phase: phase
             })
 
+        alpha = np.squeeze(alpha, axis=2)
+
         self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if self.equal_modal_selection:
             max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
         else:
-            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+            max_idx = np.argmax(alpha, axis=1)
 
         best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
