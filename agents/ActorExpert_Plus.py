@@ -42,22 +42,10 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
                 # single state so first idx
                 chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
-                # # Choose one random action among n actions
-                # idx = self.rng.randint(len(sampled_actions))
-                # chosen_action = sampled_actions[idx]
-
             self.train_global_steps += 1
 
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
-
-                # Currently only works for 1D action
-                # if not self.use_external_exploration:
-                #     alpha, mean, sigma = self.hydra_network.getModalStats()
-                #     for i in range(len(alpha)):
-                #         write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
-                #         write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
-                #         write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
             if self.write_plot:
                 alpha, mean, sigma = self.hydra_network.getModalStats()
@@ -136,19 +124,6 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
         # Currently using Current state batch instead of next state batch
         # (batchsize * n action values)
         # restack states (batchsize * n, 1)
-
-        # stacked_state_batch = None
-        #
-        # for state in state_batch:
-        #     stacked_one_state = np.tile(state, (self.num_samples, 1))
-        #
-        #     if stacked_state_batch is None:
-        #         stacked_state_batch = stacked_one_state
-        #     else:
-        #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-
-        # stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
         stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
 
         # Gradient Ascent
@@ -162,23 +137,9 @@ class ActorExpert_Plus_Network_Manager(BaseNetwork_Manager):
         # Find threshold : top (1-rho) percentile
         selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val))
 
-        # action_list = []
-        # for action, idx in zip(action_batch_final, selected_idxs):
-        #     action_list.append(action[idx])
         action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
 
         # restack states (batchsize * top_idx_num, 1)
-        # stacked_state_batch = None
-        # for state in state_batch:
-        #     stacked_one_state = np.tile(state, (int(self.num_samples * self.rho), 1))
-        #
-        #     if stacked_state_batch is None:
-        #         stacked_state_batch = stacked_one_state
-        #     else:
-        #         stacked_state_batch = np.concatenate((stacked_state_batch, stacked_one_state), axis=0)
-
-        # stacked_state_batch = np.array([np.tile(state, (int(self.num_samples * self.rho), 1)) for state in state_batch])
-        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples * self.rho), self.state_dim))
         stacked_state_batch = np.repeat(state_batch, int(self.num_samples * self.rho), axis=0)
 
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples * self.rho), self.action_dim))

@@ -1,12 +1,9 @@
 import numpy as np
-import random
 import tensorflow as tf
 
 from agents.base_agent import BaseAgent
 from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import naf_network
-
-from utils.running_mean_std import RunningMeanStd
 from experiment import write_summary
 import utils.plot_utils
 
@@ -40,14 +37,13 @@ class NAF_Network_Manager(BaseNetwork_Manager):
 
             else:
                 chosen_action, covmat = self.network.sample_action(np.expand_dims(state, 0), greedy_action)
-                # chosen_action = chosen_action[0]
 
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
             # currently doesn't handle external exploration
             if self.write_plot:
-                assert (covmat is not None)
+                assert (covmat !=None)
                 func1 = self.network.getQFunction(state)
                 func2 = self.network.getPolicyFunction(greedy_action, covmat)
 
@@ -76,7 +72,6 @@ class NAF_Network_Manager(BaseNetwork_Manager):
         action_batch = action
 
         self.network.train(state_batch, action_batch, target_q)
-        # self.sess.run(self.optimize, feed_dict={self.state_input: state.reshape(-1, self.state_dim), self.action_input: action.reshape(-1, self.action_dim), self.target_q_input: target_q.reshape(-1), self.phase: True})
         self.network.update_target_network()
 
 

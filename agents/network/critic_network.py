@@ -7,7 +7,6 @@ class CriticNetwork(BaseNetwork):
 
     def __init__(self, sess, input_norm, config):
         super(CriticNetwork, self).__init__(sess, config, config.critic_lr)
-        #tf.set_random_seed(config.random_seed)
 
         self.l1 = config.critic_l1_dim
         self.l2 = config.critic_l2_dim
@@ -67,7 +66,7 @@ class CriticNetwork(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 # inputs = self.input_norm.normalize(inputs)
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 

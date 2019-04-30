@@ -5,7 +5,7 @@
 
         "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none"],
+        "exploration_policy": ["none", "ou_noise"],
 
         "qnet_l1_dim": [200],
         "qnet_l2_dim": [200],
@@ -15,6 +15,6 @@
         "top_m": [6],
         "num_iter": [2],
 
-        "num_modal": [2,1]
+        "num_modal": [2]
     }
 }

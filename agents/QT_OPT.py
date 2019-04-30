@@ -6,8 +6,6 @@ from agents.base_agent import BaseAgent  # for python3
 from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import qt_opt_network
 
-from utils.running_mean_std import RunningMeanStd
-
 from experiment import write_summary
 import utils.plot_utils
 
@@ -52,7 +50,6 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
 
-                # TODO: Check plotting function
                 func1 = self.qt_opt_network.getQFunction(state)
                 func2 = self.qt_opt_network.getPolicyFunction(weight_mean_var[0])
 

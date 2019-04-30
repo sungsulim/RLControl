@@ -2,7 +2,7 @@
     "agent": "PICNN",
 
     "sweeps": {
-        "norm_type": ["input_norm", "batch"],
+        "norm_type": ["input_norm"],
         "exploration_policy": ["ou_noise"],
 
         "l1_dim": [200],

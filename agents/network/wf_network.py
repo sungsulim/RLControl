@@ -70,7 +70,7 @@ class WireFitting_Network(BaseNetwork):
             # action = tf.placeholder(self.dtype, shape=(None, self.action_dim))
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 state_input = tf.clip_by_value(self.input_norm.normalize(state_input), self.state_min, self.state_max)
 
             state_hidden1 = slim.fully_connected(state_input, self.l1_dim, activation_fn=None)

@@ -6,7 +6,6 @@ from agents.base_agent import BaseAgent
 from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import optimal_q_network
 from experiment import write_summary
-import utils.plot_utils
 
 
 class OptimalQ_Network_Manager(BaseNetwork_Manager):
@@ -16,7 +15,6 @@ class OptimalQ_Network_Manager(BaseNetwork_Manager):
         self.rng = np.random.RandomState(config.random_seed)
 
         # Specific Params
-
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -47,7 +45,7 @@ class OptimalQ_Network_Manager(BaseNetwork_Manager):
                 func1 = self.q_network.getQFunction(state)
 
                 raise NotImplementedError
-                # utils.plot_utils.plotFunction("DDPG", [func1], state, greedy_action, chosen_action, self.action_min,
+                # utils.plot_utils.plotFunction("OptimalQ", [func1], state, greedy_action, chosen_action, self.action_min,
                 #                               self.action_max,
                 #                               display_title='ep: ' + str(
                 #                                   self.train_ep_count) + ', steps: ' + str(
@@ -70,17 +68,12 @@ class OptimalQ_Network_Manager(BaseNetwork_Manager):
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
-        batch_size = np.shape(state_batch)[0]
-
         # max_q_batch_target: batch x 1
         # max_action_batch_target: batch x action_dim
         max_q_batch_target, max_action_batch_target = self.q_network.get_max_action(next_state_batch, use_target=True, is_train=True)
 
         # GA from highest valued action
         # if it is so fine, we might not need this step
-
-        # compute target
-        # target_q = self.q_network.predict_target(next_state_batch, self.actor_network.predict_target(next_state_batch, True), True)
 
         target_q = max_q_batch_target
         batch_size = np.shape(state_batch)[0]

@@ -50,7 +50,7 @@ class BaseAgent(object):
             else:
                 self.replay_buffer.add(state, action, reward, next_state, 0.0)
 
-        if self.norm_type is not 'none':
+        if self.norm_type != 'none':
             self.network_manager.input_norm.update(np.array([state]))
         self.learn()
 

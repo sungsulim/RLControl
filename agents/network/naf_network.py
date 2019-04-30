@@ -69,7 +69,7 @@ class NAF_Network(BaseNetwork):
             action = tf.placeholder(tf.float32, shape=(None, self.action_dim))
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             q_val, max_q, best_action, Lmat_columns = self.network(inputs, action, phase)

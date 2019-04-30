@@ -1,8 +1,6 @@
 import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
-import itertools
-import matplotlib.pyplot as plt
 
 
 class EntropyNetwork(BaseNetwork):
@@ -85,7 +83,7 @@ class EntropyNetwork(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             # TODO: merge this into one function
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             if self.norm_type == 'layer':
@@ -104,7 +102,6 @@ class EntropyNetwork(BaseNetwork):
         return inputs, phase, action, outputs, f_outputs
 
     def layer_norm_network(self, inputs, action, phase):
-        # TODO: make codes of the PICNN more compact. It can now only learn two layers, make it learnable in the case of multiple layers.
 
         u1 = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
                                                weights_initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, mode="FAN_IN", uniform=True),

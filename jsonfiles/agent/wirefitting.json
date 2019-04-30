@@ -2,13 +2,13 @@
     "agent": "WireFitting",
 
     "sweeps": {
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
         "exploration_policy": ["ou_noise"],
 
         "l1_dim":[200],
         "l2_dim":[200],
 
         "learning_rate":[1e-2, 1e-3, 1e-4],
-        "app_points":[50, 100]
+        "app_points":[100]
     }
 }

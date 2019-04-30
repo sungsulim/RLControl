@@ -53,7 +53,6 @@ class OptimalQ_Network(BaseNetwork):
         with tf.control_dependencies(self.batchnorm_ops):
 
             self.target_q_input = tf.placeholder(tf.float32, [None, 1])
-            # TODO: check dimension between self.target_q_input, self.q_val
             self.loss = tf.reduce_mean(tf.squared_difference(self.target_q_input, self.q_val))
             self.optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
@@ -73,8 +72,7 @@ class OptimalQ_Network(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             # normalize state inputs if using "input_norm" or "layer" or "batch"
-            if self.norm_type is not 'none':
-                # inputs = self.input_norm.normalize(inputs)
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             q_prediction = self.network(inputs, action, phase)
@@ -185,13 +183,6 @@ class OptimalQ_Network(BaseNetwork):
         self.stacked_action_batch32 = np.tile(self.discretized_action_pairs, (32, 1))
         self.stacked_action_batch1 = np.tile(self.discretized_action_pairs, (1, 1))
 
-
-    # def predict_action(self, *args):
-    #
-    #     inputs = args[0]
-    #     best_action = self.sess.run(self.best_action, feed_dict={self.inputs: inputs,
-    #                                                              self.phase: False})
-    #     return best_action
 
     def init_target_network(self):
         self.sess.run(self.init_target_net_params)

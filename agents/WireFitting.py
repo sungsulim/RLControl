@@ -1,8 +1,4 @@
-import numpy as np
-import random
 import tensorflow as tf
-import tensorflow.contrib.slim as slim
-from utils.running_mean_std import RunningMeanStd
 
 from agents.base_agent import BaseAgent
 from agents.network.base_network_manager import BaseNetwork_Manager
@@ -26,8 +22,6 @@ class WireFitting_Network_Manager(BaseNetwork_Manager):
     '''return an action to take for each state'''
     def take_action(self, state, is_train, is_start):
 
-        # TODO: Check how WF picks action
-        # TODO: Check if it is clipped
         greedy_action, action_points = self.network.predict_action(state.reshape(-1, self.state_dim))
 
         # train
@@ -73,11 +67,6 @@ class WireFitting_Network_Manager(BaseNetwork_Manager):
 
         # compute target
         target_q = self.network.predict_max_q_target(next_state_batch)
-
-        # batch_size = np.shape(state_batch)[0]
-        # reward_batch = np.reshape(reward_batch, (batch_size, 1))
-        # gamma_batch = np.reshape(gamma_batch, (batch_size, 1))
-        # target_q = np.reshape(target_q, (batch_size, 1))
 
         y_i = reward_batch + gamma_batch * target_q
 

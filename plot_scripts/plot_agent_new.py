@@ -29,17 +29,10 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-# NAF check OU_noise
-# selected_idx=  range(0, 27) # range(27, 54)
 
-# NAF check self_noise
-# selected_idx=  range(27, 54)
+selected_idx =  []
+selected_type = selected_idx[:]
 
-# 21,19,3,1,9
-selected_idx= [] # range(0, 27) # range(27, 54)
-selected_type = selected_idx[:] # This will be the labels for those idx.
-# selected_type = ["unimodal", "bimodal"]
-# selected_type = [str(selected_idx[0])+": self_noise"]
 
 truncate_train_ep = 2000
 # Example: selected_type = ['NAF', 'Wire_fitting']
@@ -50,9 +43,17 @@ def get_xyrange(envname):
 
     xmax = None
 
-    if envname == 'HalfCheetah-v2':
+    if envname == 'Bimodal1DEnv':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnvCustom':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'HalfCheetah-v2':
         ymin = [-500, -500]
-        ymax = [6000, 6000]
+        ymax = [9000, 9000]
 
     elif envname == 'Hopper-v2':
         ymin = [0, 0]
@@ -62,17 +63,21 @@ def get_xyrange(envname):
         ymin = [-500, -1000]
         ymax = [2000, 2000]
 
+    elif envname == 'Walker2d-v2':
+        ymin = [-500, -1000]
+        ymax = [2000, 4000]
+
     elif envname == 'Swimmer-v2':
-        ymin = [0, 0]
-        ymax = [150, 150]
+        ymin = [20, 20]
+        ymax = [120, 120]
 
     elif envname == 'Reacher-v2':
         ymin = [-50, -20]
         ymax = [0, 0]
 
-    elif envname == 'HumanoidStandup-v2':
-        ymin = [20000, 20000]
-        ymax = [160000, 160000]
+    elif envname == 'Humanoid-v2':
+        ymin = [0, 0]
+        ymax = [5000, 5000]
 
     elif envname == 'LunarLanderContinuous-v2':
         ymin = [-250, -250]
@@ -87,9 +92,9 @@ def get_xyrange(envname):
         ymax = [1000, 1000]
 
     elif envname == 'Pendulum-v0':
-        ymin = [-1800, -1800]
-        ymax = [0, 0]
-        xmax = 51
+        ymin = [-1400, -1400]
+        ymax = [-100, -100]
+        xmax = 72
 
     elif envname == 'InvertedPendulum-v2':
         ymin = [0, 0]
@@ -141,10 +146,8 @@ if __name__ == "__main__":
     EVAL_EPISODES = env_json['EvalEpisodes']
 
 
-    _, ymin, ymax = get_xyrange(envname)
-
-
-
+    # _, ymin, ymax = get_xyrange(envname)
+    
 
     #colors = ['b','r','g','c']
 
@@ -171,11 +174,7 @@ if __name__ == "__main__":
         params = np.loadtxt(files[0], delimiter=',', dtype='str')
 
 
-        xmax = np.shape(lc)[-1]
-
-        if xmax > truncate_train_ep:
-            xmax = truncate_train_ep
-        print(xmax)
+        xmax, ymin, ymax = get_xyrange(envname)
 
         title = "result: %s, %d runs" %(agent, num_runs)
 
@@ -187,6 +186,11 @@ if __name__ == "__main__":
         
 
         if result == 'TrainEpisode':
+            xmax = np.shape(lc)[-1]
+            if xmax > truncate_train_ep:
+                xmax = truncate_train_ep
+            print(xmax)
+
             plt.xlabel('Episodes')
             opt_range = range(0, xmax)
             xlimt = (0, xmax-1)
@@ -194,20 +198,52 @@ if __name__ == "__main__":
 
         elif result == 'EvalEpisode':
             plt.xlabel('Training Steps (per 1000 steps)')
-            opt_range = range(0, xmax) 
 
+            if xmax is None:
+                xmax = np.shape(lc)[-1] # int(max_length)
+
+            opt_range = range(0, xmax) 
             xlimt = (0, xmax-1)
 
+            is_label_custom_defined = False
 
-            # # plt.xticks(np.append(1,opt_range[4::5]), 
-            # np.append(2.0, np.linspace(float(EVAL_INTERVAL_MIL_STEPS * 1e3), float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)) [4::5])
-            # )
+            if envname == 'Pendulum-v0':
+                x_loc_arr = np.array([0, 11, 21, 31, 41, 51, 61, 71, 81, 91, 101, 111, 121, 131, 141])
+                x_val_arr = np.array([0.9, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0])
+                y_val_arr = [-1600, -1200, -800, -400, -200, 0]                
+                is_label_custom_defined = True
 
-            plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
+            elif envname == 'LunarLanderContinuous-v2':
+                x_loc_arr = np.array([0, 41, 91, 141, 191])
+                x_val_arr = np.array([45, 250, 500, 750, 1000])
+                y_val_arr = [-200, -100, 0, 100, 200, 250]
+                is_label_custom_defined = True
+
+            elif envname == 'HalfCheetah-v2':
+                x_loc_arr = np.array([0, 41, 91, 141, 191])
+                x_val_arr = np.array([45, 250, 500, 750, 1000])
+                y_val_arr = [0, 2000, 4000, 6000, 8000]
+                is_label_custom_defined = True
+
+            elif envname == 'Hopper-v2':
+                x_loc_arr = np.array([0, 41, 91, 141, 191])
+                x_val_arr = np.array([45, 250, 500, 750, 1000])
+                y_val_arr = [0, 500, 1000, 1500, 2000, 2500, 3000]
+                is_label_custom_defined = True
+
+            elif envname == 'Swimmer-v2':
+                x_loc_arr = np.array([0, 41, 91, 141, 191])
+                x_val_arr = np.array([45, 250, 500, 750, 1000])
+                y_val_arr = [20, 40, 60, 80, 100, 120]
+                is_label_custom_defined = True
+
+            if is_label_custom_defined:
+                plt.xticks(x_loc_arr, x_val_arr)
+                plt.yticks(y_val_arr, y_val_arr)
+            else:
+                plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
+
             num_samples = num_runs # * EVAL_EPISODES
-
-            #print(range(int(EVAL_INTERVAL_MIL_STEPS * 1000), int(EVAL_INTERVAL_MIL_STEPS * 1000 * (xmax+1)), int(EVAL_INTERVAL_MIL_STEPS *1000)))
-            #exit()
 
         h = plt.ylabel("Cum. Reward per episode")
         h.set_rotation(90)
@@ -265,12 +301,12 @@ if __name__ == "__main__":
             else:
                 sort_performance_arr = []
                 for i in range(len(lc)):
-                    sort_performance_arr.append([i, np.nansum(lc[i])])
+                    sort_performance_arr.append([i, np.nansum(lc[i,:xmax])])
 
                 for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
                     print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
 
-                BestInd = np.argmax(np.nansum(lc, axis = 1))
+                BestInd = np.argmax(np.nansum(lc[:,:xmax], axis = 1))
 
 
                  

@@ -102,7 +102,7 @@ for setting_num in range(NUM_SETTINGS):
             continue
 
         lc_0 = np.loadtxt(train_rewards_filename, delimiter=',')
-        lc_1 = np.loadtxt(eval_mean_rewards_filename, delimiter=',')
+        lc_1 = np.loadtxt(eval_mean_rewards_filename, delimiter=',') # [:eval_lc_length+9] temporary solution for Pendulum-v0
 
         # compute moving window 
         lc_0 = movingaverage(lc_0, 10)

@@ -17,7 +17,6 @@ import statistics
 # example: python3 ../plot_scripts/mergefile.py ../jsonfile/environment/LunarLanderContinuous-v2.json LunarLanderContinuous-v2results 9 5 NAF 
 # This will generate mergedRESULT Directory (i.e. mergedLunarLanderContinuous-v2results)
 
-
 if len(sys.argv)!=6:
     print('Incorrect Input')
     print('type: mergefile_custom_new.py env_json srcdir nparams nruns algname ')
@@ -99,7 +98,7 @@ for setting_num in range(NUM_SETTINGS):
         lc_0 = np.loadtxt(train_rewards_filename, delimiter=',')
         lc_1 = np.loadtxt(eval_mean_rewards_filename, delimiter=',')
 
-
+        lc_1 = lc_1[:eval_lc_length]
         train_lc_arr.append(lc_0)
         train_lc_length_arr.append(len(lc_0))
         eval_mean_lc_arr.append(lc_1)

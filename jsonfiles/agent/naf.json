@@ -2,7 +2,7 @@
     "agent": "NAF",
 
     "sweeps": {
-        "norm_type": ["input_norm", "layer"],
+        "norm_type": ["input_norm"],
 
         "exploration_policy": ["none"],
 

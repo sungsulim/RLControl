@@ -9,6 +9,7 @@ from agents.network.entropy_network import EntropyNetwork
 from experiment import write_summary
 import utils.plot_utils
 
+
 class ActorExpert_PICNN_Network_Manager(BaseNetwork_Manager):
     def __init__(self, config):
         super(ActorExpert_PICNN_Network_Manager, self).__init__(config)
@@ -60,14 +61,9 @@ class ActorExpert_PICNN_Network_Manager(BaseNetwork_Manager):
 
                 old_greedy_action, greedy_action = self.actor_network.predict_action(np.expand_dims(state, 0), False)
 
-                # if self.hydra_network.use_better_q_gd:
-                #     greedy_action = self.hydra_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True,
-                #                                                          is_better_q_gd=True)
-
                 old_greedy_action = old_greedy_action[0]
                 greedy_action = greedy_action[0]
 
-                # utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, greedy_action, chosen_action,
                 utils.plot_utils.plotFunction("ActorExpert_PICNN", [func1, func2], state,
                                               [greedy_action, old_greedy_action, mean], chosen_action,
                                               self.action_min, self.action_max,
@@ -80,10 +76,6 @@ class ActorExpert_PICNN_Network_Manager(BaseNetwork_Manager):
         # Eval
         else:
             _, greedy_action = self.actor_network.predict_action(np.expand_dims(state, 0), False)
-
-            # if self.hydra_network.use_better_q_gd:
-            #     greedy_action = self.actor_network.q_gradient_ascent(np.expand_dims(state, 0), greedy_action, True,
-            #                                                          is_better_q_gd=True)
 
             greedy_action = greedy_action[0]
             chosen_action = greedy_action
@@ -106,13 +98,6 @@ class ActorExpert_PICNN_Network_Manager(BaseNetwork_Manager):
 
         # Use original Actor
         _, next_action_batch_init_target = self.actor_network.predict_action(next_state_batch, True)
-
-        # if self.actor_network.use_better_q_gd:
-        #     next_action_batch_final_target = self.hydra_network.q_gradient_ascent(next_state_batch,
-        #                                                                           next_action_batch_init_target, True,
-        #                                                                           is_better_q_gd=True)
-        # else:
-        #     next_action_batch_final_target = next_action_batch_init_target
 
         next_action_batch_final_target = next_action_batch_init_target
 
@@ -147,8 +132,6 @@ class ActorExpert_PICNN_Network_Manager(BaseNetwork_Manager):
 
         action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
 
-        # stacked_state_batch = np.array([np.tile(state, (int(self.num_samples*self.rho), 1)) for state in state_batch])
-        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples*self.rho), self.state_dim))
         stacked_state_batch = np.repeat(state_batch, int(self.num_samples * self.rho), axis=0)
 
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples * self.rho), self.action_dim))

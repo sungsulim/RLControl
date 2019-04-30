@@ -50,20 +50,8 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 # sampled_actions = self.hydra_network.sample_action(np.expand_dims(state, 0), False)[0]
                 chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
-                # # Choose one random action among n actions
-                # idx = self.rng.randint(len(sampled_actions))
-                # chosen_action = sampled_actions[idx]
-
             if self.write_log:
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
-
-                # Currently only works for 1D action
-                # if not self.use_external_exploration:
-                #     alpha, mean, sigma = self.hydra_network.getModalStats()
-                #     for i in range(len(alpha)):
-                #         write_summary(self.writer, self.train_global_steps, alpha[i], tag='train/alpha%d' % i)
-                #         write_summary(self.writer, self.train_global_steps, mean[i], tag='train/mean%d' % i)
-                #         write_summary(self.writer, self.train_global_steps, sigma[i], tag='train/sigma%d' % i)
 
             if self.write_plot:
                 alpha, mean, sigma = self.hydra_network.getModalStats()
@@ -78,7 +66,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 old_greedy_action = old_greedy_action[0]
                 greedy_action = greedy_action[0]
 
-                # utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, greedy_action, chosen_action,
                 utils.plot_utils.plotFunction("ActorExpert", [func1, func2], state, [greedy_action, old_greedy_action, mean], chosen_action,
                                               self.action_min, self.action_max,
                                               display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
@@ -92,10 +79,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                 # single state so first idx
                 # single action so first idx
                 chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
-
-                # # Choose one random action among n actions
-                # idx = self.rng.randint(len(sampled_actions))
-                # chosen_action = sampled_actions[idx]
 
             else:
                 _, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
@@ -152,8 +135,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         action_batch_final = action_batch_init
         action_batch_final_reshaped = np.reshape(action_batch_final, (batch_size * self.num_samples, self.action_dim))
 
-        # stacked_state_batch = np.array([np.tile(state, (self.num_samples, 1)) for state in state_batch])
-        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * self.num_samples, self.state_dim))
         stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
 
         q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
@@ -161,13 +142,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         # Find threshold : top (1-rho) percentile
         selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples*self.rho)], q_val))
-
-
         action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
-
-
-        # stacked_state_batch = np.array([np.tile(state, (int(self.num_samples*self.rho), 1)) for state in state_batch])
-        # stacked_state_batch = np.reshape(stacked_state_batch, (batch_size * int(self.num_samples*self.rho), self.state_dim))
         stacked_state_batch = np.repeat(state_batch, int(self.num_samples*self.rho), axis=0)
 
         action_list = np.reshape(action_list, (batch_size * int(self.num_samples*self.rho), self.action_dim))

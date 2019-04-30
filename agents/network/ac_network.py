@@ -22,15 +22,7 @@ class ActorCritic_Network(BaseNetwork):
         self.num_modal = config.num_modal
         self.num_samples = config.num_samples
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
-
         self.sigma_scale = 1.0  # config.sigma_scale
-
-
-
-        self.use_uniform_sampling = False
-        if config.use_uniform_sampling == "True":
-            self.use_uniform_sampling = True
-            self.uniform_sampling_ratio = 0.2  # config.uniform_sampling_ratio
 
         self.equal_modal_selection = False
         if config.equal_modal_selection == "True":
@@ -97,7 +89,7 @@ class ActorCritic_Network(BaseNetwork):
             action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
 
             # normalize inputs
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(
@@ -264,11 +256,6 @@ class ActorCritic_Network(BaseNetwork):
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
 
-        # print(np.shape(alpha), type(self.temp_alpha))
-        # print(np.shape(mean), type(self.temp_mean))
-        # print(np.shape(sigma), type(self.temp_sigma))
-        # print(np.shape(action), type(self.temp_action))
-
         return self.sess.run(self.policy_action_grads, feed_dict={
             self.temp_alpha: alpha,
             self.temp_mean: mean,
@@ -347,21 +334,12 @@ class ActorCritic_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        #self.setModalStats(alpha[0], mean[0], sigma[0])
-
-        # TODO: Check multi-dimensional action case. Is it sampling correctly
-        # selected_idx = np.random.choice(self.num_modal, self.num_samples, p=alpha[0])
-        # modal_idx_list = [np.random.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
+        # self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if is_single_sample:
             num_samples = None
         else:
             num_samples = self.num_samples
-
-        # if do_multiple_sample:
-        #     size = self.num_samples
-        # else:
-        #     size = 1
 
         if self.equal_modal_selection:
             modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples) for _ in alpha]
@@ -371,44 +349,11 @@ class ActorCritic_Network(BaseNetwork):
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                           in zip(modal_idx_list, mean, sigma)]
 
-        # uniform sampling TODO: Optimize this
-        if self.actor_update == "cem" and self.use_uniform_sampling and not is_single_sample:
-            for j in range(len(sampled_actions)):
-                for i in range(int(self.num_samples * self.uniform_sampling_ratio)):
-                    sampled_actions[j][i] = self.rng.uniform(self.action_min, self.action_max)
-
         return sampled_actions
 
     # return uniformly sampled actions (batchsize x num_samples x action_dim)
     def sample_uniform_action(self, batchsize):
         return self.rng.uniform(self.action_min, self.action_max, size=(batchsize, self.num_samples, self.action_dim))
-
-
-    # # Should return n actions
-    # def sample_multiple_actions(self, inputs, phase):
-    #
-    #     # batchsize x action_dim
-    #     alpha, mean, sigma = self.sess.run(
-    #         [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-    #             self.inputs: inputs,
-    #             self.phase: phase
-    #         })
-    #
-    #     alpha = np.squeeze(alpha, axis=2)
-    #
-    #     self.setModalStats(alpha[0], mean[0], sigma[0])
-    #
-    #     if self.equal_modal_selection:
-    #         modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples) for _ in alpha]
-    #     else:
-    #         modal_idx_list = [self.rng.choice(self.num_modal, self.num_samples, p=prob) for prob in alpha]
-    #
-    #     sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
-    #                        in zip(modal_idx_list, mean, sigma)]
-    #
-    #
-    #
-    #     return sampled_actions
 
     def predict_action(self, *args):
         inputs = args[0]

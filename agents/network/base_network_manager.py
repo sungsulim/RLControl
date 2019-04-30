@@ -33,7 +33,7 @@ class BaseNetwork_Manager(object):
         self.set_exploration(config)
 
         # type of normalization: 'none', 'batch', 'layer', 'input_norm'
-        if config.norm_type is not 'none':
+        if config.norm_type != 'none':
             self.input_norm = RunningMeanStd(self.state_dim)
         else:
             self.input_norm = None

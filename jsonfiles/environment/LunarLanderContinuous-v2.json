@@ -1,9 +1,0 @@
-{
-    "environment": "LunarLanderContinuous-v2",
-
-   "TotalMilSteps": 1.0,
-    "EpisodeSteps": -1,
-
-    "EvalIntervalMilSteps": 0.005,
-    "EvalEpisodes": 10
-}

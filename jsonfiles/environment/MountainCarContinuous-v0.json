@@ -1,9 +1,0 @@
-{
-    "environment": "MountainCarContinuous-v0",
-
-    "TotalMilSteps": 0.2,
-    "EpisodeSteps": -1,
-
-    "EvalIntervalMilSteps": 0.005,
-    "EvalEpisodes": 30
-}

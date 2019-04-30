@@ -123,7 +123,7 @@ class ActorExpert_Network(BaseNetwork):
             action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
 
             # normalize inputs
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(

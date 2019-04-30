@@ -25,11 +25,6 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
             self.sess = tf.Session()
 
             self.entropy_network = entropy_network.EntropyNetwork(self.sess, self.input_norm, config)
-            # self.entropy_network = entropy_network.EntropyNetwork(self.sess, self.input_norm, critic_layer_dim,
-            #                                                       state_dim, state_min, state_max,
-            #                                                       action_dim, action_min, action_max,
-            #                                                       config.critic_lr, config.tau, self.inference,
-            #                                                       norm_type=self.norm_type)
             self.sess.run(tf.global_variables_initializer())
             self.entropy_network.init_target_network()
 
@@ -106,10 +101,6 @@ class PartialInputConvex_Network_Manager(BaseNetwork_Manager):
 
         # Update the critic given the targets
         predicted_q_value, _ = self.entropy_network.train(state_batch, action_batch, y_i)
-        #print('y:', np.sum(y_i))
-        #print('predicted value:', np.sum(predicted_q_value))
-        #print('action_batch:', action_batch)
-        #print('predicted value:', predicted_q_value)
 
         # Update target networks
         self.entropy_network.update_target_network()

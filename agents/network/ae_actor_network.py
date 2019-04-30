@@ -54,10 +54,6 @@ class AE_Actor_Network(BaseNetwork):
         # "policy_gd_max_steps": [50],
         # "policy_gd_stop": [1e-3],
 
-        self.equal_modal_selection = False
-        # if config.equal_modal_selection == "True":
-        #     self.equal_modal_selection = True
-
 
         # original network
         self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha = self.build_network(
@@ -107,7 +103,7 @@ class AE_Actor_Network(BaseNetwork):
             action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
 
             # normalize inputs
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             action_prediction_mean, action_prediction_sigma, action_prediction_alpha = self.network(inputs, phase)
@@ -212,11 +208,7 @@ class AE_Actor_Network(BaseNetwork):
         action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name='temp_action')
 
         result = self.tf_normal(action, mean, sigma)
-
-        if self.equal_modal_selection:
-            result = tf.scalar_mul(1.0 / self.num_modal, result)
-        else:
-            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         return alpha, mean, sigma, action, result
@@ -227,12 +219,7 @@ class AE_Actor_Network(BaseNetwork):
         # mean: batch x num_modal x action_dim
         # action: batch x action_dim
         result = self.tf_normal(action, mean, sigma)
-
-        # Modified to do equal weighting
-        if self.equal_modal_selection:
-            result = tf.scalar_mul(1.0 / self.num_modal, result)
-        else:
-            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
@@ -309,11 +296,7 @@ class AE_Actor_Network(BaseNetwork):
                 self.phase: phase
             })
         self.setModalStats(alpha[0], mean[0], sigma[0])
-
-        if self.equal_modal_selection:
-            max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
-        else:
-            max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
+        max_idx = np.argmax(np.squeeze(alpha, axis=2), axis=1)
 
         best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
@@ -345,11 +328,7 @@ class AE_Actor_Network(BaseNetwork):
         else:
             num_samples = self.num_samples
 
-        if self.equal_modal_selection:
-            modal_idx_list = [self.rng.choice(self.num_modal, num_samples) for _ in alpha]
-        else:
-            modal_idx_list = [self.rng.choice(self.num_modal, num_samples, p=prob) for prob in alpha]
-
+        modal_idx_list = [self.rng.choice(self.num_modal, num_samples, p=prob) for prob in alpha]
         sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
                            in zip(modal_idx_list, mean, sigma)]
 
@@ -373,12 +352,7 @@ class AE_Actor_Network(BaseNetwork):
         mean = np.squeeze(mean, axis=1)
         sigma = np.squeeze(sigma, axis=1)
 
-        if self.equal_modal_selection:
-            return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
-                np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-                np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
-        else:
-            return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+        return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
         self.saved_alpha = alpha

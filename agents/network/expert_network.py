@@ -77,7 +77,7 @@ class ExpertNetwork(BaseNetwork):
             action = tf.placeholder(tf.float32, [None, self.action_dim])
 
             # normalize inputs
-            if self.norm_type is not 'none':
+            if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
             q_prediction = self.network(inputs, action, phase)
