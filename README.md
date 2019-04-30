@@ -1,18 +1,26 @@
 # RLControl
-Implementation of Continuous Control RL Algorithms.
+Implementation of Continuous Control RL Algorithms. 
+
+Repository used for our paper [Actor-Expert: A Framework for using Q-learning in Continuous Action Spaces](https://arxiv.org/abs/1810.09103).
+
+webpage: https://sites.google.com/ualberta.ca/actorexpert
 
 ## Available Algorithms
 * Q-learning methods
-  * [Actor-Expert, Actor-Expert+](https://arxiv.org/abs/1810.09103)
+  * Actor-Expert, Actor-Expert+: [Actor-Expert: A Framework for using Q-learning in Continuous Action Spaces](https://arxiv.org/abs/1810.09103)
   * Actor-Expert with PICNN
-  * [Wire-Fitting](http://www.leemon.com/papers/1993bk3.pdf) 
-  * [Normalized Advantage Functions(NAF)](https://arxiv.org/abs/1603.00748)
-  * [(Partial) Input Convex Neural Networks(ICNN)](https://arxiv.org/abs/1609.07152) - adapted from github.com/locuslab/icnn
-  * [QT-Opt (single, mixture gaussian)](https://arxiv.org/abs/1806.10293)
+  * Wire-Fitting: [Reinforcement Learning with High-dimensional, Continuous Actions](http://www.leemon.com/papers/1993bk3.pdf) 
+  * Normalized Advantage Functions(NAF): [Continuous Deep Q-Learning with Model-based Acceleration](https://arxiv.org/abs/1603.00748)
+  * (Partial) Input Convex Neural Networks(PICNN): [Input Convex Neural Networks](https://arxiv.org/abs/1609.07152) - adapted from github.com/locuslab/icnn
+  * QT-Opt: [QT-Opt: Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation](https://arxiv.org/abs/1806.10293) - both single and mixture gaussian
   
 * Policy Gradient methods
-  * [Deep Deterministic Policy Gradient(DDPG)](https://arxiv.org/abs/1509.02971)
-  * Advantage Actor-Critic baseline with Replay Buffer : This is different from ACER
+  * Deep Deterministic Policy Gradient(DDPG): [Continuous Control with Deep Reinforcement Learning](https://arxiv.org/abs/1509.02971)
+  * Advantage Actor-Critic baseline with Replay Buffer: Not to be confused with ACER
+
+
+## Installation
+Create virtual environment and install necessary packages through "pip3 -r requirements.txt"
 
 ## Usage
 Settings for available environments and agents are provided in `jsonfiles/` directory
