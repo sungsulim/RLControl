@@ -1,3 +1,5 @@
+# Bundle Entropy adapted from the repo of the original author: https://github.com/locuslab/icnn
+
 import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
