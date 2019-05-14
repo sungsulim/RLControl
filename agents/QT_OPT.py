@@ -55,8 +55,7 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
 
                 utils.plot_utils.plotFunction("QT_OPT", [func1, func2], state, [greedy_action, means], chosen_action, self.action_min,
                                               self.action_max,
-                                              display_title='ep: ' + str(
-                                                  self.train_ep_count) + ', steps: ' + str(
+                                              display_title='QT-Opt, steps: ' + str(
                                                   self.train_global_steps),
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,

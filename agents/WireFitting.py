@@ -44,7 +44,7 @@ class WireFitting_Network_Manager(BaseNetwork_Manager):
 
                 utils.plot_utils.plotFunction("WireFitting", [func1], state, greedy_action, chosen_action,
                                               self.action_min, self.action_max,
-                                              display_title='ep: ' + str(self.train_ep_count) + ', steps: ' + str(self.train_global_steps),
+                                              display_title='WireFitting, steps: ' + str(self.train_global_steps),
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(),
                                               ep_count=self.train_ep_count, show=False)
