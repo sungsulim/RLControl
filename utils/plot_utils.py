@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 # bit messy but contains all plot functions (for AE_CCEM, DDPG, NAF)
-def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min, x_max, resolution=1e2, display_title='', save_title='',
+def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min, x_max, resolution=1e3, display_title='', save_title='',
                  save_dir='', linewidth=2.0, ep_count=0, grid=True, show=False, equal_aspect=False):
     fig, ax = plt.subplots(2, sharex=True)
     # fig, ax = plt.subplots(figsize=(10, 5))
@@ -55,14 +55,15 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
             mode_string = ""
             for i in range(len(greedy_action)):
-                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
-            ax[1].set_title("greedy actions: " + mode_string)
+                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i]))
+
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + mode_string)
         else:
             top_margin = 1.0
 
@@ -101,14 +102,15 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
             mode_string = ""
             for i in range(len(greedy_action)):
-                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
-            ax[1].set_title("greedy actions: " + mode_string)
+                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i]))
+
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + mode_string)
         else:
             top_margin = 1.0
 
@@ -147,14 +149,15 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
             mode_string = ""
             for i in range(len(greedy_action)):
-                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i])) + ", "
-            ax[1].set_title("greedy actions: " + mode_string)
+                mode_string += "{:.2f}".format(np.squeeze(greedy_action[i]))
+
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + mode_string)
         else:
             top_margin = 1.0
 
@@ -219,10 +222,10 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
         if display_title:
 
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
-            ax[1].set_title("greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
 
         else:
             top_margin = 1.0
@@ -257,11 +260,11 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
         if display_title:
 
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
-            ax[1].set_title("greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
 
         else:
             top_margin = 1.0
@@ -328,12 +331,11 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
 
         if display_title:
 
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
-
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
-            ax[1].set_title("greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, greedy action: " + np.format_float_positional(greedy_action[0], precision=2))
 
         else:
             top_margin = 1.0
@@ -381,18 +383,20 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             ax[1].axvline(x=expl_action[0], linewidth=1.5, color='blue')
 
         if display_title:
-            display_title += ", argmax Q(S,A): {:.2f}".format(max_point_x)
             fig.suptitle(display_title, fontsize=11, fontweight='bold')
             top_margin = 0.95
 
             mode_string = ""
             for i in range(len(modal_mean)):
                 mode_string += "{:.2f}".format(np.squeeze(modal_mean[i])) + ", "
-            ax[1].set_title("modal means: " + mode_string)
+
+            ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
+            ax[1].set_title("Policy, modal means: " + mode_string)
         else:
             top_margin = 1.0
 
-
+    # set y range in the Q val plot
+    ax[0].set_ylim([-0.1, 1.6])
 
     # common
     if equal_aspect:
