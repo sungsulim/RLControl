@@ -403,7 +403,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
                 self.phase: phase
             })
 
-        # self.setModalStats(alpha[0], mean[0], sigma[0])
+        self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if self.equal_modal_selection:
             max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
@@ -455,7 +455,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         alpha = np.squeeze(alpha, axis=2)
 
-        # self.setModalStats(alpha[0], mean[0], sigma[0])
+        self.setModalStats(alpha[0], mean[0], sigma[0])
 
         if is_single_sample:
             num_samples = 1

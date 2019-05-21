@@ -38,7 +38,7 @@ class QT_OPT_Network_Manager(BaseNetwork_Manager):
                 chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
 
             else:
-                chosen_action = sample[0][0]
+                chosen_action = np.clip(sample[0][0], self.action_min, self.action_max)
 
             if is_start:
                 self.train_ep_count += 1

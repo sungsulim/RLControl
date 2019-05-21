@@ -165,7 +165,7 @@ class WireFitting_Network(BaseNetwork):
         self.sess.run([self.update_target_net_params])  #, self.update_target_batchnorm_params])
 
     def getQFunction(self, state):
-        raise NotImplementedError
-        # return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
-        #                                                                   self.action: np.expand_dims([action], 0),
-        #                                                                   self.phase: False})
+        # raise NotImplementedError
+        return lambda action: self.sess.run(self.q_val, feed_dict={self.state_input: np.expand_dims(state, 0),
+                                                                          self.action_input: np.expand_dims(action, 0),
+                                                                          self.phase: False})
