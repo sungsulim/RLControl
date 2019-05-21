@@ -122,9 +122,16 @@ class ActorExpert_Network(BaseNetwork):
             phase = tf.placeholder(tf.bool, name="network_input_phase")
             action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
 
-            # normalize inputs
-            if self.norm_type != 'none':
-                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+            # # normalize inputs
+            # if self.norm_type != 'none':
+            #     # inputs = self.input_norm.normalize(raw_inputs)
+            #     # inputs = (raw_inputs - self.input_norm.mean) / np.sqrt(self.input_norm.var)
+            #     inputs = tf.divide(tf.subtract(raw_inputs, self.input_norm.mean), tf.sqrt(self.input_norm.var))
+            # else:
+            #     inputs = raw_inputs
+
+            # self.get_raw_inputs = raw_inputs
+            # self.get_inputs = inputs
 
             action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(
                 inputs, action, phase)
@@ -346,72 +353,88 @@ class ActorExpert_Network(BaseNetwork):
 
     def q_action_gradients(self, inputs, action, is_training):
 
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
+
+
         return self.sess.run(self.action_grads, feed_dict={
-            self.inputs: inputs,
+            self.inputs: processed_inputs,
             self.action: action,
             self.phase: is_training
         })
 
-    def train_expert(self, *args):
-        # args (inputs, action, predicted_q_value)
+    def train_expert(self, inputs, action, predicted_q_value):
+
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
+
         return self.sess.run([self.q_prediction, self.expert_optimize], feed_dict={
-            self.inputs: args[0],
-            self.action: args[1],
-            self.predicted_q_value: args[2],
+            self.inputs: processed_inputs,
+            self.action: action,
+            self.predicted_q_value: predicted_q_value,
             self.phase: True
         })
 
-    def train_actor(self, *args):
-        # args [inputs, actions, phase]
+    def train_actor(self, inputs, actions):
+
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
+
         return self.sess.run(self.actor_optimize, feed_dict={
-            self.inputs: args[0],
-            self.actions: args[1],
+            self.inputs: processed_inputs,
+            self.actions: actions,
             self.phase: True
         })
 
-    def predict_q(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
+    def predict_q(self, inputs, action, phase):
+
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
+
 
         return self.sess.run(self.q_prediction, feed_dict={
-            self.inputs: inputs,
+            self.inputs: processed_inputs,
             self.action: action,
             self.phase: phase
         })
 
-    def predict_q_target(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
+    def predict_q_target(self, inputs, action, phase):
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
 
         return self.sess.run(self.target_q_prediction, feed_dict={
-            self.target_inputs: inputs,
+            self.target_inputs: processed_inputs,
             self.target_action: action,
             self.target_phase: phase
         })
 
-    def predict_true_q(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
-        env_name = args[3]
+    def predict_true_q(self, inputs, action, phase, env_name):
 
         return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
 
 
-    def predict_action(self, *args):
-        inputs = args[0]
-        phase = args[1]
+    def predict_action(self, inputs, phase):
+
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
 
         # alpha: batchsize x num_modal x 1
         # mean: batchsize x num_modal x action_dim
         alpha, mean, sigma = self.sess.run(
             [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                self.inputs: inputs,
+                self.inputs: processed_inputs,
                 self.phase: phase
             })
         self.setModalStats(alpha[0], mean[0], sigma[0])
@@ -456,12 +479,28 @@ class ActorExpert_Network(BaseNetwork):
     def sample_action(self, inputs, phase, is_single_sample):
         # args [inputs]
 
+        if self.norm_type != 'none':
+            processed_inputs = self.input_norm.normalize(inputs)
+        else:
+            processed_inputs = inputs
+
+        # print("in sample action")
+        # print('input_norm in network')
+        # print("mean: {}, var: {}, count: {}".format(self.input_norm.mean,
+        #                                             self.input_norm.var,
+        #                                             self.input_norm.count))
+        # print(inputs, processed_inputs)
+        # input()
+
+
         # batchsize x action_dim
         alpha, mean, sigma = self.sess.run(
             [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                self.inputs: inputs,
+                self.inputs: processed_inputs,
                 self.phase: phase
             })
+
+
 
         alpha = np.squeeze(alpha, axis=2)
 
@@ -497,7 +536,8 @@ class ActorExpert_Network(BaseNetwork):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
     def getQFunction(self, state):
-        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
+
+        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: self.input_norm.normalize(np.expand_dims(state, 0)) if self.norm_type != 'none' else np.expand_dims(state, 0),
                                                                           self.action: np.expand_dims([action], 0),
                                                                           self.phase: False})
 
