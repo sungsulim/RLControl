@@ -5,8 +5,9 @@ import tensorflow as tf
 
 from agents.base_agent import BaseAgent  # for python3
 from agents.network.base_network_manager import BaseNetwork_Manager
-from agents.network import actor_network
-from agents.network import critic_network
+# from agents.network import actor_network
+# from agents.network import critic_network
+from agents.network import hydra_ddpg_network
 
 from experiment import write_summary
 import utils.plot_utils
@@ -20,18 +21,19 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
 
-            self.actor_network = actor_network.ActorNetwork(self.sess, self.input_norm, config)
-            self.critic_network = critic_network.CriticNetwork(self.sess, self.input_norm, config)
+            # self.actor_network = actor_network.ActorNetwork(self.sess, self.input_norm, config)
+            # self.critic_network = critic_network.CriticNetwork(self.sess, self.input_norm, config)
+            self.hydra_network = hydra_ddpg_network.HydraDDPGNetwork(self.sess, self.input_norm, config)
+
             self.sess.run(tf.global_variables_initializer())
 
             ######
-            self.actor_network.init_target_network()
-            self.critic_network.init_target_network()
+            self.hydra_network.init_target_network()
             ######
 
     def take_action(self, state, is_train, is_start):
 
-        greedy_action = self.actor_network.predict(np.expand_dims(state, 0), False)[0]
+        greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)[0]
 
         if is_train:
             if is_start:
@@ -47,7 +49,7 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
             if self.write_plot:
-                func1 = self.critic_network.getQFunction(state)
+                func1 = self.hydra_netowrk.getQFunction(state)
 
                 utils.plot_utils.plotFunction("DDPG", [func1], state, greedy_action, chosen_action, self.action_min,
                                               self.action_max,
@@ -72,7 +74,7 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
         # compute target
-        target_q = self.critic_network.predict_target(next_state_batch, self.actor_network.predict_target(next_state_batch, True), True)
+        target_q = self.hydra_network.predict_qval_target(next_state_batch, self.hydra_network.predict_action_target(next_state_batch, True), True)
 
         batch_size = np.shape(state_batch)[0]
         reward_batch = np.reshape(reward_batch, (batch_size, 1))
@@ -82,16 +84,15 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
         y_i = reward_batch + gamma_batch * target_q
 
         # Update the critic given the targets
-        predicted_q_value, _ = self.critic_network.train(state_batch, action_batch, y_i)
+        predicted_q_value, _ = self.hydra_network.train_critic(state_batch, action_batch, y_i)
 
         # Update the actor using the sampled gradient
-        a_outs = self.actor_network.predict(state_batch, True)
-        a_grads = self.critic_network.action_gradients(state_batch, a_outs, True)
-        self.actor_network.train(state_batch, a_grads[0])
+        a_outs = self.hydra_network.predict_action(state_batch, True)
+        a_grads = self.hydra_network.action_gradients(state_batch, a_outs, True)
+        self.hydra_network.train_actor(state_batch, a_grads[0])
 
         # Update target networks
-        self.actor_network.update_target_network()
-        self.critic_network.update_target_network()
+        self.hydra_network.update_target_network()
 
 
 class DDPG(BaseAgent):

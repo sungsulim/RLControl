@@ -5,10 +5,8 @@
         "norm_type": ["input_norm"],
         "exploration_policy": ["ou_noise"],
 
-        "actor_l1_dim": [200],
+        "shared_l1_dim": [200],
         "actor_l2_dim": [200],
-
-        "critic_l1_dim": [200],
         "critic_l2_dim": [200],
         
         "actor_lr": [1e-3, 1e-4, 1e-5],
