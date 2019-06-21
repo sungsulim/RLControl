@@ -33,6 +33,14 @@ def create_agent(agent_string, config):
         from agents.ActorExpert_PICNN import ActorExpert_PICNN
         return ActorExpert_PICNN(config)
 
+    elif agent_string == "ActorExpert_Separate":
+        from agents.ActorExpert_Separate import ActorExpert_Separate
+        return ActorExpert_Separate(config)
+
+    # elif agent_string == "ActorExpert_Plus_Separate":
+    #     from agents.ActorExpert_Plus_Separate import ActorExpert_Plus_Separate
+    #     return ActorExpert_Plus_Separate(config)
+
     elif agent_string == "QT_OPT":
         from agents.QT_OPT import QT_OPT
         return QT_OPT(config)
@@ -40,6 +48,10 @@ def create_agent(agent_string, config):
     elif agent_string == "ActorCritic":
         from agents.ActorCritic import ActorCritic
         return ActorCritic(config)
+
+    elif agent_string == "SoftActorCritic":
+        from agents.SoftActorCritic import SoftActorCritic
+        return SoftActorCritic(config)
 
     elif agent_string == "OptimalQ":
         from agents.OptimalQ import OptimalQ

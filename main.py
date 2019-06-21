@@ -115,7 +115,7 @@ def main():
     np.array(eval_episode_std_rewards).tofile(eval_std_rewards_filename, sep=',', format='%15.8f')
 
     params = []
-    params_names = '_'
+    # params_names = '_'
     for key in agent_params:
         # for Python 2 since JSON load delivers "unicode" rather than pure string
         # then it will produce problem at plotting stage
@@ -123,7 +123,7 @@ def main():
             params.append(agent_params[key].encode('utf-8'))
         else:
             params.append(agent_params[key])
-        params_names += (key + '_')
+        # params_names += (key + '_')
 
     params = np.array(params)
     # name = prefix + params_names + 'Params.txt'

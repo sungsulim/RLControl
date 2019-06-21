@@ -49,7 +49,7 @@ class DDPG_Network_Manager(BaseNetwork_Manager):
                 write_summary(self.writer, self.train_global_steps, chosen_action[0], tag='train/action_taken')
 
             if self.write_plot:
-                func1 = self.hydra_netowrk.getQFunction(state)
+                func1 = self.hydra_network.getQFunction(state)
 
                 utils.plot_utils.plotFunction("DDPG", [func1], state, greedy_action, chosen_action, self.action_min,
                                               self.action_max,
