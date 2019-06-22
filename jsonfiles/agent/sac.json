@@ -1,0 +1,22 @@
+{
+    "agent": "SoftActorCritic",
+    "sweeps": {
+
+        "norm_type": ["input_norm"],
+
+        "exploration_policy": ["none"],
+
+        "actor_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "critic_l1_dim": [200],
+        "critic_l2_dim": [200],
+
+        "pi_lr": [1e-3],
+        "qf_vf_lr": [1e-3],
+
+        "entropy_scale": [0],
+
+        "reparameterize": ["True"],
+        "sample_for_eval": ["False"]
+    }
+}
