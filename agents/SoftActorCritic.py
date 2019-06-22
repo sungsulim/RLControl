@@ -8,12 +8,14 @@ from agents.network.base_network_manager import BaseNetwork_Manager
 from agents.network import sac_network
 from experiment import write_summary
 import utils.plot_utils
+# from spinup.utils.logx import EpochLogger
 
 
 class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
     def __init__(self, config):
         super(SoftActorCritic_Network_Manager, self).__init__(config)
 
+        # self.logger = EpochLogger()
         self.rng = np.random.RandomState(config.random_seed)
 
         self.sample_for_eval = False
@@ -72,11 +74,11 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
-        # Policy Update
-        self.network.train_pi(state_batch)
+        # Policy Update, Qf and Vf Update
+        outs = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
 
-        # Qf, Vf Update
-        self.network.train_qf_vf(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+        # self.logger.store(LossPi=outs[0], LossQ=outs[1], LossV=outs[2], QVals=outs[3],
+        #              VVals=outs[4], LogPi=outs[5])
 
         # Update target networks
         self.network.update_target_network()

@@ -120,6 +120,19 @@ class Experiment(object):
             if self.total_step_count % self.train_environment.eval_interval == 0:
                 eval_session_time += self.eval()
 
+        # self.agent.network_manager.logger.store(EpRet=episode_reward, EpLen=episode_step_count)
+        #
+        # # Log info about epoch
+        # self.agent.network_manager.logger.log_tabular('EpRet', with_min_and_max=True)
+        # self.agent.network_manager.logger.log_tabular('EpLen', average_only=True)
+        # self.agent.network_manager.logger.log_tabular('QVals', with_min_and_max=True)
+        # self.agent.network_manager.logger.log_tabular('VVals', with_min_and_max=True)
+        # self.agent.network_manager.logger.log_tabular('LogPi', with_min_and_max=True)
+        # self.agent.network_manager.logger.log_tabular('LossPi', average_only=True)
+        # self.agent.network_manager.logger.log_tabular('LossQ', average_only=True)
+        # self.agent.network_manager.logger.log_tabular('LossV', average_only=True)
+        # self.agent.network_manager.logger.dump_tabular()
+
         # check if this episode is finished because of Total Training Step Limit
         if not (done or episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT):
             force_terminated = True

@@ -9,10 +9,10 @@ class Config:
         self.exploration_policy = None
 
         self.warmup_steps = 0
-        self.batch_size = 32
+        self.batch_size = 100 # 32
         self.buffer_size = 1e6
 
-        self.tau = 0.01
+        self.tau = 0.005 # 0.01
         self.gamma = 0.99
 
         # if using OU noise for exploration
