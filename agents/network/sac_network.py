@@ -46,10 +46,10 @@ class SoftActorCriticNetwork(BaseNetwork):
         self.phase_ph = tf.placeholder(tf.bool)
 
         with tf.variable_scope('main'):
-            self.mu, self.pi, self.logp_pi, self.q, self.q_pi, self.v = self.build_networks(self.x_ph, self.a_ph, self.phase_ph)
+            self.mu, self.pi, self.logp_pi, self.q1, self.q1_pi, self.q2, self.q2_pi, self.v = self.build_networks(self.x_ph, self.a_ph, self.phase_ph)
 
         with tf.variable_scope('target'):
-            _, _, _, _, _, self.v_targ = self.build_networks(self.x2_ph, self.a_ph, self.phase_ph)
+            _, _, _, _, _, _, _, self.v_targ = self.build_networks(self.x2_ph, self.a_ph, self.phase_ph)
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = tf.group([tf.assign(v_targ, (1 - self.tau) * v_targ + self.tau * v_main)
@@ -71,16 +71,19 @@ class SoftActorCriticNetwork(BaseNetwork):
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
 
+            min_q_pi = tf.minimum(self.q1_pi, self.q2_pi)
+
             # Targets for Q and V regression
             q_backup = tf.stop_gradient(self.r_ph + self.g_ph * self.v_targ)
-            v_backup = tf.stop_gradient(self.q_pi - self.entropy_scale * self.logp_pi)
+            v_backup = tf.stop_gradient(min_q_pi - self.entropy_scale * self.logp_pi)
 
             # Soft actor-critic losses
-            pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
-            q_loss = 0.5 * tf.reduce_mean((q_backup - self.q) ** 2)
+            pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q1_pi)
+            q1_loss = 0.5 * tf.reduce_mean((q_backup - self.q1) ** 2)
+            q2_loss = 0.5 * tf.reduce_mean((q_backup - self.q2) ** 2)
 
             v_loss = 0.5 * tf.reduce_mean((v_backup - self.v) ** 2)
-            value_loss = q_loss + v_loss
+            value_loss = q1_loss + q2_loss + v_loss
 
             # Policy train op
             # (has to be separate from value train op, because q1_pi appears in pi_loss)
@@ -95,7 +98,7 @@ class SoftActorCriticNetwork(BaseNetwork):
             with tf.control_dependencies([train_pi_op]):
                 train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
 
-            self.train_ops = [pi_loss, q_loss, v_loss, self.q, self.v, self.logp_pi,
+            self.train_ops = [pi_loss, q1_loss, q2_loss, v_loss, self.q1, self.q2, self.v, self.logp_pi,
                         train_pi_op, train_value_op]
 
     def get_vars(self, scope):
@@ -112,16 +115,22 @@ class SoftActorCriticNetwork(BaseNetwork):
         mu *= self.action_max[0]
         pi *= self.action_max[0]
 
-        with tf.variable_scope('qf'):
-            qf_a = self.qf_network(state_ph, action_ph, phase_ph)
+        with tf.variable_scope('qf1'):
+            qf1_a = self.qf_network(state_ph, action_ph, phase_ph)
 
-        with tf.variable_scope('qf', reuse=True):
-            qf_pi = self.qf_network(state_ph, pi, phase_ph)
+        with tf.variable_scope('qf1', reuse=True):
+            qf1_pi = self.qf_network(state_ph, pi, phase_ph)
+
+        with tf.variable_scope('qf2'):
+            qf2_a = self.qf_network(state_ph, action_ph, phase_ph)
+
+        with tf.variable_scope('qf2', reuse=True):
+            qf2_pi = self.qf_network(state_ph, pi, phase_ph)
 
         with tf.variable_scope('vf'):
             vf = self.vf_network(state_ph, phase_ph)
 
-        return mu, pi, logp_pi, qf_a, qf_pi, vf
+        return mu, pi, logp_pi, qf1_a, qf1_pi, qf2_a, qf2_pi, vf
 
     def policy_network(self, state_ph, phase_ph):
 
