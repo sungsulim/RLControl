@@ -8,7 +8,7 @@ EPS = 1e-6
 
 class SoftActorCriticNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
-        super(SoftActorCriticNetwork, self).__init__(sess, config, config.pi_qf_vf_lr)
+        super(SoftActorCriticNetwork, self).__init__(sess, config, [config.pi_lr, config.qf_vf_lr])
 
         self.rng = np.random.RandomState(config.random_seed)
 
@@ -84,12 +84,12 @@ class SoftActorCriticNetwork(BaseNetwork):
 
             # Policy train op
             # (has to be separate from value train op, because q1_pi appears in pi_loss)
-            pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+            pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[0])
             train_pi_op = pi_optimizer.minimize(pi_loss, var_list=self.get_vars('main/pi'))
 
             # Value train op
             # (control dep of train_pi_op because sess.run otherwise evaluates in nondeterministic order)
-            value_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+            value_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[1])
             value_params = self.get_vars('main/qf') + self.get_vars('main/vf')
 
             with tf.control_dependencies([train_pi_op]):

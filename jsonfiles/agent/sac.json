@@ -6,14 +6,15 @@
 
         "exploration_policy": ["none"],
 
-        "actor_l1_dim": [400],
-        "actor_l2_dim": [300],
-        "critic_l1_dim": [400],
-        "critic_l2_dim": [300],
+        "actor_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "critic_l1_dim": [200],
+        "critic_l2_dim": [200],
 
-        "pi_qf_vf_lr": [1e-2, 1e-3, 1e-4],
+        "pi_lr": [1e-2, 1e-3],
+        "qf_vf_lr": [1e-3, 1e-4],
 
-        "entropy_scale": [0, 0.01, 0.1],
+        "entropy_scale": [0, 0.01, 0.1, 1.0],
 
         "sample_for_eval": ["False"]
     }
