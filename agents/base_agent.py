@@ -38,7 +38,7 @@ class BaseAgent(object):
         return self.take_action(state, is_train, is_start=False)
 
     def take_action(self, state, is_train, is_start):
-        if self.replay_buffer.get_size() > self.warmup_steps:
+        if self.replay_buffer.get_size() < self.warmup_steps:
             action = (np.random.random_sample(size=self.action_dim) - 0.5) * 2 * self.action_max[0]
         else:
             action = self.network_manager.take_action(state, is_train, is_start)
