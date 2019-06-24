@@ -491,17 +491,24 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
     def getPolicyFunction(self, alpha, mean, sigma):
 
-        # alpha = np.squeeze(alpha, axis=1)
-        mean = np.squeeze(mean, axis=1)
-        sigma = np.squeeze(sigma, axis=1)
+        if self.num_modal == 2:
+            # alpha = np.squeeze(alpha, axis=1)
+            mean = np.squeeze(mean, axis=1)
+            sigma = np.squeeze(sigma, axis=1)
 
-        if self.equal_modal_selection:
+        elif self.num_modal == 1:
+            alpha = np.squeeze(alpha)
+            mean = np.squeeze(mean)
+            sigma = np.squeeze(sigma)
+        else:
+            raise ValueError("getPolicyFunction() not defined for this num_modal")
+
+        if self.equal_modal_selection and self.num_modal == 2:
             return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
                 np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
                 np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
         else:
-            return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))),
-                                                             np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
+            return lambda action: np.sum(alpha * np.multiply(np.sqrt(1.0 / (2 * np.pi * np.square(sigma))), np.exp(-np.square(action - mean) / (2.0 * np.square(sigma)))))
 
     def setModalStats(self, alpha, mean, sigma):
         self.saved_alpha = alpha

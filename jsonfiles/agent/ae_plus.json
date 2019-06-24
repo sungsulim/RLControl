@@ -10,14 +10,14 @@
         "actor_l2_dim": [200],
         "expert_l2_dim": [200],
 
-        "actor_lr": [1e-3, 1e-4, 1e-5],
-        "expert_lr": [1e-2, 1e-3, 1e-4],
+        "actor_lr": [1e-3, 1e-4],
+        "expert_lr": [1e-2, 1e-3],
 
         "rho": [0.6],
         "num_samples": [10],
-        "num_modal": [2],
+        "num_modal": [1],
 
-        "use_uniform_sampling": ["False"],
+        "use_uniform_sampling": ["False", "True"],
         "use_better_q_gd": ["False"],
 
         "gd_alpha": [1e-2],
