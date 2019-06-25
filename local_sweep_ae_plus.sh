@@ -3,7 +3,7 @@
 ENV_NAME=Bimodal1DEnv
 AGENT_NAME=ae_plus
 
-source /cshome/sungsu/Documents/workspace/myenv/bin/activate
+source /Users/sungsulim/Documents/projects/RLControl/venv/bin/activate
 #echo "Bash version ${BASH_VERSION}..."
 
 # Inclusive 
