@@ -46,10 +46,10 @@ class SoftActorCriticNetwork(BaseNetwork):
         self.phase_ph = tf.placeholder(tf.bool)
 
         with tf.variable_scope('main'):
-            self.mu, self.pi, self.logp_pi, self.q, self.q_pi, self.v = self.build_networks(self.x_ph, self.a_ph, self.phase_ph)
+            self.mu, self.pi, self.logp_pi, self.std, self.q, self.q_pi, self.v = self.build_networks(self.x_ph, self.a_ph, self.phase_ph)
 
         with tf.variable_scope('target'):
-            _, _, _, _, _, self.v_targ = self.build_networks(self.x2_ph, self.a_ph, self.phase_ph)
+            _, _, _, _, _, _, self.v_targ = self.build_networks(self.x2_ph, self.a_ph, self.phase_ph)
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = tf.group([tf.assign(v_targ, (1 - self.tau) * v_targ + self.tau * v_main)
@@ -105,7 +105,7 @@ class SoftActorCriticNetwork(BaseNetwork):
 
         # policy
         with tf.variable_scope('pi'):
-            mu, pi, logp_pi = self.policy_network(state_ph, phase_ph)
+            mu, pi, logp_pi, std = self.policy_network(state_ph, phase_ph)
             mu, pi, logp_pi = self.apply_squashing_func(mu, pi, logp_pi)
 
         # make sure actions are in correct range
@@ -121,7 +121,7 @@ class SoftActorCriticNetwork(BaseNetwork):
         with tf.variable_scope('vf'):
             vf = self.vf_network(state_ph, phase_ph)
 
-        return mu, pi, logp_pi, qf_a, qf_pi, vf
+        return mu, pi, logp_pi, std, qf_a, qf_pi, vf
 
     def policy_network(self, state_ph, phase_ph):
 
@@ -176,7 +176,7 @@ class SoftActorCriticNetwork(BaseNetwork):
         pi = mu + tf.random_normal(tf.shape(mu)) * std
         logp_pi = self.gaussian_likelihood(pi, mu, log_std)
 
-        return mu, pi, logp_pi
+        return mu, pi, logp_pi, std
 
     def gaussian_likelihood(self, x, mu, log_std):
         pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + EPS)) ** 2 + 2 * log_std + np.log(2 * np.pi))
@@ -294,4 +294,18 @@ class SoftActorCriticNetwork(BaseNetwork):
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
+    def getQFunction(self, state):
+        return lambda action: self.sess.run(self.q, feed_dict={
+            self.x_ph: np.expand_dims(state, 0),
+            self.a_ph: np.expand_dims([action], 0),
+            self.phase_ph: False
+        })
+
+    def getPolicyFunction(self, state):
+
+        mean, std = self.sess.run([self.mu, self.std], feed_dict={
+            self.x_ph: np.expand_dims(state, 0),
+            self.phase_ph: False
+        })
+        return lambda action: 1/(std * np.sqrt(2 * np.pi)) * np.exp(- (action - mean)**2 / (2 * std**2))
 
