@@ -16,6 +16,6 @@
 
         "entropy_scale": [0, 0.01, 0.1, 1.0],
 
-        "sample_for_eval": ["False"]
+        "sample_for_eval": ["True"]
     }
 }
