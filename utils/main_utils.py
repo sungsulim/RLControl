@@ -53,6 +53,10 @@ def create_agent(agent_string, config):
         from agents.SoftActorCritic import SoftActorCritic
         return SoftActorCritic(config)
 
+    elif agent_string == "SoftQlearning":
+        from agents.SoftQlearning import SoftQlearning
+        return SoftQlearning(config)
+
     elif agent_string == "OptimalQ":
         from agents.OptimalQ import OptimalQ
         return OptimalQ(config)

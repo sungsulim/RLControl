@@ -1,0 +1,22 @@
+{
+    "agent": "SoftQlearning",
+    "sweeps": {
+
+        "norm_type": ["input_norm"],
+
+        "exploration_policy": ["none"],
+
+        "actor_l1_dim": [200],
+        "actor_l2_dim": [200],
+        "expert_l1_dim": [200],
+        "expert_l2_dim": [200],
+
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "expert_lr": [1e-2, 1e-3, 1e-4],
+
+        "reward_scale": [30],
+        "value_n_particles": [16],
+        "kernel_n_particles": [16],
+        "kernel_update_ratio": [0.5]
+    }
+}
