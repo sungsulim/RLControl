@@ -33,12 +33,13 @@ class SoftQlearning_Network_Manager(BaseNetwork_Manager):
                 self.train_ep_count += 1
             self.train_global_steps += 1
 
+            greedy_action = self.network.take_action(np.expand_dims(state, 0))[0]
             if self.use_external_exploration:
-                raise NotImplementedError
+                chosen_action = self.exploration_policy.generate(greedy_action, self.train_global_steps)
 
             else:
                 # Get action from network
-                chosen_action = self.network.take_action(np.expand_dims(state, 0))[0]
+                chosen_action = greedy_action
                 # print('train', chosen_action)
 
             if self.write_log:

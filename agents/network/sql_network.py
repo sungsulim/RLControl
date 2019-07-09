@@ -83,10 +83,10 @@ class SoftQlearningNetwork(BaseNetwork):
             # \hat Q in Equation 11:
             ys = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * next_value)
 
-            print(np.shape(self.reward_scale * self.r_ph))
-            print(np.shape(self.g_ph * next_value))
-
-            print(np.shape(ys))
+            # print(np.shape(self.reward_scale * self.r_ph))
+            # print(np.shape(self.g_ph * next_value))
+            #
+            # print(np.shape(ys))
             assert_shape(ys, [None])
 
             # Equation 11:
