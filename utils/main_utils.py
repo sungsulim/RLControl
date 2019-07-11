@@ -49,6 +49,10 @@ def create_agent(agent_string, config):
         from agents.ActorCritic import ActorCritic
         return ActorCritic(config)
 
+    elif agent_string == "ActorCritic_Separate":
+        from agents.ActorCritic_Separate import ActorCritic_Separate
+        return ActorCritic_Separate(config)
+
     elif agent_string == "SoftActorCritic":
         from agents.SoftActorCritic import SoftActorCritic
         return SoftActorCritic(config)
