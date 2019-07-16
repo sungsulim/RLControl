@@ -4,7 +4,7 @@
 
         "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none"],
+        "exploration_policy": ["none", "ou_noise"],
 
         "actor_l1_dim": [200],
         "actor_l2_dim": [200],
@@ -16,6 +16,6 @@
 
         "reward_scale": [1, 10, 100, 1000],
 
-        "sample_for_eval": ["False", "True"]
+        "sample_for_eval": ["True"]
     }
 }

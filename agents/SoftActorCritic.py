@@ -40,7 +40,8 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
             self.train_global_steps += 1
 
             if self.use_external_exploration:
-                raise NotImplementedError
+                greedy_action = self.network.predict_action(np.expand_dims(state, 0))
+                chosen_action = self.exploration_policy.generate(greedy_action[0], self.train_global_steps)
 
             else:
                 # Get action from network
