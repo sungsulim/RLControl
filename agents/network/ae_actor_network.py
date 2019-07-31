@@ -21,7 +21,7 @@ class AE_Actor_Network(BaseNetwork):
         self.num_modal = config.num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
-        self.sigma_scale = 1.0  # config.sigma_scale
+        self.sigma_scale = 2.0  # config.sigma_scale
 
         self.use_uniform_sampling = False
         if config.use_uniform_sampling == "True":
