@@ -288,7 +288,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
     #     else:
     #         top_margin = 1.0
 
-    elif agent_name == 'DDPG' or agent_name == 'WireFitting':
+    elif agent_name == 'DDPG' or agent_name == 'WireFitting' or agent_name == 'SoftQlearning':
         func1 = func_list[0]
         for point_x in x:
             point_y1 = np.squeeze(func1([point_x]))  # reduce dimension
@@ -483,7 +483,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
             top_margin = 1.0
 
     # set y range in the Q val plot
-    ax[0].set_ylim([-0.1, 1.6])
+    # ax[0].set_ylim([-0.1, 1.6])
 
     # common
     if equal_aspect:

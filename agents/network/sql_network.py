@@ -338,13 +338,11 @@ class SoftQlearningNetwork(BaseNetwork):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
     def getQFunction(self, state):
-        # return lambda action: self.sess.run(self.q, feed_dict={
-        #     self.x_ph: np.expand_dims(state, 0),
-        #     self.a_ph: np.expand_dims([action], 0),
-        #     self.phase_ph: False
-        # })
-
-        raise NotImplementedError
+        return lambda action: self.sess.run(self.q, feed_dict={
+            self.x_ph: np.expand_dims(state, 0),
+            self.a_ph: np.expand_dims(action, 0),
+            self.phase_ph: False
+        })
 
     def getPolicyFunction(self, state):
 

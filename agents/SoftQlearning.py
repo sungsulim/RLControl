@@ -46,19 +46,14 @@ class SoftQlearning_Network_Manager(BaseNetwork_Manager):
                 raise NotImplementedError
 
             if self.write_plot:
-
-                # q_func = self.network.getQFunction(state)
-                # pi_func = self.network.getPolicyFunction(state)
-                # greedy_action = self.network.predict_action(np.expand_dims(state, 0))[0]
-                #
-                # utils.plot_utils.plotFunction("SoftQlearning", [q_func, pi_func], state,
-                #                               greedy_action, chosen_action,
-                #                               self.action_min, self.action_max,
-                #                               display_title='SoftActorCritic, steps: ' + str(self.train_global_steps),
-                #                               save_title='steps_' + str(self.train_global_steps),
-                #                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
-                #                               show=False)
-                raise NotImplementedError
+                q_func = self.network.getQFunction(state)
+                utils.plot_utils.plotFunction("SoftQlearning", [q_func], state,
+                                              greedy_action, chosen_action,
+                                              self.action_min, self.action_max,
+                                              display_title='SoftQlearning, steps: ' + str(self.train_global_steps),
+                                              save_title='steps_' + str(self.train_global_steps),
+                                              save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
+                                              show=False)
         # Eval
         else:
 
