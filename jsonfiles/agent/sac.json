@@ -4,15 +4,15 @@
 
         "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none", "ou_noise"],
+        "exploration_policy": ["none"],
 
         "actor_l1_dim": [200],
         "actor_l2_dim": [200],
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
 
-        "pi_lr": [1e-3, 1e-4, 1e-5],
-        "qf_vf_lr": [1e-2, 1e-3, 1e-4],
+        "pi_lr": [0.01, 0.005, 0.001, 0.0005, 0.0001, 0.00005, 0.00001],
+        "qf_vf_lr": [0.1, 0.05, 0.01, 0.005, 0.001, 0.0005, 0.0001],
 
         "reward_scale": [1, 10, 100, 1000],
 

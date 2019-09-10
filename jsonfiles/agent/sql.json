@@ -11,8 +11,8 @@
         "expert_l1_dim": [200],
         "expert_l2_dim": [200],
 
-        "actor_lr": [1e-3, 1e-4, 1e-5],
-        "expert_lr": [1e-2, 1e-3, 1e-4],
+        "actor_lr": [0.01, 0.005, 0.001, 0.0005, 0.0001],
+        "expert_lr": [0.1, 0.05, 0.01, 0.005, 0.001],
 
         "reward_scale": [1, 10, 100, 1000],
         "value_n_particles": [30],

@@ -5,12 +5,12 @@
 
         "norm_type": ["input_norm"],
 
-        "exploration_policy": ["none", "ou_noise"],
+        "exploration_policy": ["none"],
 
         "qnet_l1_dim": [200],
         "qnet_l2_dim": [200],
 
-        "qnet_lr": [1e-2, 1e-3, 1e-4],
+        "qnet_lr": [0.1, 0.05, 0.01, 0.005, 0.001],
         "num_samples": [64],
         "top_m": [6],
         "num_iter": [2],
