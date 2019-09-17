@@ -3,15 +3,14 @@ from agents.network.base_network import BaseNetwork
 import numpy as np
 
 
-class ActorExpert_Plus_Network(BaseNetwork):
+class ActorExpert_Plus_Actor_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
-        super(ActorExpert_Plus_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
+        super(ActorExpert_Plus_Actor_Network, self).__init__(sess, config, config.actor_lr)
 
         self.rng = np.random.RandomState(config.random_seed)
 
-        self.shared_layer_dim = config.shared_l1_dim
-        self.actor_layer_dim = config.actor_l2_dim
-        self.expert_layer_dim = config.expert_l2_dim
+        self.l1_dim = config.l1_dim
+        self.l2_dim = config.l2_dim
 
         self.input_norm = input_norm
 
@@ -66,14 +65,12 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
 
         # original network
-        self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
-            scope_name='actorexpert')
-        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actorexpert')
+        self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha = self.build_network(scope_name='ae_actor')
+        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='ae_actor')
 
         # Target network
-        self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha, self.target_q_prediction = self.build_network(
-            scope_name='target_actorexpert')
-        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_actorexpert')
+        self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha = self.build_network(scope_name='target_ae_actor')
+        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_ae_actor')
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = [
@@ -97,18 +94,10 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
-
-            # Expert Update
-            self.expert_loss = tf.reduce_mean(tf.squared_difference(self.predicted_q_value, self.q_prediction))
-            self.expert_optimize = tf.train.AdamOptimizer(self.learning_rate[1]).minimize(self.expert_loss)
-
             # Actor update
             self.actor_loss = self.get_lossfunc(self.action_prediction_alpha, self.action_prediction_sigma,
                                                 self.action_prediction_mean, self.actions)
-            self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss)
-
-        # Get the gradient of the expert w.r.t. the action
-        self.action_grads = tf.gradients(self.q_prediction, self.action)
+            self.actor_optimize = tf.train.AdamOptimizer(self.learning_rate).minimize(self.actor_loss)
 
         # # Get the gradient of the policy w.r.t. the action
         self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
@@ -124,24 +113,23 @@ class ActorExpert_Plus_Network(BaseNetwork):
             if self.norm_type != 'none':
                 inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
 
-            action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(
-                inputs, action, phase)
+            action_prediction_mean, action_prediction_sigma, action_prediction_alpha = self.network(inputs, action, phase)
 
-        return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
+        return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha
 
     def network(self, inputs, action, phase):
         # shared net
-        shared_net = tf.contrib.layers.fully_connected(inputs, self.shared_layer_dim, activation_fn=None,
+        net = tf.contrib.layers.fully_connected(inputs, self.l1_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                            factor=1.0, mode="FAN_IN", uniform=True),
                                                        weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                            factor=1.0, mode="FAN_IN", uniform=True))
 
-        shared_net = self.apply_norm(shared_net, activation_fn=tf.nn.relu, phase=phase, layer_num=1)
+        net = self.apply_norm(net, activation_fn=tf.nn.relu, phase=phase, layer_num=1)
 
         # action branch
-        action_net = tf.contrib.layers.fully_connected(shared_net, self.actor_layer_dim, activation_fn=None,
+        action_net = tf.contrib.layers.fully_connected(net, self.l2_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                            factor=1.0, mode="FAN_IN", uniform=True),
                                                        # tf.truncated_normal_initializer(),
@@ -203,23 +191,7 @@ class ActorExpert_Plus_Network(BaseNetwork):
         normalize_alpha = tf.reciprocal(tf.reduce_sum(action_prediction_alpha, axis=1, keepdims=True))
         action_prediction_alpha = tf.multiply(normalize_alpha, action_prediction_alpha)
 
-        # Q branch
-        q_net = tf.contrib.layers.fully_connected(tf.concat([shared_net, action], 1), self.expert_layer_dim,
-                                                  activation_fn=None,
-                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True),
-                                                  # tf.truncated_normal_initializer(), \
-                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True))
-
-        q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase, layer_num=3)
-        q_prediction = tf.contrib.layers.fully_connected(q_net, 1, activation_fn=None,
-                                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
-                                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
+        return action_prediction_mean, action_prediction_sigma, action_prediction_alpha
 
     def tf_normal(self, y, mu, sigma):
 
@@ -271,93 +243,41 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         return tf.reduce_mean(result)
 
-    def policy_gradient_ascent(self, alpha, mean, sigma, action_init):
-
-        action = np.copy(action_init)
-
-        ascent_count = 0
-        update_flag = np.ones([alpha.shape[0], self.action_dim])  # batch_size * action_dim
-
-        while np.any(update_flag > 0) and ascent_count < self.policy_gd_max_steps:
-            action_old = np.copy(action)
-
-            # print(np.shape(self.policy_action_gradients(alpha, mean, sigma, action)))
-            # exit()
-            gradients = self.policy_action_gradients(alpha, mean, sigma, action)[0]
-            action += update_flag * self.policy_gd_alpha * gradients
-            action = np.clip(action, self.action_min, self.action_max)
-
-            # stop if action diff. is small
-            stop_idx = [idx for idx in range(len(action)) if
-                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= self.policy_gd_stop]
-            update_flag[stop_idx] = 0
-            # print(update_flag)
-
-            ascent_count += 1
-
-        # print('ascent count:', ascent_count)
-        return action
-
-    def policy_action_gradients(self, alpha, mean, sigma, action):
-
-        return self.sess.run(self.policy_action_grads, feed_dict={
-            self.temp_alpha: alpha,
-            self.temp_mean: mean,
-            self.temp_sigma: sigma,
-            self.temp_action: action
-        })
-
-    def q_gradient_ascent(self, state, action_init, is_training, is_better_q_gd=False):
-
-        if is_better_q_gd:
-            gd_alpha = self.better_q_gd_alpha
-            gd_max_steps = self.better_q_gd_max_steps
-            gd_stop = self.better_q_gd_stop
-
-        else:
-            gd_alpha = self.gd_alpha
-            gd_max_steps = self.gd_max_steps
-            gd_stop = self.gd_stop
-
-        action = np.copy(action_init)
-
-        ascent_count = 0
-        update_flag = np.ones([state.shape[0], self.action_dim])  # batch_size * action_dim
-
-        while np.any(update_flag > 0) and ascent_count < gd_max_steps:
-            action_old = np.copy(action)
-
-            gradients = self.q_action_gradients(state, action, is_training)[0]
-            action += update_flag * gd_alpha * gradients
-            action = np.clip(action, self.action_min, self.action_max)
-
-            # stop if action diff. is small
-            stop_idx = [idx for idx in range(len(action)) if
-                        np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= gd_stop]
-            update_flag[stop_idx] = 0
-            # print(update_flag)
-
-            ascent_count += 1
-
-        # print('ascent count:', ascent_count)
-        return action
-
-    def q_action_gradients(self, inputs, action, is_training):
-
-        return self.sess.run(self.action_grads, feed_dict={
-            self.inputs: inputs,
-            self.action: action,
-            self.phase: is_training
-        })
-
-    def train_expert(self, *args):
-        # args (inputs, action, predicted_q_value)
-        return self.sess.run([self.q_prediction, self.expert_optimize], feed_dict={
-            self.inputs: args[0],
-            self.action: args[1],
-            self.predicted_q_value: args[2],
-            self.phase: True
-        })
+    # def policy_gradient_ascent(self, alpha, mean, sigma, action_init):
+    #
+    #     action = np.copy(action_init)
+    #
+    #     ascent_count = 0
+    #     update_flag = np.ones([alpha.shape[0], self.action_dim])  # batch_size * action_dim
+    #
+    #     while np.any(update_flag > 0) and ascent_count < self.policy_gd_max_steps:
+    #         action_old = np.copy(action)
+    #
+    #         # print(np.shape(self.policy_action_gradients(alpha, mean, sigma, action)))
+    #         # exit()
+    #         gradients = self.policy_action_gradients(alpha, mean, sigma, action)[0]
+    #         action += update_flag * self.policy_gd_alpha * gradients
+    #         action = np.clip(action, self.action_min, self.action_max)
+    #
+    #         # stop if action diff. is small
+    #         stop_idx = [idx for idx in range(len(action)) if
+    #                     np.mean(np.abs(action_old[idx] - action[idx]) / self.action_max) <= self.policy_gd_stop]
+    #         update_flag[stop_idx] = 0
+    #         # print(update_flag)
+    #
+    #         ascent_count += 1
+    #
+    #     # print('ascent count:', ascent_count)
+    #     return action
+    #
+    # def policy_action_gradients(self, alpha, mean, sigma, action):
+    #
+    #     return self.sess.run(self.policy_action_grads, feed_dict={
+    #         self.temp_alpha: alpha,
+    #         self.temp_mean: mean,
+    #         self.temp_sigma: sigma,
+    #         self.temp_action: action
+    #     })
 
     def train_actor(self, *args):
         # args [inputs, actions, phase]
@@ -367,29 +287,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
             self.phase: True
         })
 
-    def predict_q(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
-
-        return self.sess.run(self.q_prediction, feed_dict={
-            self.inputs: inputs,
-            self.action: action,
-            self.phase: phase
-        })
-
-    def predict_q_target(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
-
-        return self.sess.run(self.target_q_prediction, feed_dict={
-            self.target_inputs: inputs,
-            self.target_action: action,
-            self.target_phase: phase
-        })
 
     def predict_action(self, *args):
         inputs = args[0]
@@ -414,7 +311,8 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         old_best_mean = best_mean
         if self.use_policy_gd:
-            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            # best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            raise NotImplementedError
 
         return old_best_mean, best_mean
 
@@ -439,7 +337,8 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
         old_best_mean = best_mean
         if self.use_policy_gd:
-            best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            # best_mean = self.policy_gradient_ascent(alpha, mean, sigma, best_mean)
+            raise NotImplementedError
 
         return best_mean
 
@@ -483,11 +382,6 @@ class ActorExpert_Plus_Network(BaseNetwork):
 
     def update_target_network(self):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
-
-    def getQFunction(self, state):
-        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
-                                                                          self.action: np.expand_dims([action], 0),
-                                                                          self.phase: False})
 
     def getPolicyFunction(self, alpha, mean, sigma):
 

@@ -72,7 +72,6 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                                               show=False)
-
         # Eval
         else:
             if self.sample_for_eval:
