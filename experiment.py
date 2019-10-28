@@ -102,7 +102,7 @@ class Experiment(object):
 
             # if the episode was externally terminated by episode step limit, don't do update
             # (except Bimodal1DEnv, where the episode is only 1 step)
-            if self.train_environment.name == 'Bimodal1DEnv':
+            if self.train_environment.name.startswith('Bimodal1DEnv'):
                 is_truncated = False
             else:
                 if done and episode_step_count == self.train_environment.EPISODE_STEPS_LIMIT:
