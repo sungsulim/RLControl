@@ -1,5 +1,5 @@
 {
-    "environment": "Bimodal1DEnv_uneq_var2",
+    "environment": "Bimodal1DEnv_uneq_var3",
 
     "TotalMilSteps": 0.00075,
     "EpisodeSteps": 1,

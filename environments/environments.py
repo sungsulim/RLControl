@@ -22,6 +22,8 @@ def create_environment(env_params):
         return Bimodal1DEnvironment_uneq_var1(env_params)
     elif env_name == 'Bimodal1DEnv_uneq_var2':
         return Bimodal1DEnvironment_uneq_var2(env_params)
+    elif env_name == 'Bimodal1DEnv_uneq_var3':
+        return Bimodal1DEnvironment_uneq_var3(env_params)
     elif env_name == 'Bimodal2DEnv':
         return Bimodal2DEnvironment(env_params)
     else:
@@ -400,6 +402,92 @@ class Bimodal1DEnvironment_uneq_var2(object):
         # Two gaussian functions.
         modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
         modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
+
+        return modal1 + modal2
+
+    # Close the environment and clear memory
+    def close(self):
+        pass
+
+class Bimodal1DEnvironment_uneq_var3(object):
+    def __init__(self, env_params):
+
+        self.name = env_params['environment']
+        self.eval_interval = env_params['EvalIntervalMilSteps'] * 1000000
+        self.eval_episodes = env_params['EvalEpisodes']
+
+        # total number of steps allowed in a run
+        self.TOTAL_STEPS_LIMIT = env_params['TotalMilSteps'] * 1000000
+
+        # maximum number of steps allowed for each episode
+        # if -1 takes default setting from gym
+        if env_params['EpisodeSteps'] != -1:
+            self.EPISODE_STEPS_LIMIT = env_params['EpisodeSteps']
+
+        else:
+            self.EPISODE_STEPS_LIMIT = 1  # only one state env
+
+        # state info
+        self.state_dim = 1
+        # self.state_range = np.array([10.])
+        # self.state_min = np.array([-5.])
+        # self.state_max = np.array([5.])
+        self.state_range = np.array([4.])
+        self.state_min = np.array([-2.])
+        self.state_max = np.array([2.])
+        self.state_bounded = True
+
+        # action info
+        self.action_dim = 1
+        # self.action_range = np.array([10.])
+        # self.action_min = np.array([-5.])
+        # self.action_max = np.array([5.])
+        self.action_range = np.array([4.])
+        self.action_min = np.array([-2.])
+        self.action_max = np.array([2.])
+
+        # DEBUG
+        # print('stateDim:',self.stateDim)
+        # print('stateRange:', self.stateRange)
+        # print('stateMin:', self.stateMin)
+        # print("stateBounded :: ", self.stateBounded)
+
+        # print("actionDim", self.actionDim)
+        # print('actRange', self.actRange)
+        # print("actionBound :: ", self.actionBound)
+        # print('actMin', self.actMin)
+        # exit()
+
+    def set_random_seed(self, random_seed):
+        pass
+
+    # Reset the environment for a new episode. return the initial state
+    def reset(self):
+
+        # starts at 0.
+        self.state = np.array([0.])
+        return self.state
+
+    def step(self, action):
+        self.state = self.state + action  # terminal state
+        reward = self.reward_func(action)
+        done = True
+        info = {}
+
+        return self.state, reward, done, info
+
+    def reward_func(self, action):
+
+        maxima1 = -1.0
+        maxima2 = 1.0
+
+        stddev1 = 0.3
+        stddev2 = 0.1
+
+        # Reward function.
+        # Two gaussian functions.
+        modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
+        modal2 = 1. * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
 
         return modal1 + modal2
 
