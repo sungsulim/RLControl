@@ -61,7 +61,11 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
                 alpha, mean, sigma = self.hydra_network.getModalStats()
-                func1 = self.hydra_network.getQFunction(state)
+                if self.use_true_q:
+                    func1 = self.hydra_network.getTrueQFunction(state)
+                else:
+                    func1 = self.hydra_network.getQFunction(state)
+
                 func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
                 old_greedy_action, greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
@@ -145,7 +149,7 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
 
         if self.use_true_q:
-            q_val = self.hydra_network.predict_true_q(stacked_state_batch, action_batch_final_reshaped, True, self.config.env_name)
+            q_val = self.hydra_network.predict_true_q(stacked_state_batch, action_batch_final_reshaped, True)
         else:
             q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
         q_val = np.reshape(q_val, (batch_size, self.num_samples))

@@ -8,6 +8,8 @@ class ActorExpert_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorExpert_Network, self).__init__(sess, config, [config.actor_lr, config.expert_lr])
 
+        self.config = config
+
         self.rng = np.random.RandomState(config.random_seed)
 
         self.shared_layer_dim = config.shared_l1_dim
@@ -397,10 +399,8 @@ class ActorExpert_Network(BaseNetwork):
         # args  (inputs, action, phase)
         inputs = args[0]
         action = args[1]
-        phase = args[2]
-        env_name = args[3]
 
-        return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
+        return [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
 
 
     def predict_action(self, *args):
@@ -502,9 +502,7 @@ class ActorExpert_Network(BaseNetwork):
                                                                           self.phase: False})
 
     def getTrueQFunction(self, state):
-        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
-                                                                          self.action: np.expand_dims([action], 0),
-                                                                          self.phase: False})
+        return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))
 
     def getPolicyFunction(self, alpha, mean, sigma):
 
