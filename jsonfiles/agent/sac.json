@@ -16,6 +16,8 @@
 
         "reward_scale": [1, 10, 100, 1000],
 
-        "sample_for_eval": ["True", "False"]
+        "sample_for_eval": ["True", "False"],
+
+        "use_true_q": ["True"]
     }
 }

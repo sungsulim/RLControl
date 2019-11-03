@@ -501,6 +501,11 @@ class ActorExpert_Network(BaseNetwork):
                                                                           self.action: np.expand_dims([action], 0),
                                                                           self.phase: False})
 
+    def getTrueQFunction(self, state):
+        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
+                                                                          self.action: np.expand_dims([action], 0),
+                                                                          self.phase: False})
+
     def getPolicyFunction(self, alpha, mean, sigma):
 
         if self.num_modal == 2:

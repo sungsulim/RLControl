@@ -32,6 +32,12 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
             self.hydra_network.init_target_network()
 
+        self.use_true_q = False
+        if config.use_true_q == "True":
+            self.use_true_q = True
+
+        self.config = config
+
     def take_action(self, state, is_train, is_start):
 
         # Train
@@ -103,26 +109,28 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
         batch_size = np.shape(state_batch)[0]
 
         # Expert Update
-        # Perhaps do GA on the Q function
 
-        # Use original Actor
-        _, next_action_batch_init_target = self.hydra_network.predict_action(next_state_batch, True)
+        if not self.use_true_q:
+            # Perhaps do GA on the Q function
 
-        if self.hydra_network.use_better_q_gd:
-            next_action_batch_final_target = self.hydra_network.q_gradient_ascent(next_state_batch, next_action_batch_init_target, True, is_better_q_gd=True)
-        else:
-            next_action_batch_final_target = next_action_batch_init_target
+            # Use original Actor
+            _, next_action_batch_init_target = self.hydra_network.predict_action(next_state_batch, True)
 
-        # batchsize * n
-        target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
-        
-        reward_batch = np.reshape(reward_batch, (batch_size, 1))
-        gamma_batch = np.reshape(gamma_batch, (batch_size, 1))
+            if self.hydra_network.use_better_q_gd:
+                next_action_batch_final_target = self.hydra_network.q_gradient_ascent(next_state_batch, next_action_batch_init_target, True, is_better_q_gd=True)
+            else:
+                next_action_batch_final_target = next_action_batch_init_target
 
-        # compute target : y_i = r_{i+1} + \gamma * max Q'(s_{i+1}, a')
-        y_i = reward_batch + gamma_batch * target_q
+            # batchsize * n
+            target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
 
-        predicted_q_val, _ = self.hydra_network.train_expert(state_batch, action_batch, y_i)
+            reward_batch = np.reshape(reward_batch, (batch_size, 1))
+            gamma_batch = np.reshape(gamma_batch, (batch_size, 1))
+
+            # compute target : y_i = r_{i+1} + \gamma * max Q'(s_{i+1}, a')
+            y_i = reward_batch + gamma_batch * target_q
+
+            predicted_q_val, _ = self.hydra_network.train_expert(state_batch, action_batch, y_i)
 
         # Actor Update
 
@@ -136,7 +144,10 @@ class ActorExpert_Network_Manager(BaseNetwork_Manager):
 
         stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
 
-        q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
+        if self.use_true_q:
+            q_val = self.hydra_network.predict_true_q(stacked_state_batch, action_batch_final_reshaped, True, self.config.env_name)
+        else:
+            q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
         q_val = np.reshape(q_val, (batch_size, self.num_samples))
 
         # Find threshold : top (1-rho) percentile

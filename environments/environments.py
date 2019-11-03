@@ -19,11 +19,11 @@ def create_environment(env_params):
     if env_name == 'Bimodal1DEnv':
         return Bimodal1DEnvironment(env_params)
     elif env_name == 'Bimodal1DEnv_uneq_var1':
-        return Bimodal1DEnvironment_uneq_var1(env_params)
+        return Bimodal1DEnv_uneq_var1(env_params)
     elif env_name == 'Bimodal1DEnv_uneq_var2':
-        return Bimodal1DEnvironment_uneq_var2(env_params)
+        return Bimodal1DEnv_uneq_var2(env_params)
     elif env_name == 'Bimodal1DEnv_uneq_var3':
-        return Bimodal1DEnvironment_uneq_var3(env_params)
+        return Bimodal1DEnv_uneq_var3(env_params)
     elif env_name == 'Bimodal2DEnv':
         return Bimodal2DEnvironment(env_params)
     else:
@@ -218,7 +218,8 @@ class Bimodal1DEnvironment(object):
 
         return self.state, reward, done, info
 
-    def reward_func(self, action):
+    @staticmethod
+    def reward_func(action):
 
         maxima1 = -1.0
         maxima2 = 1.0
@@ -236,7 +237,7 @@ class Bimodal1DEnvironment(object):
         pass
 
 
-class Bimodal1DEnvironment_uneq_var1(object):
+class Bimodal1DEnv_uneq_var1(object):
     def __init__(self, env_params):
 
         self.name = env_params['environment']
@@ -303,7 +304,8 @@ class Bimodal1DEnvironment_uneq_var1(object):
 
         return self.state, reward, done, info
 
-    def reward_func(self, action):
+    @staticmethod
+    def reward_func(action):
 
         maxima1 = -1.0
         maxima2 = 1.0
@@ -323,7 +325,7 @@ class Bimodal1DEnvironment_uneq_var1(object):
         pass
 
 
-class Bimodal1DEnvironment_uneq_var2(object):
+class Bimodal1DEnv_uneq_var2(object):
     def __init__(self, env_params):
 
         self.name = env_params['environment']
@@ -390,7 +392,8 @@ class Bimodal1DEnvironment_uneq_var2(object):
 
         return self.state, reward, done, info
 
-    def reward_func(self, action):
+    @staticmethod
+    def reward_func(action):
 
         maxima1 = -1.0
         maxima2 = 1.0
@@ -409,7 +412,7 @@ class Bimodal1DEnvironment_uneq_var2(object):
     def close(self):
         pass
 
-class Bimodal1DEnvironment_uneq_var3(object):
+class Bimodal1DEnv_uneq_var3(object):
     def __init__(self, env_params):
 
         self.name = env_params['environment']
@@ -476,7 +479,8 @@ class Bimodal1DEnvironment_uneq_var3(object):
 
         return self.state, reward, done, info
 
-    def reward_func(self, action):
+    @staticmethod
+    def reward_func(action):
 
         maxima1 = -1.0
         maxima2 = 1.0

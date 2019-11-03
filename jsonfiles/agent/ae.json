@@ -21,6 +21,8 @@
         "use_uniform_sampling": ["False"],
         "use_better_q_gd": ["False"],
 
-        "sample_for_eval": ["False"]
+        "sample_for_eval": ["False"],
+
+        "use_true_q": ["True"]
     }
 }

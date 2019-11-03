@@ -17,6 +17,8 @@
         "reward_scale": [1, 10, 100, 1000],
         "value_n_particles": [30],
         "kernel_n_particles": [30],
-        "kernel_update_ratio": [0.5]
+        "kernel_update_ratio": [0.5],
+
+        "use_true_q": ["True"]
     }
 }
