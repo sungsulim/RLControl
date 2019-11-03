@@ -44,6 +44,7 @@ def main():
 
     # Create env_params for agent
     env_params = {
+            "env_name": train_env.name,
             "state_dim": train_env.state_dim,
             "state_min": train_env.state_min,
             "state_max": train_env.state_max,
