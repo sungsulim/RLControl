@@ -126,6 +126,19 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             # batchsize * n
             target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
 
+        elif self.critic_update == 'random_q':
+
+            # batchsize x num_samples x action_dim
+            next_action_batch = self.hydra_network.sample_uniform_action(self.batch_size)
+            next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * self.num_samples, self.action_dim))
+
+            stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
+
+            target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
+            target_q = np.reshape(target_q, (self.batch_size, self.num_samples))
+            target_q = np.max(target_q, axis=1, keepdims=True)  # find max across samples
+
+
         else:
             raise ValueError("Invalid self.critic_update config")
 

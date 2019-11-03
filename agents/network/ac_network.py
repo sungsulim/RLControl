@@ -322,6 +322,20 @@ class ActorCritic_Network(BaseNetwork):
 
         return [getattr(environments.environments, env_name).reward_func(a[0]) for a in action]
 
+    def predict_random_q_target(self, *args):
+        # args  (inputs, action, phase)
+        inputs = args[0]
+        actions = args[1]
+        phase = args[2]
+
+        random_action_samples = np.randomu
+
+        return self.sess.run(self.target_q_prediction, feed_dict={
+            self.target_inputs: inputs,
+            self.target_action: actions,
+            self.target_phase: phase
+        })
+
     # return sampled actions
     def sample_action(self, inputs, phase, is_single_sample):
 
