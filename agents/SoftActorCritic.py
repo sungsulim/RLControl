@@ -31,6 +31,10 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.network.init_target_network()
 
+        self.use_true_q = False
+        if config.use_true_q == "True":
+            self.use_true_q = True
+
     def take_action(self, state, is_train, is_start):
 
         # Train
@@ -53,7 +57,10 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
 
-                q_func = self.network.getQFunction(state)
+                if self.use_true_q:
+                    q_func = self.network.getTrueQFunction(state)
+                else:
+                    q_func = self.network.getQFunction(state)
                 pi_func = self.network.getPolicyFunction(state)
                 greedy_action = self.network.predict_action(np.expand_dims(state, 0))[0]
 

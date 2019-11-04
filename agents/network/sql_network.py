@@ -66,7 +66,7 @@ class SoftQlearningNetwork(BaseNetwork):
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
-
+        # TODO: when using trueQ, override self.q, self.q_svgd, and self.q_targ
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
 

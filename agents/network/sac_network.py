@@ -10,6 +10,10 @@ class SoftActorCriticNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(SoftActorCriticNetwork, self).__init__(sess, config, [config.pi_lr, config.qf_vf_lr])
 
+        self.use_true_q = False
+        if config.use_true_q == "True":
+            self.use_true_q = True
+
         self.rng = np.random.RandomState(config.random_seed)
 
         self.actor_l1_dim = config.actor_l1_dim
@@ -68,41 +72,61 @@ class SoftActorCriticNetwork(BaseNetwork):
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
-
         # Optimization Op
-        with tf.control_dependencies(self.batchnorm_ops):
+        if self.use_true_q:
+            with tf.control_dependencies(self.batchnorm_ops):
 
-            # Targets for Q and V regression
-            # q_backup = tf.stop_gradient(self.r_ph + self.g_ph * self.v_targ)
-            q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
+                # TODO: override self.v_targ, self.q_pi, self.q, self.v
 
-            # v_backup = tf.stop_gradient(self.q_pi - self.entropy_scale * self.logp_pi)
-            v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
+                # Targets for Q and V regression
+                q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
 
-            # Soft actor-critic losses
-            # pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
-            pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
+                v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
 
-            q_loss = 0.5 * tf.reduce_mean((q_backup - self.q) ** 2)
+                # Soft actor-critic losses
+                pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
 
-            v_loss = 0.5 * tf.reduce_mean((v_backup - self.v) ** 2)
-            value_loss = q_loss + v_loss
+                # Policy train op
+                # (has to be separate from value train op, because q1_pi appears in pi_loss)
+                pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[0])
+                train_pi_op = pi_optimizer.minimize(pi_loss, var_list=self.get_vars('main/pi'))
 
-            # Policy train op
-            # (has to be separate from value train op, because q1_pi appears in pi_loss)
-            pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[0])
-            train_pi_op = pi_optimizer.minimize(pi_loss, var_list=self.get_vars('main/pi'))
+                self.train_ops = [pi_loss, self.logp_pi, train_pi_op]
+        else:
 
-            # Value train op
-            # (control dep of train_pi_op because sess.run otherwise evaluates in nondeterministic order)
-            value_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[1])
-            value_params = self.get_vars('main/qf') + self.get_vars('main/vf')
+            with tf.control_dependencies(self.batchnorm_ops):
 
-            with tf.control_dependencies([train_pi_op]):
-                train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
+                # Targets for Q and V regression
+                # q_backup = tf.stop_gradient(self.r_ph + self.g_ph * self.v_targ)
+                q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
 
-            self.train_ops = [pi_loss, q_loss, v_loss, self.q, self.v, self.logp_pi,
-                        train_pi_op, train_value_op]
+                # v_backup = tf.stop_gradient(self.q_pi - self.entropy_scale * self.logp_pi)
+                v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
+
+                # Soft actor-critic losses
+                # pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
+                pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
+
+                q_loss = 0.5 * tf.reduce_mean((q_backup - self.q) ** 2)
+
+                v_loss = 0.5 * tf.reduce_mean((v_backup - self.v) ** 2)
+                value_loss = q_loss + v_loss
+
+                # Policy train op
+                # (has to be separate from value train op, because q1_pi appears in pi_loss)
+                pi_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[0])
+                train_pi_op = pi_optimizer.minimize(pi_loss, var_list=self.get_vars('main/pi'))
+
+                # Value train op
+                # (control dep of train_pi_op because sess.run otherwise evaluates in nondeterministic order)
+                value_optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate[1])
+                value_params = self.get_vars('main/qf') + self.get_vars('main/vf')
+
+                with tf.control_dependencies([train_pi_op]):
+                    train_value_op = value_optimizer.minimize(value_loss, var_list=value_params)
+
+                self.train_ops = [pi_loss, q_loss, v_loss, self.q, self.v, self.logp_pi,
+                            train_pi_op, train_value_op]
 
     def get_vars(self, scope):
         return [x for x in tf.global_variables() if scope in x.name]
