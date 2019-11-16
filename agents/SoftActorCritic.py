@@ -58,7 +58,8 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.write_plot:
 
                 if self.use_true_q:
-                    q_func = self.network.getTrueQFunction(state)
+                    # q_func = self.network.getTrueQFunction(state)
+                    raise NotImplementedError
                 else:
                     q_func = self.network.getQFunction(state)
                 pi_func = self.network.getPolicyFunction(state)

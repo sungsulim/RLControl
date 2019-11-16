@@ -1,0 +1,9 @@
+{
+    "environment": "Bimodal1DEnv_eq_var3",
+
+    "TotalMilSteps": 0.00075,
+    "EpisodeSteps": 1,
+
+    "EvalIntervalMilSteps": 0.000005,
+    "EvalEpisodes": 10
+}
