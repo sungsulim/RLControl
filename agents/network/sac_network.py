@@ -10,6 +10,8 @@ class SoftActorCriticNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(SoftActorCriticNetwork, self).__init__(sess, config, [config.pi_lr, config.qf_vf_lr])
 
+        self.config = config
+
         self.use_true_q = False
         if config.use_true_q == "True":
             self.use_true_q = True
@@ -48,6 +50,9 @@ class SoftActorCriticNetwork(BaseNetwork):
         self.r_ph = tf.placeholder(tf.float32, shape=(None, 1))
         self.g_ph = tf.placeholder(tf.float32, shape=(None, 1))
 
+        # for self.use_true_q
+        self.true_q_pi_ph = tf.placeholder(tf.float32, shape=(None, 1))
+
         self.phase_ph = tf.placeholder(tf.bool)
 
         with tf.variable_scope('main'):
@@ -77,14 +82,8 @@ class SoftActorCriticNetwork(BaseNetwork):
             with tf.control_dependencies(self.batchnorm_ops):
 
                 # TODO: override self.v_targ, self.q_pi, self.q, self.v
-
-                # Targets for Q and V regression
-                q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
-
-                v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
-
                 # Soft actor-critic losses
-                pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
+                pi_loss = tf.reduce_mean(self.logp_pi - self.true_q_pi_ph)
 
                 # Policy train op
                 # (has to be separate from value train op, because q1_pi appears in pi_loss)
@@ -152,6 +151,66 @@ class SoftActorCriticNetwork(BaseNetwork):
             vf = self.vf_network(state_ph, phase_ph)
 
         return mu, pi, logp_pi, std, qf_a, qf_pi, vf
+
+    def qf_network(self, state_ph, action_ph, phase_ph):
+        if self.norm_type != 'none':
+            inputs = tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
+
+        q_net = tf.contrib.layers.fully_connected(inputs, self.critic_l1_dim, activation_fn=None,
+                                                       weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                           factor=1.0, mode="FAN_IN", uniform=True),
+                                                       weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                       biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                           factor=1.0, mode="FAN_IN", uniform=True))
+
+        q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=1)
+
+        # Q branch
+        q_net = tf.contrib.layers.fully_connected(tf.concat([q_net, action_ph], 1), self.critic_l2_dim,
+                                                  activation_fn=None,
+                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True),
+                                                  # tf.truncated_normal_initializer(), \
+                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True))
+
+        q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=3)
+        q_val = tf.contrib.layers.fully_connected(q_net, 1, activation_fn=None,
+                                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
+                                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
+
+        return q_val
+
+    def vf_network(self, state_ph, phase_ph):
+        if self.norm_type != 'none':
+            inputs = tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
+
+        v_net = tf.contrib.layers.fully_connected(inputs, self.critic_l1_dim, activation_fn=None,
+                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True),
+                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True))
+        v_net = self.apply_norm(v_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=1)
+
+        v_net = tf.contrib.layers.fully_connected(v_net, self.critic_l2_dim,
+                                                  activation_fn=None,
+                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True),
+                                                  # tf.truncated_normal_initializer(), \
+                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
+                                                      factor=1.0, mode="FAN_IN", uniform=True))
+        v_net = self.apply_norm(v_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=3)
+
+        v_val = tf.contrib.layers.fully_connected(v_net, 1, activation_fn=None,
+                                                  weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
+                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
+                                                  biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
+
+        return v_val
 
     def policy_network(self, state_ph, phase_ph):
 
@@ -226,66 +285,6 @@ class SoftActorCriticNetwork(BaseNetwork):
 
         return x + tf.stop_gradient((u - x) * clip_up + (l - x) * clip_low)
 
-    def qf_network(self, state_ph, action_ph, phase_ph):
-        if self.norm_type != 'none':
-            inputs = tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
-
-        q_net = tf.contrib.layers.fully_connected(inputs, self.critic_l1_dim, activation_fn=None,
-                                                       weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                           factor=1.0, mode="FAN_IN", uniform=True),
-                                                       weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                       biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                           factor=1.0, mode="FAN_IN", uniform=True))
-
-        q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=1)
-
-        # Q branch
-        q_net = tf.contrib.layers.fully_connected(tf.concat([q_net, action_ph], 1), self.critic_l2_dim,
-                                                  activation_fn=None,
-                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True),
-                                                  # tf.truncated_normal_initializer(), \
-                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True))
-
-        q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=3)
-        q_val = tf.contrib.layers.fully_connected(q_net, 1, activation_fn=None,
-                                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
-                                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return q_val
-
-    def vf_network(self, state_ph, phase_ph):
-        if self.norm_type != 'none':
-            inputs = tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
-
-        v_net = tf.contrib.layers.fully_connected(inputs, self.critic_l1_dim, activation_fn=None,
-                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True),
-                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True))
-        v_net = self.apply_norm(v_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=1)
-
-        v_net = tf.contrib.layers.fully_connected(v_net, self.critic_l2_dim,
-                                                  activation_fn=None,
-                                                  weights_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True),
-                                                  # tf.truncated_normal_initializer(), \
-                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                  biases_initializer=tf.contrib.layers.variance_scaling_initializer(
-                                                      factor=1.0, mode="FAN_IN", uniform=True))
-        v_net = self.apply_norm(v_net, activation_fn=tf.nn.relu, phase=phase_ph, layer_num=3)
-
-        v_val = tf.contrib.layers.fully_connected(v_net, 1, activation_fn=None,
-                                                  weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
-                                                  weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                  biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return v_val
-
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
         batch_size = np.shape(state_batch)[0]
@@ -299,6 +298,24 @@ class SoftActorCriticNetwork(BaseNetwork):
             self.x2_ph: next_state_batch,
             self.r_ph: reward_batch,
             self.g_ph: gamma_batch
+        })
+
+    def update_network_true_q(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
+
+        # batch_size = np.shape(state_batch)[0]
+
+        # reward_batch = np.reshape(reward_batch, (batch_size, 1))
+        # gamma_batch = np.reshape(gamma_batch, (batch_size, 1))
+
+        true_q_pi_batch = np.expand_dims(self.predict_true_q(state_batch, action_batch), 1)
+
+        return self.sess.run(self.train_ops, feed_dict={
+            self.x_ph: state_batch,
+            self.a_ph: action_batch,
+            # self.x2_ph: next_state_batch,
+            # self.r_ph: reward_batch,
+            # self.g_ph: gamma_batch
+            self.true_q_pi_ph: true_q_pi_batch
         })
 
     def predict_action(self, state):
@@ -317,6 +334,14 @@ class SoftActorCriticNetwork(BaseNetwork):
                 self.phase_ph: True
             })
         return pi
+
+    def predict_true_q(self, *args):
+        # args  (inputs, action, phase)
+        inputs = args[0]
+        action = args[1]
+
+        return [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
+
 
     def init_target_network(self):
         self.sess.run(self.init_target_net_params)
@@ -339,3 +364,5 @@ class SoftActorCriticNetwork(BaseNetwork):
         })
         return lambda action: 1/(std * np.sqrt(2 * np.pi)) * np.exp(- (action - mean)**2 / (2 * std**2))
 
+    def getTrueQFunction(self, state):
+        return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))

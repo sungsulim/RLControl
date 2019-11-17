@@ -58,8 +58,8 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.write_plot:
 
                 if self.use_true_q:
-                    # q_func = self.network.getTrueQFunction(state)
-                    raise NotImplementedError
+                    q_func = self.network.getTrueQFunction(state)
+                    # raise NotImplementedError
                 else:
                     q_func = self.network.getQFunction(state)
                 pi_func = self.network.getPolicyFunction(state)
@@ -93,14 +93,17 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
-        # Policy Update, Qf and Vf Update
-        outs = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+        if self.use_true_q:
+            outs = self.network.update_network_true_q(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+        else:
+            # Policy Update, Qf and Vf Update
+            outs = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
 
-        # self.logger.store(LossPi=outs[0], LossQ=outs[1], LossV=outs[2], QVals=outs[3],
-        #              VVals=outs[4], LogPi=outs[5])
+            # self.logger.store(LossPi=outs[0], LossQ=outs[1], LossV=outs[2], QVals=outs[3],
+            #              VVals=outs[4], LogPi=outs[5])
 
-        # Update target networks
-        self.network.update_target_network()
+            # Update target networks
+            self.network.update_target_network()
 
 
 class SoftActorCritic(BaseAgent):
