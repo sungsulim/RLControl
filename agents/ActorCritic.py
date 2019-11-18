@@ -35,6 +35,12 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.hydra_network.init_target_network()
 
+        self.use_true_q = False
+        if config.use_true_q == "True":
+            self.use_true_q = True
+
+        self.config = config
+
     def take_action(self, state, is_train, is_start):
 
         greedy_action = self.hydra_network.predict_action(np.expand_dims(state, 0), False)
@@ -67,7 +73,10 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             if self.write_plot:
                 alpha, mean, sigma = self.hydra_network.getModalStats()
-                func1 = self.hydra_network.getQFunction(state)
+                if self.use_true_q:
+                    func1 = self.hydra_network.getTrueQFunction(state)
+                else:
+                    func1 = self.hydra_network.getQFunction(state)
                 func2 = self.hydra_network.getPolicyFunction(alpha, mean, sigma)
 
                 utils.plot_utils.plotFunction("ActorCritic", [func1, func2], state, [greedy_action, mean], chosen_action,
@@ -101,58 +110,58 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
         # Modified Actor-Critic
 
-        if self.critic_update == "sampled":
-            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=True)
-            next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * 1, self.action_dim))
+        if not self.use_true_q:
+            if self.critic_update == "sampled":
+                next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=True)
+                next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * 1, self.action_dim))
 
-            # batchsize * n
-            target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_reshaped, True)
+                # batchsize * n
+                target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_reshaped, True)
 
-        elif self.critic_update == "expected":
-            next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=False)
-            next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * self.num_samples, self.action_dim))
+            elif self.critic_update == "expected":
+                next_action_batch = self.hydra_network.sample_action(next_state_batch, True, is_single_sample=False)
+                next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * self.num_samples, self.action_dim))
 
-            stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
+                stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
 
-            # batchsize * n
-            target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
-            target_q = np.reshape(target_q, (self.batch_size, self.num_samples))
-            target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
+                # batchsize * n
+                target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
+                target_q = np.reshape(target_q, (self.batch_size, self.num_samples))
+                target_q = np.mean(target_q, axis=1, keepdims=True)  # average across samples
 
-        elif self.critic_update == "mean":
-            # Use original Actor
-            next_action_batch_final_target = self.hydra_network.predict_action(next_state_batch, True)
+            elif self.critic_update == "mean":
+                # Use original Actor
+                next_action_batch_final_target = self.hydra_network.predict_action(next_state_batch, True)
 
-            # batchsize * n
-            target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
+                # batchsize * n
+                target_q = self.hydra_network.predict_q_target(next_state_batch, next_action_batch_final_target, True)
 
-        elif self.critic_update == 'random_q':
+            elif self.critic_update == 'random_q':
 
-            # batchsize x num_samples x action_dim
-            next_action_batch = self.hydra_network.sample_uniform_action(self.batch_size)
-            next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * self.num_samples, self.action_dim))
+                # batchsize x num_samples x action_dim
+                next_action_batch = self.hydra_network.sample_uniform_action(self.batch_size)
+                next_action_batch_reshaped = np.reshape(next_action_batch, (self.batch_size * self.num_samples, self.action_dim))
 
-            stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
+                stacked_next_state_batch = np.repeat(next_state_batch, self.num_samples, axis=0)
 
-            target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
-            target_q = np.reshape(target_q, (self.batch_size, self.num_samples))
-            target_q = np.max(target_q, axis=1, keepdims=True)  # find max across samples
+                target_q = self.hydra_network.predict_q_target(stacked_next_state_batch, next_action_batch_reshaped, True)
+                target_q = np.reshape(target_q, (self.batch_size, self.num_samples))
+                target_q = np.max(target_q, axis=1, keepdims=True)  # find max across samples
 
+            else:
+                raise ValueError("Invalid self.critic_update config")
 
-        else:
-            raise ValueError("Invalid self.critic_update config")
+            reward_batch = np.reshape(reward_batch, (self.batch_size, 1))
+            gamma_batch = np.reshape(gamma_batch, (self.batch_size, 1))
 
+            # compute target : y_i = r_{i+1} + \gamma * max Q'(s_{i+1}, a')
+            y_i = reward_batch + gamma_batch * target_q
 
-        reward_batch = np.reshape(reward_batch, (self.batch_size, 1))
-        gamma_batch = np.reshape(gamma_batch, (self.batch_size, 1))
-
-        # compute target : y_i = r_{i+1} + \gamma * max Q'(s_{i+1}, a')
-        y_i = reward_batch + gamma_batch * target_q
-
-        predicted_q_val, _ = self.hydra_network.train_critic(state_batch, action_batch, y_i)
-        stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
+            predicted_q_val, _ = self.hydra_network.train_critic(state_batch, action_batch, y_i)
 
         # Actor Update
+        stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
+
         # LogLikelihood update
         if self.actor_update == "ll":
             # for each transition, sample again?
@@ -166,8 +175,10 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             action_batch_new_reshaped = np.reshape(action_batch_new,
                                                    (self.batch_size * self.num_samples, self.action_dim))
 
-            q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, action_batch_new_reshaped,
-                                                                True)
+            if self.use_true_q:
+                q_val_batch_reshaped = self.hydra_network.predict_true_q(stacked_state_batch, action_batch_new_reshaped, True)
+            else:
+                q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, action_batch_new_reshaped, True)
             q_val_batch = np.reshape(q_val_batch_reshaped, (self.batch_size, self.num_samples))
             q_val_picked = np.array([[b[0]] for b in q_val_batch])
             q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
@@ -182,7 +193,11 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             action_batch_final = action_batch_init
             action_batch_final_reshaped = np.reshape(action_batch_final, (self.batch_size * self.num_samples, self.action_dim))
 
-            q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
+            if self.use_true_q:
+                q_val = self.hydra_network.predict_true_q(stacked_state_batch, action_batch_final_reshaped, True)
+            else:
+                q_val = self.hydra_network.predict_q(stacked_state_batch, action_batch_final_reshaped, True)
+
             q_val = np.reshape(q_val, (self.batch_size, self.num_samples))
 
             # Find threshold : top (1-rho) percentile
