@@ -14,8 +14,8 @@
         "expert_lr": [0],
 
 
-        "rho": [0.2],
-        "num_samples": [30],
+        "rho": [0.05],
+        "num_samples": [120],
         "num_modal": [1, 2],
 
         "use_uniform_sampling": ["False"],
@@ -23,6 +23,6 @@
 
         "sample_for_eval": ["False"],
 
-        "use_true_q": ["True"]
+        "use_true_q": ["False"]
     }
 }
