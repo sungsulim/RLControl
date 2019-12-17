@@ -77,8 +77,10 @@ def minimize_qp(p, xs, q_means, q_stds):
 def main():
     # configuration
     distance_min = 0
-    distance_max = 4
+    distance_max = 1.5
     num_points = 5
+
+    save_file = False
 
     p_mixture_probs = np.array([0.5, 0.5])
     p_stds = np.array([0.2, 0.2])
@@ -86,8 +88,8 @@ def main():
 
     # Exhaustive search
     num_q_means = 100
-    q_stds_min = 0.37
-    q_stds_max = 5
+    q_stds_min = 0.5 # 0.001 # 001
+    q_stds_max = 7
     num_q_stds = 100
 
     p = [None] * num_points
@@ -95,6 +97,8 @@ def main():
     kl_best_forward = [None] * num_points
     q_best_reverse = [None] * num_points
     kl_best_reverse = [None] * num_points
+
+    trapz_xs_arr = [None] * num_points
 
     for idx, dist in enumerate(distance_list):
 
@@ -115,6 +119,8 @@ def main():
         num_trapz_points = 1000
         trapz_xs = np.linspace(trapz_xs_min, trapz_xs_max, num_trapz_points)
 
+        trapz_xs_arr[idx] = trapz_xs
+
         q_best_forward[idx], kl_best_forward[idx] = minimize_pq(
             p[idx], trapz_xs, q_means, q_stds
         )
@@ -123,29 +129,46 @@ def main():
         )
 
     # plotting
-    fig, axs = plt.subplots(nrows=1, ncols=num_p_second_means, sharex=True, sharey=True)
+    fig, axs = plt.subplots(nrows=1, ncols=num_points, sharex=True, sharey=True)
     # fig.set_size_inches(8, 1.5)
+    # plt.figure(figsize=(20, 6))
+
     for idx, dist in enumerate(distance_list):
-        xs_min = -1
-        xs_max = 4
+        xs_min = -distance_max/2 - 1
+        xs_max = distance_max/2 + 1
         num_plot_points = 1000
         xs = np.linspace(xs_min, xs_max, num_plot_points)
         axs[idx].plot(xs, p[idx].pdf(xs), label='$p$', color='black')
         axs[idx].plot(xs, q_best_forward[idx].pdf(xs), label='$\mathrm{argmin}_q \,\mathrm{KL}(p || q)$', color='black', linestyle='dashed')
-        axs[idx].plot(xs, q_best_reverse[idx].pdf(xs), label='$\mathrm{argmin}_q \,\mathrm{KL}(q || p)$', color='black', linestyle='dotted')
+        axs[idx].plot(xs, q_best_reverse[idx].pdf(xs), label='$\mathrm{argmin}_q \,\mathrm{KL}(q || p)$', color='blue', linestyle='dotted')
+
+        # log info
+        print("*** mode at : {}, \nkl(p||q): mean {}, std {}, kl_val {},"
+              "\nkl(q||p): mean {}, std {}, kl_val {}".format([-dist/2, dist/2], q_best_forward[idx].means, q_best_forward[idx].stds, kl_best_forward[idx], q_best_reverse[idx].means, q_best_reverse[idx].stds, kl_best_reverse[idx]))
+
+        optimal_mean = dist/2
+        optimal_std = q_stds_min
+        optimal_q = GaussianMixture1D(np.array([1]), np.array([optimal_mean]), np.array([optimal_std]))
+        # optimal_kl_forward_val = approx_kl(p[idx], optimal_q, trapz_xs_arr[idx])
+        optimal_kl_reverse_val = approx_kl(optimal_q, p[idx], trapz_xs_arr[idx])
+
+        # print('optimal kl(p||q): mean {}, std {}, kl_val {}'.format(optimal_mean, optimal_std, optimal_kl_forward_val))
+        print('optimal kl(q||p): mean {}, std {}, kl_val {}\n'.format(optimal_mean, optimal_std, optimal_kl_reverse_val))
 
         axs[idx].spines['right'].set_visible(False)
         axs[idx].spines['top'].set_visible(False)
         # axs[idx].set_yticks([])
         # axs[idx].set_xticks([])
 
-        axs[idx].set_title('mean: [0, {}]'.format(p_second_mean))
+        axs[idx].set_title('[{}, {}]'.format(-dist/2, dist/2))
 
-    axs[2].legend(ncol=3, loc='upper center', bbox_to_anchor=(0.5, 0), fontsize='small')
+    axs[2].legend(ncol=3, loc='upper center', bbox_to_anchor=(0.5, -0.05), fontsize='small')
     filenames = ['reverse_forward_kl.pdf', 'reverse_forward_kl.png']
-    for filename in filenames:
-        fig.savefig(filename, bbox_inches='tight', dpi=200)
-        print('Saved to {}'.format(filename))
+
+    if save_file:
+        for filename in filenames:
+            fig.savefig(filename, dpi=200)
+            print('Saved to {}'.format(filename))
 
     plt.show()
 

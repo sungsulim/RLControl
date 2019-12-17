@@ -259,8 +259,8 @@ class SoftActorCriticNetwork(BaseNetwork):
                                                                     biases_initializer=tf.random_uniform_initializer(
                                                                         -3e-3, 3e-3))
 
-        # log_std = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (log_std + 1)
-        log_std = tf.scalar_mul(1.0, log_std)
+        log_std = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (log_std + 1)
+        # log_std = tf.scalar_mul(1.0, log_std)
         std = tf.exp(log_std)
         pi = mu + tf.random_normal(tf.shape(mu)) * std
         logp_pi = self.gaussian_likelihood(pi, mu, log_std)
