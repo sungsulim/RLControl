@@ -24,7 +24,10 @@ class ActorExpert_Network(BaseNetwork):
         self.num_modal = config.num_modal
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
-        self.sigma_scale = 1.0  # config.sigma_scale
+        # set sigma bound
+        # self.sigma_scale = 1.0  # config.sigma_scale
+        self.LOG_STD_MIN = -20
+        self.LOG_STD_MAX = 2
 
         self.use_uniform_sampling = False
         if config.use_uniform_sampling == "True":
@@ -37,6 +40,7 @@ class ActorExpert_Network(BaseNetwork):
             self.better_q_gd_alpha = 1e-2  # config.better_q_gd_alpha
             self.better_q_gd_max_steps = 10  # config.better_q_gd_max_steps
             self.better_q_gd_stop = 1e-3  # config.better_q_gd_stop
+
 
         # Removed from config
         # "better_q_gd_alpha": [1e-2],
@@ -193,7 +197,9 @@ class ActorExpert_Network(BaseNetwork):
         action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
 
         # exp. sigma
-        action_prediction_sigma = tf.exp(tf.scalar_mul(self.sigma_scale, action_prediction_sigma))
+        # action_prediction_sigma = tf.exp(tf.scalar_mul(self.sigma_scale, action_prediction_sigma))
+        log_std = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (action_prediction_sigma + 1)
+        action_prediction_sigma = tf.exp(log_std)
 
         # mean: [None, num_modal, action_dim]  : [None, 1]
         # sigma: [None, num_modal, action_dim] : [None, 1]
