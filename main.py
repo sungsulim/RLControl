@@ -11,6 +11,7 @@ import datetime
 from collections import OrderedDict
 
 import argparse
+import subprocess
 
 
 def main():
@@ -131,6 +132,12 @@ def main():
     name = prefix + '_agent_' + 'Params.txt'
 
     params.tofile(name, sep=',', format='%s')
+
+    # generate video and delete figures
+    if args.write_plot:
+        subprocess.run(["ffmpeg", "-framerate", "24", "-i", "{}/figures/steps_%01d.png".format(log_dir), "{}.mp4".format(log_dir)])
+        # subprocess.run(["mv", "{}.mp4".format(log_dir), "{}/../".format(log_dir)])
+        subprocess.run(["rm", "-rf", "{}/figures".format(log_dir)])
 
 
 if __name__ == '__main__':

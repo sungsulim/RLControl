@@ -253,7 +253,8 @@ class SoftActorCriticNetwork(BaseNetwork):
         # tanh activation
         log_std = tf.contrib.layers.fully_connected(action_net, 1 * self.action_dim,
                                                                     activation_fn=tf.tanh,
-                                                                    weights_initializer=tf.random_uniform_initializer(-3e-3,3e-3),
+                                                                    # weights_initializer=tf.random_uniform_initializer(-3e-3,3e-3),
+                                                                    weights_initializer=tf.random_uniform_initializer(0, 1),
                                                                     weights_regularizer=None,
                                                                     # tf.contrib.layers.l2_regularizer(0.001),
                                                                     biases_initializer=tf.random_uniform_initializer(
