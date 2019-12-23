@@ -19,7 +19,7 @@
         "num_samples": [30],
         "num_modal": [2],
 
-        "sample_for_eval": ["True"],
+        "sample_for_eval": ["False"],
 	    "equal_modal_selection": ["False"]
     }
 }

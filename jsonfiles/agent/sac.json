@@ -18,6 +18,6 @@
 
         "sample_for_eval": ["False"],
 
-        "use_true_q": ["False", "True"]
+        "use_true_q": ["False"]
     }
 }

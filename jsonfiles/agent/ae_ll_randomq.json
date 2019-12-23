@@ -2,7 +2,7 @@
     "agent": "ActorCritic",
     "sweeps": {
         "critic_update": ["random_q"],
-        "actor_update": ["ll"],
+        "actor_update": ["ll", "cem"],
 
         "norm_type": ["input_norm"],
 
@@ -12,15 +12,15 @@
         "actor_l2_dim": [200],
         "critic_l2_dim": [200],
 
-        "actor_lr": [1e-3, 1e-4, 1e-5],
-        "critic_lr": [1e-2, 1e-3, 1e-4],
+        "actor_lr": [0.01, 0.001, 0.0001, 0.00001],
+        "critic_lr": [1, 0.1, 0.01, 0.001],
 
-        "rho": [0.2],
-        "num_samples": [30],
-        "num_modal": [1, 2],
+        "rho": [0.05],
+        "num_samples": [120],
+        "num_modal": [1],
 
         "sample_for_eval": ["False"],
 	    "equal_modal_selection": ["False"],
-        "use_true_q": ["True"]
+        "use_true_q": ["False"]
     }
 }
