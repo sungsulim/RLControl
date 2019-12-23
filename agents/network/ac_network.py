@@ -62,7 +62,11 @@ class ActorCritic_Network(BaseNetwork):
 
         self.q_target = tf.placeholder(tf.float32, [None, 1])
         self.q_val = tf.placeholder(tf.float32, [None, 1])
+        self.entropy = tf.placeholder(tf.float32, [None, 1])
         self.actions = tf.placeholder(tf.float32, [None, self.action_dim])
+
+        self.get_tf_ll = self.compute_ll(self.action_prediction_alpha, self.action_prediction_sigma,
+                                                self.action_prediction_mean, self.actions)
 
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
@@ -74,7 +78,7 @@ class ActorCritic_Network(BaseNetwork):
             # Actor update
             # Loglikelihood
             self.actor_loss_ll = self.get_lossfunc_ll(self.action_prediction_alpha, self.action_prediction_sigma,
-                                                self.action_prediction_mean, self.actions, self.q_val)
+                                                self.action_prediction_mean, self.actions, self.q_val, self.entropy)
             self.actor_optimize_ll = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_ll)
 
             # CEM
@@ -221,7 +225,7 @@ class ActorCritic_Network(BaseNetwork):
 
         return alpha, mean, sigma, action, result
 
-    def get_lossfunc_ll(self, alpha, sigma, mu, y, q_val):
+    def get_lossfunc_ll(self, alpha, sigma, mu, y, q_val, entropy):
         # alpha: batch x num_modal x 1
         # sigma: batch x num_modal x action_dim
         # mu: batch x num_modal x action_dim
@@ -237,8 +241,8 @@ class ActorCritic_Network(BaseNetwork):
             result = tf.multiply(result, tf.squeeze(alpha, axis=2))
 
         result = tf.reduce_sum(result, 1, keepdims=True)
-        result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
-        result = tf.multiply(result, q_val)
+        neg_ll = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
+        result = tf.multiply(neg_ll, tf.multiply(q_val, entropy))
 
         return tf.reduce_mean(result)
 
@@ -259,6 +263,11 @@ class ActorCritic_Network(BaseNetwork):
         result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
 
         return tf.reduce_mean(result)
+
+    def get_loglikelihood(self, state_batch, action_batch):
+
+
+        raise NotImplementedError
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
 
@@ -284,6 +293,7 @@ class ActorCritic_Network(BaseNetwork):
             self.inputs: args[0],
             self.actions: args[1],
             self.q_val: args[2],
+            self.entropy: args[3],
             self.phase: True
         })
 

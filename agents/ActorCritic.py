@@ -39,6 +39,11 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         if config.use_true_q == "True":
             self.use_true_q = True
 
+        self.add_entropy = False
+        if config.add_entropy == "True":
+            self.add_entropy = True
+            self.entropy_scale = config.entropy_scale
+
         self.config = config
 
     def take_action(self, state, is_train, is_start):
@@ -183,7 +188,12 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             q_val_picked = np.array([[b[0]] for b in q_val_batch])
             q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
 
-            self.hydra_network.train_actor_ll(state_batch, action_batch_new_picked, q_val_picked - q_val_mean)
+            if self.add_entropy:
+                entropy_batch = self.hydra_network.get_loglikelihood(state_batch, action_batch_new_picked)
+            else:
+                entropy_batch = np.zeros((self.batch_size,1))
+
+            self.hydra_network.train_actor_ll(state_batch, action_batch_new_picked, q_val_picked - q_val_mean, self.entropy_scale * entropy_batch)
 
         # CEM update
         elif self.actor_update == "cem":

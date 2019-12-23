@@ -21,6 +21,9 @@
 
         "sample_for_eval": ["False"],
 	    "equal_modal_selection": ["False"],
-        "use_true_q": ["False"]
+        "use_true_q": ["False"],
+
+        "add_entropy": ["True"],
+        "entropy_scale": [1, 0.1, 0.01, 0.001]
     }
 }
