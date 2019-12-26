@@ -40,9 +40,9 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             self.use_true_q = True
 
         self.add_entropy = False
+        self.entropy_scale = config.entropy_scale
         if config.add_entropy == "True":
             self.add_entropy = True
-            self.entropy_scale = config.entropy_scale
 
         self.config = config
 
@@ -210,8 +210,16 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             q_val = np.reshape(q_val, (self.batch_size, self.num_samples))
 
+            if self.add_entropy:
+
+                # shape: (batch_size, num_samples, action_dim)
+                entropy_batch = self.hydra_network.get_loglikelihood(state_batch, action_batch_final)
+                entropy_batch = np.squeeze(entropy_batch, axis=2)
+            else:
+                entropy_batch = np.zeros((self.batch_size, self.num_samples))
+
             # Find threshold : top (1-rho) percentile
-            selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val))
+            selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val - entropy_batch))
 
             action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
 

@@ -2,6 +2,7 @@ import tensorflow as tf
 from agents.network.base_network import BaseNetwork
 import numpy as np
 import environments.environments
+import scipy.stats
 
 
 class ActorCritic_Network(BaseNetwork):
@@ -65,8 +66,8 @@ class ActorCritic_Network(BaseNetwork):
         self.entropy = tf.placeholder(tf.float32, [None, 1])
         self.actions = tf.placeholder(tf.float32, [None, self.action_dim])
 
-        self.get_tf_ll = self.compute_ll(self.action_prediction_alpha, self.action_prediction_sigma,
-                                                self.action_prediction_mean, self.actions)
+        # self.get_tf_ll = self.compute_ll(self.action_prediction_alpha, self.action_prediction_sigma,
+                                                # self.action_prediction_mean, self.actions)
 
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
@@ -141,8 +142,7 @@ class ActorCritic_Network(BaseNetwork):
 
         action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim,
                                                                     activation_fn=tf.tanh,
-                                                                    weights_initializer=tf.random_uniform_initializer(0,
-                                                                                                                      3e-3),
+                                                                    weights_initializer=tf.random_uniform_initializer(0,1),
                                                                     weights_regularizer=None,
                                                                     # tf.contrib.layers.l2_regularizer(0.001),
                                                                     biases_initializer=tf.random_uniform_initializer(
@@ -242,7 +242,7 @@ class ActorCritic_Network(BaseNetwork):
 
         result = tf.reduce_sum(result, 1, keepdims=True)
         neg_ll = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
-        result = tf.multiply(neg_ll, tf.multiply(q_val, entropy))
+        result = tf.multiply(neg_ll, tf.add(q_val, -entropy))
 
         return tf.reduce_mean(result)
 
@@ -266,8 +266,22 @@ class ActorCritic_Network(BaseNetwork):
 
     def get_loglikelihood(self, state_batch, action_batch):
 
+        alpha_batch, mean_batch, sigma_batch = self.sess.run(
+            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
+                self.inputs: state_batch,
+                self.phase: True
+            })
 
-        raise NotImplementedError
+        # Assuming it's unimodal
+        assert(np.shape(alpha_batch)[1] == 1)
+        mean_batch = np.squeeze(mean_batch, axis=2)
+        sigma_batch = np.squeeze(sigma_batch, axis=2)
+
+        # shape: (batch_size, 1)
+        norm_pdf = [scipy.stats.norm(mean, sigma).pdf(action) for mean, sigma, action in zip(mean_batch, sigma_batch, action_batch)]
+
+        return np.array(norm_pdf)
+
 
     def policy_action_gradients(self, alpha, mean, sigma, action):
 
