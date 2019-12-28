@@ -219,7 +219,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
                 entropy_batch = np.zeros((self.batch_size, self.num_samples))
 
             # Find threshold : top (1-rho) percentile
-            selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val - entropy_batch))
+            selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val - self.entropy_scale * entropy_batch))
 
             action_list = [actions[idxs] for actions, idxs in zip(action_batch_final, selected_idxs)]
 

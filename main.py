@@ -130,8 +130,12 @@ def main():
     params = np.array(params)
     # name = prefix + params_names + 'Params.txt'
     name = prefix + '_agent_' + 'Params.txt'
-
     params.tofile(name, sep=',', format='%s')
+
+    # save json file as well
+    # Bimodal1DEnv_uneq_var1_ActorCritic_agent_Params
+    with open('{}{}_{}_agent_Params.json'.format(save_dir, env_json['environment'], agent_json['agent']), 'w') as json_save_file:
+        json.dump(agent_json, json_save_file)
 
     # generate video and delete figures
     if args.write_plot:
