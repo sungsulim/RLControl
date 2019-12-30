@@ -1,4 +1,7 @@
+# import matplotlib
+# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+
 import numpy as np
 import glob
 import sys
@@ -23,15 +26,20 @@ import json
 ######################
 
 
-
-
 ### CONFIG BEFORE RUNNING ###
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
+eval_last_N = True
+last_N = 50
 
-selected_idx =  []
-selected_type = selected_idx[:]
+selected_idx = [] # range(0 ,392, 1) # range(392,784, 1) # range(49,98,1) # #
+selected_type = selected_idx[:] # ['ae_sep bimodal', 'ae_sep unimodal', 'ae_sep bimodal w uniform', 'ae_sep unimodal w uniform'] #
+
+
+cutoff= 16
+# ['mean, mean', 'ga, mean', 'mean, ga', 'ga, ga']#
+# ['Q-learning: x, Evaluation: x', 'Q-learning: o, Evaluation: x', 'Q-learning: x, Evaluation: o', 'Q-learning: o, Evaluation: o']
 
 
 truncate_train_ep = 2000
@@ -44,6 +52,30 @@ def get_xyrange(envname):
     xmax = None
 
     if envname == 'Bimodal1DEnv':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_uneq_var1':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_uneq_var2':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_uneq_var3':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_eq_var1':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_eq_var2':
+        ymin = [-0.5, -0.5]
+        ymax = [2.0, 2.0]
+
+    elif envname == 'Bimodal1DEnv_eq_var3':
         ymin = [-0.5, -0.5]
         ymax = [2.0, 2.0]
 
@@ -222,7 +254,7 @@ if __name__ == "__main__":
             elif envname == 'HalfCheetah-v2':
                 x_loc_arr = np.array([0, 41, 91, 141, 191])
                 x_val_arr = np.array([45, 250, 500, 750, 1000])
-                y_val_arr = [0, 2000, 4000, 6000, 8000]
+                y_val_arr = [0, 2000, 4000, 6000, 8000, 10000]
                 is_label_custom_defined = True
 
             elif envname == 'Hopper-v2':
@@ -270,15 +302,34 @@ if __name__ == "__main__":
                     draw_lc = lc[item,:xmax]
                     draw_lcse = lcstd[item,:xmax] /np.sqrt(num_samples)
 
-                print('drawing.. '+ agent + ' setting: '+str(item), np.nansum(draw_lc))
-                sort_performance_arr.append([item, np.nansum(draw_lc)])
+
+
+                if eval_last_N:
+                    print('drawing.. ' + agent + ' setting: ' + str(item), np.nansum(draw_lc[xmax-last_N:xmax]))
+                    sort_performance_arr.append([item, np.nansum(draw_lc[xmax-last_N:xmax])])
+                else:
+                    print('drawing.. ' + agent + ' setting: ' + str(item), np.nansum(draw_lc[:xmax]))
+                    sort_performance_arr.append([item, np.nansum(draw_lc[:xmax])])
+
                 plt.fill_between(opt_range, draw_lc - draw_lcse, draw_lc + draw_lcse, alpha = 0.2)#, facecolor=colors[idx])
                 #handle, = plt.plot(opt_range, draw_lc, colors[idx], linewidth=1.0) 
                 handle, = plt.plot(opt_range, draw_lc, linewidth=1.0) 
                 handle_arr.append(handle)
 
+            best_belowcutoff = None
+            best_abovecutoff = None
+
             for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
                 print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
+
+                if best_belowcutoff is None and pair[0] < cutoff:
+                    best_belowcutoff = pair
+
+                if best_abovecutoff is None and pair[0] >= cutoff:
+                    best_abovecutoff = pair
+            print("*** best below cutoff setting {} : {}".format(best_belowcutoff[0], best_belowcutoff[1]))
+            print("*** best above cutoff setting {} : {}".format(best_abovecutoff[0], best_abovecutoff[1]))
+
 
             legend_arr = []
             for i in range(len(selected_idx)):
@@ -301,12 +352,33 @@ if __name__ == "__main__":
             else:
                 sort_performance_arr = []
                 for i in range(len(lc)):
-                    sort_performance_arr.append([i, np.nansum(lc[i,:xmax])])
+                    if eval_last_N:
+                        sort_performance_arr.append([i, np.nansum(lc[i, xmax-last_N:xmax])])
+                    else:
+                        sort_performance_arr.append([i, np.nansum(lc[i,:xmax])])
+
+                # for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
+                #     print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
+
+                best_belowcutoff = None
+                best_abovecutoff = None
 
                 for pair in sorted(sort_performance_arr, key=lambda x: x[1], reverse=True):
                     print('setting ' + str(pair[0]) + ': ' + str(pair[1]))
 
-                BestInd = np.argmax(np.nansum(lc[:,:xmax], axis = 1))
+                    if best_belowcutoff is None and pair[0] < cutoff:
+                        best_belowcutoff = pair
+
+                    if best_abovecutoff is None and pair[0] >= cutoff:
+                        best_abovecutoff = pair
+                print("*** best below cutoff setting {} : {}".format(best_belowcutoff[0], best_belowcutoff[1]))
+                print("*** best above cutoff setting {} : {}".format(best_abovecutoff[0], best_abovecutoff[1]))
+
+
+                if eval_last_N:
+                    BestInd = np.argmax(np.nansum(lc[:, xmax-last_N:xmax], axis=1))
+                else:
+                    BestInd = np.argmax(np.nansum(lc[:, :xmax], axis=1))
 
 
                  

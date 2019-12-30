@@ -12,7 +12,9 @@ import matplotlib.pyplot as plt
 # Usage
 # python3 ../plot_scripts/plot_Bimodal.py   DIR_RAW_RESULT(without / at the end)  ENV.json  NUM_RUNS AGENT_NAME  SETTING_NUM
 
+show_plot = False
 show_label = True
+
 
 DIR = str(sys.argv[1])
 
@@ -28,6 +30,8 @@ EVAL_EPISODES = env_json['EvalEpisodes']
 NUM_RUNS = int(sys.argv[3])
 AGENT_NAME = str(sys.argv[4])
 SETTING_NUM = int(sys.argv[5])
+
+custom_save_name = str(sys.argv[6])
 
 
 
@@ -53,7 +57,8 @@ plt.ylim(ylimt)
 plt.xlim(xlimt)
 
 if show_label:
-    plt.title(AGENT_NAME+": " +str(NUM_RUNS)+" runs")
+
+    plt.title("{} \nEnv: {}, Agent: {} \n({} runs, setting: {})".format(custom_save_name, ENV_NAME, AGENT_NAME, NUM_RUNS, SETTING_NUM))
     plt.xlabel('Training Steps (per 1000 steps)')
     h = plt.ylabel("Cum. Reward per episode")
     h.set_rotation(90)
@@ -103,9 +108,13 @@ for i in range(NUM_RUNS):
 
 
 
-eval_rewards_mean = np.mean(eval_rewards_total_arr, axis=0)[:xmax]
+eval_rewards_mean = np.nanmean(eval_rewards_total_arr, axis=0)[:xmax]
 plt.plot(opt_range, eval_rewards_mean, color='b', linewidth=1.5)
-plt.show()
+
+if show_plot:
+    plt.show()
+else:
+    plt.savefig("{}_{}_{}_runs.png".format(ENV_NAME, AGENT_NAME, custom_save_name))
 plt.close()
 # print('eval_rewards_total_arr', np.shape(eval_rewards_total_arr))
 # print('eval_rewards_mean', np.shape(eval_rewards_mean))

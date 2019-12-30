@@ -2,3 +2,6 @@ results/
 **/*.pyc
 **/.DS_Store
 .idea/**
+.idea/misc.xml
+.idea/vcs.xml
+/venv

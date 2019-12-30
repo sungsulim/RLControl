@@ -39,7 +39,8 @@ NUM_RUNS = int(sys.argv[3])
 AGENT_NAME = str(sys.argv[4])
 #SETTING_NUM = int(sys.argv[5])
 
-SETTING_NUM = [0,2,4]
+# SETTING_NUM =  [0,2,4]
+SETTING_NUM = [12,16,5]
 
 #### Plot Settings #####
 

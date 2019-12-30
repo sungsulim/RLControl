@@ -1,4 +1,5 @@
-import matplotlib as mpl
+# import matplotlib
+# matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
@@ -19,65 +20,54 @@ from plot_agent_new import get_xyrange
 # You should place the .npy of different agents in one directory (DIR_of_npy)
 
 
+show_labels = True
 
 ####### CONFIG ####
+
 # This should be the agent name between Pendulum-v0_(   )_EvalEpisode_BestResult_avg.npy
 # You can change the agent name between ( ) to be anything, as long as other format is same.
 
-# combined
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_10runs', 'AE_Supervised_10runs']
-# agents = ['AE_CCEM_10runs', 'AE_Supervised_10runs', 'AE_CCEM_with_2GA_10runs', 'AE_Supervised_with_2GA_10runs']
-# agents = ['ActorExpert_no_target', 'ActorExpert_Plus','ActorExpert_Plus_no_target']
-# agents = ['DDPG_10runs', 'NAF_10runs', 'AE_10runs', 'AE_Plus_10runs', 'PICNN_10runs', 'QT_OPT_10runs']
+###### thesis plots
+# Q-learning methods (A)
+# agents = ['ActorExpert_together_bimodal', 'ActorExpert_Plus_together_bimodal', 'SoftQlearning', 'NAF', 'PICNN', 'QT_OPT']
+# agents = ['ActorExpert', 'ActorExpert_Plus', 'SoftQlearning', 'NAF', 'PICNN', 'QT_OPT']
 
-# agents = ['ActorExpert', 'ActorExpert_Plus', 'DDPG', 'NAF', 'QT_OPT', 'PICNN'] #,'DDPG', 'NAF', 'WireFitting', 'QT_OPT'] # 'WireFitting'
-# agents = ['ActorExpert', 'ActorExpert_Plus', 'ActorCritic(expected_cem)', 'ActorCritic(expected_ll)']
-# agents = ['ActorExpert', 'ActorExpert_Plus', 'ActorExpert_better_q', 'ActorExpert_Plus_better_q', 'DDPG', 'NAF', 'QT_OPT']
-# agents = ['ActorExpert_Plus', 'ActorExpert_Plus_better_q', 'ActorExpert_Plus_og']
-# agents = ['ActorExpert_ll_uniform_weighted', 'ActorExpert_ll_policy_weighted']
-# agents =['ActorExpert', 'ActorCritic_sampled_nonorm', 'ActorCritic_sampled', 'ActorCritic']
+# Value & Policy (B)
+# agents = ['ActorExpert_Separate_bimodal', 'ActorExpert_Plus_Separate_bimodal', 'SoftQlearning', 'ActorCritic_Separate_bimodal_sample_eval', 'SoftActorCritic_sample_eval', 'DDPG']
+# agents = ['ActorExpert_Separate', 'ActorExpert_Plus_Separate', 'SoftQlearning', 'ActorCritic_Separate', 'SoftActorCritic', 'DDPG']
 
-agents = ['ActorExpert', 'ActorExpert_Plus', 'NAF', 'PICNN', 'QT_OPT_2modal'] #,'OptimalQ']
-# agents = ['QT_OPT_1modal', 'QT_OPT_2modal', 'QT_OPT']
+# (C)
+# agents = ['ActorExpert_Separate_bimodal', 'ActorExpert_Plus_Separate_bimodal', 'SoftQlearning', 'ActorCritic_Separate_bimodal_mean_eval', 'SoftActorCritic_mean_eval', 'DDPG']
+# agents = ['ActorExpert_Separate_bimodal', 'ActorExpert_Plus_Separate_bimodal', 'ActorCritic_Separate_bimodal_sample_eval', 'ActorCritic_Separate_bimodal_mean_eval', 'SoftActorCritic_sample_eval', 'SoftActorCritic_mean_eval']
+# agents = ['ActorExpert_Separate', 'ActorExpert_Plus_Separate', 'ActorCritic_Separate', 'ActorCritic_Separate_mean', 'SoftActorCritic', 'SoftActorCritic_mean']
 
-# agents = ['ActorExpert', 'ActorExpert_Plus', 'ActorCritic_sample_eval', 'DDPG']# , 'ActorExpert_samplingforeval', 'ActorCritic_samplingforeval']
-# agents = ['ActorExpert', 'ActorExpert_with_uni']
-# agents = ['ActorExpert_mean_mean', 'ActorExpert_mean_mean_100eval']
-# agents=['QT_OPT', 'QT_OPT_new', 'QT_OPT_gmm']
+# AE together & separate (bimodal) (D)
+# agents = ['ActorExpert', 'ActorExpert_Separate']
 
 
+# AE together bimodal w, w/o uniform sampling (E)
+# agents = ['ActorExpert_together_bimodal', 'ActorExpert_together_bimodal_uniform_sampling']
+# agents = ['ActorExpert', 'ActorExpert_uni']
 
-# agents =['ActorCritic', 'ActorCritic_cem', 'ActorCritic_sampled', 'ActorCritic_cem_sampled']
-
+# AE better target (F)
+# agents = ['ActorExpert_together_bimodal_mean_mean', 'ActorExpert_together_bimodal_ga_mean_next_best', 'ActorExpert_together_bimodal_mean_ga', 'ActorExpert_together_bimodal_ga_ga_next_best']
 # agents = ['ActorExpert_mean_mean', 'ActorExpert_ga_mean', 'ActorExpert_mean_ga', 'ActorExpert_ga_ga']
 
-# agents =['ActorCritic_alphamodal', 'ActorCritic_equalmodal']
 
-# LL separate
-# agents = ['DDPG_10runs', 'NAF_10runs', 'AE_CCEM_separate_10runs', 'AE_Supervised_separate_10runs']
+# Sandbox
+# agents = ['ActorExpert_together_bimodal', 'ActorExpert_LL_bimodal', 'ActorExpert_LL_randomq_bimodal']
+# agents = ['ActorExpert_together_unimodal', 'ActorExpert_LL_unimodal', 'ActorExpert_LL_randomq_unimodal']
 
+# PD
+# agents = ['ActorExpert', 'ActorExpert_LL_randomq_bimodal', 'ActorExpert_LL_randomq_unimodal']
 
-# HC combined
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_10runs', 'AE_Supervised_5runs']
+agents = ['ActorExpert_more_sampling_unimodal', 'ActorExpert_more_sampling_bimodal', 'ActorExpert_together_unimodal', 'ActorExpert_together_bimodal']
 
-# HC separate
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_separate_5runs', 'AE_Supervised_separate_10runs']
-
-# Hopper combined
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_8runs', 'AE_CCEM_10runs', 'AE_Supervised_5runs']
-
-# Hopper separate
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_8runs', 'AE_CCEM_separate_5runs', 'AE_Supervised_separate_10runs']
-
-# PD Combined
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_10runs', 'AE_Supervised_10runs']
-
-# PD Separate
-# agents = ['DDPG_10runs', 'NAF_10runs', 'ICNN_10runs', 'AE_CCEM_separate_10runs', 'AE_Supervised_separate_10runs']
+####################
 
 
 display_idx = 1 # IDX to determine whether to plot train_episode or eval_episode (0: Train, 1: Eval)
-show_labels = True
+
 
 ###################
 
@@ -100,7 +90,7 @@ suffix = 'BestResult'
 data_type = ['avg', 'se']
 
 
-agents_avg =[]
+agents_avg = []
 agents_se = []
 
 max_length = 1
@@ -117,12 +107,22 @@ for ag in agents:
     agents_se.append(se)
 
 
-mpl.style.use('default')
+# mpl.style.use('default')
 
-# 
+# used in thesis
 colors = [ '#377eb8', '#4daf4a', '#ff7f00',
                   '#f781bf', '#984ea3', '#999999','#a65628',
-                  '#999999', '#e41a1c', '#dede00'] # ['b', 'c', 'r', 'm', 'g', 'y', 'k', 'w'] # 
+                  '#999999', '#e41a1c', '#dede00']
+
+# used in ss curve
+# colors = [ '#377eb8', '#4daf4a', '#ff7f00',
+#                   '#f781bf', '#984ea3', '#999999','#a65628',
+#                   '#e41a1c', '#999999', '#dede00']
+
+
+# Color scheme for actor-critic sample/mean eval comparison
+# colors = [ '#377eb8', '#4daf4a', '#ff7f00', '#ff7f00',
+#                   '#f781bf', '#f781bf', ]
 
 plt.figure(figsize=(12,6))
 
@@ -278,7 +278,15 @@ plt.ylim(ylimt)
 handle_arr=[]  
 for idx in range(len(agents)):
     pad_length = len(opt_range) - len(agents_avg[idx][:xmax])
-    plt.fill_between(opt_range, np.append(agents_avg[idx][:xmax] - agents_se[idx][:xmax], np.zeros(pad_length) + np.nan), np.append(agents_avg[idx][:xmax] + agents_se[idx][:xmax], np.zeros(pad_length) + np.nan), alpha = 0.2, facecolor=colors[idx])
+
+    # For AC, SAC sample/mean eval comparison
+    # if idx == 2 or idx == 4:
+    #     handle, = plt.plot(opt_range, np.append(agents_avg[idx][:xmax], np.zeros(pad_length) + np.nan), colors[idx], linestyle='-.', linewidth=1.2, label=agents[idx])
+    # else:
+    plt.fill_between(opt_range,
+                     np.append(agents_avg[idx][:xmax] - agents_se[idx][:xmax], np.zeros(pad_length) + np.nan),
+                     np.append(agents_avg[idx][:xmax] + agents_se[idx][:xmax], np.zeros(pad_length) + np.nan),
+                     alpha=0.2, facecolor=colors[idx])
     handle, = plt.plot(opt_range, np.append(agents_avg[idx][:xmax], np.zeros(pad_length) + np.nan), colors[idx], linewidth=1.2, label=agents[idx])
     handle_arr.append(handle)
     
