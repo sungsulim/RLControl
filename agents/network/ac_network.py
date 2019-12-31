@@ -278,7 +278,7 @@ class ActorCritic_Network(BaseNetwork):
         sigma_batch = np.squeeze(sigma_batch, axis=2)
 
         # shape: (batch_size, 1)
-        norm_pdf = [scipy.stats.norm(mean, sigma).pdf(action) for mean, sigma, action in zip(mean_batch, sigma_batch, action_batch)]
+        norm_pdf = [scipy.stats.norm(mean, sigma).logpdf(action) for mean, sigma, action in zip(mean_batch, sigma_batch, action_batch)]
 
         return np.array(norm_pdf)
 
