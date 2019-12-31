@@ -29,7 +29,7 @@ class BaseNetwork(object):
     def set_session(self, session):
         self.session = session
 
-    def build_network(self, scope_name):
+    def build_network(self, *args):
         """
         build network.
         """

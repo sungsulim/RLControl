@@ -154,7 +154,7 @@ class SoftActorCriticNetwork(BaseNetwork):
 
     def qf_network(self, state_ph, action_ph, phase_ph):
         if self.norm_type != 'none':
-            inputs = tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
+            inputs = self.input_norm.normalize(state_ph) # tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min[0], self.state_max[0])
 
         q_net = tf.contrib.layers.fully_connected(inputs, self.critic_l1_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(

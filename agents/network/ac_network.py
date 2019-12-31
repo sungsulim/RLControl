@@ -3,7 +3,8 @@ from agents.network.base_network import BaseNetwork
 import numpy as np
 import environments.environments
 import scipy.stats
-
+from tensorflow.contrib.distributions import MultivariateNormalDiag  # as MultivariateNormalDiag
+from tensorflow.contrib.distributions import Normal
 
 class ActorCritic_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
@@ -11,6 +12,7 @@ class ActorCritic_Network(BaseNetwork):
 
         self.config = config
         self.rng = np.random.RandomState(config.random_seed)
+        self.batch_size = config.batch_size
 
         self.shared_layer_dim = config.shared_l1_dim
         self.actor_layer_dim = config.actor_l2_dim
@@ -29,17 +31,34 @@ class ActorCritic_Network(BaseNetwork):
         self.LOG_STD_MIN = -20
         self.LOG_STD_MAX = 2
 
+        # Not being used
         self.equal_modal_selection = False
         if config.equal_modal_selection == "True":
             self.equal_modal_selection = True
 
+        # define placeholders
+        self.state_ph = tf.placeholder(tf.float32, shape=(None, self.state_dim))
+        self.action_ph = tf.placeholder(tf.float32, shape=(None, self.action_dim))
+        self.phase_ph = tf.placeholder(tf.bool)
+        self.n_samples_ph = tf.placeholder(tf.int32)
+
+        self.target_state_ph = tf.placeholder(tf.float32, shape=(None, self.state_dim))
+        self.target_action_ph = tf.placeholder(tf.float32, shape=(None, self.action_dim))
+        self.target_phase_ph = tf.placeholder(tf.bool)
+        self.target_n_samples_ph = tf.placeholder(tf.int32)  # this is just dummy placeholder
+
+        self.q_target_ph = tf.placeholder(tf.float32, shape=(None, 1))
+        self.q_val_ph = tf.placeholder(tf.float32, shape=(None, 1))
+        self.entropy_ph = tf.placeholder(tf.float32, shape=(None, 1))
+
         # original network
-        self.inputs, self.phase, self.action, self.action_prediction_mean, self.action_prediction_sigma, self.action_prediction_alpha, self.q_prediction = self.build_network(
-            scope_name='actorcritic')
+        self.pi_alpha, self.pi_mu, self.pi_std, self.pi_samples, self.pi_samples_logprob, self.pi_actions_logprob, self.q_prediction = self.build_network(
+            self.state_ph, self.action_ph, self.phase_ph, self.n_samples_ph, scope_name='actorcritic')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actorcritic')
 
         # Target network
-        self.target_inputs, self.target_phase, self.target_action, self.target_action_prediction_mean, self.target_action_prediction_sigma, self.target_action_prediction_alpha, self.target_q_prediction = self.build_network(
+        _, _, _, _, _, _, self.target_q_prediction = self.build_network(
+            self.target_state_ph, self.target_action_ph, self.target_phase_ph, self.target_n_samples_ph,
             scope_name='target_actorcritic')
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_actorcritic')
 
@@ -61,52 +80,43 @@ class ActorCritic_Network(BaseNetwork):
             self.batchnorm_ops = [tf.no_op()]
             self.update_target_batchnorm_params = tf.no_op()
 
-        self.q_target = tf.placeholder(tf.float32, [None, 1])
-        self.q_val = tf.placeholder(tf.float32, [None, 1])
-        self.entropy = tf.placeholder(tf.float32, [None, 1])
-        self.actions = tf.placeholder(tf.float32, [None, self.action_dim])
-
-        # self.get_tf_ll = self.compute_ll(self.action_prediction_alpha, self.action_prediction_sigma,
-                                                # self.action_prediction_mean, self.actions)
-
         # Optimization Op
         with tf.control_dependencies(self.batchnorm_ops):
+            # TODO: Update loss
 
             # critic Update
-            self.critic_loss = tf.reduce_mean(tf.squared_difference(self.q_target, self.q_prediction))
+            self.critic_loss = tf.reduce_mean(tf.squared_difference(self.q_target_ph, self.q_prediction))
             self.critic_optimize = tf.train.AdamOptimizer(self.learning_rate[1]).minimize(self.critic_loss)
 
             # Actor update
             # Loglikelihood
-            self.actor_loss_ll = self.get_lossfunc_ll(self.action_prediction_alpha, self.action_prediction_sigma,
-                                                self.action_prediction_mean, self.actions, self.q_val, self.entropy)
+            self.actor_loss_ll = self.get_actor_loss_ll(self.pi_actions_logprob, self.q_val_ph, self.entropy_ph)
             self.actor_optimize_ll = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_ll)
 
             # CEM
-            self.actor_loss_cem = self.get_lossfunc_cem(self.action_prediction_alpha, self.action_prediction_sigma,
-                                                self.action_prediction_mean, self.actions)
+            self.actor_loss_cem = self.get_actor_loss_cem(self.pi_actions_logprob)
             self.actor_optimize_cem = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_cem)
 
-        # # Get the gradient of the policy w.r.t. the action
-        self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
-        self.policy_action_grads = tf.gradients(self.policy_func, self.temp_action)
+        # # # Get the gradient of the policy w.r.t. the action
+        # self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
+        # self.policy_action_grads = tf.gradients(self.policy_func, self.temp_action)
 
-    def build_network(self, scope_name):
+    # TODO: combine this with network()
+    def build_network(self, state_ph, action_ph, phase_ph, n_samples_ph, scope_name):
         with tf.variable_scope(scope_name):
-            inputs = tf.placeholder(tf.float32, shape=(None, self.state_dim), name="network_input_state")
-            phase = tf.placeholder(tf.bool, name="network_input_phase")
-            action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name="network_input_action")
-
             # normalize inputs
             if self.norm_type != 'none':
-                inputs = tf.clip_by_value(self.input_norm.normalize(inputs), self.state_min, self.state_max)
+                # I don't think clip by value is necessary
+                # tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min, self.state_max)
+                state_ph = self.input_norm.normalize(state_ph)
 
-            action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction = self.network(
-                inputs, action, phase)
 
-        return inputs, phase, action, action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
+            pi_alpha, pi_mu, pi_std, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction = self.network(state_ph, action_ph, phase_ph, n_samples_ph)
 
-    def network(self, inputs, action, phase):
+        return pi_alpha, pi_mu, pi_std, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction
+
+    def network(self, inputs, action, phase, num_samples):
+        # TODO: Remove alpha (not using multimodal)
         # shared net
         shared_net = tf.contrib.layers.fully_connected(inputs, self.shared_layer_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(
@@ -118,19 +128,18 @@ class ActorCritic_Network(BaseNetwork):
         shared_net = self.apply_norm(shared_net, activation_fn=tf.nn.relu, phase=phase, layer_num=1)
 
         # action branch
-        action_net = tf.contrib.layers.fully_connected(shared_net, self.actor_layer_dim, activation_fn=None,
+        pi_net = tf.contrib.layers.fully_connected(shared_net, self.actor_layer_dim, activation_fn=None,
                                                        weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                            factor=1.0, mode="FAN_IN", uniform=True),
-                                                       # tf.truncated_normal_initializer(),
                                                        weights_regularizer=None,
-                                                       # tf.contrib.layers.l2_regularizer(0.001),
                                                        biases_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                            factor=1.0, mode="FAN_IN", uniform=True))
 
-        action_net = self.apply_norm(action_net, activation_fn=tf.nn.relu, phase=phase, layer_num=2)
+        pi_net = self.apply_norm(pi_net, activation_fn=tf.nn.relu, phase=phase, layer_num=2)
 
-        action_prediction_mean = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim,
-                                                                   activation_fn=tf.tanh,
+        # no activation
+        pi_mu = tf.contrib.layers.fully_connected(pi_net, self.num_modal * self.action_dim,
+                                                                   activation_fn=None,
                                                                    weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                                        factor=1.0, mode="FAN_IN", uniform=True),
                                                                    # weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
@@ -140,7 +149,7 @@ class ActorCritic_Network(BaseNetwork):
                                                                        factor=1.0, mode="FAN_IN", uniform=True))
         # biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        action_prediction_sigma = tf.contrib.layers.fully_connected(action_net, self.num_modal * self.action_dim,
+        pi_logstd = tf.contrib.layers.fully_connected(pi_net, self.num_modal * self.action_dim,
                                                                     activation_fn=tf.tanh,
                                                                     weights_initializer=tf.random_uniform_initializer(0,1),
                                                                     weights_regularizer=None,
@@ -148,7 +157,7 @@ class ActorCritic_Network(BaseNetwork):
                                                                     biases_initializer=tf.random_uniform_initializer(
                                                                         -3e-3, 3e-3))
 
-        action_prediction_alpha = tf.contrib.layers.fully_connected(action_net, self.num_modal, activation_fn=tf.tanh,
+        pi_alpha = tf.contrib.layers.fully_connected(pi_net, self.num_modal, activation_fn=tf.tanh,
                                                                     weights_initializer=tf.random_uniform_initializer(
                                                                         -3e-3, 3e-3),
                                                                     weights_regularizer=None,
@@ -157,29 +166,56 @@ class ActorCritic_Network(BaseNetwork):
                                                                         -3e-3, 3e-3))
 
         # reshape output
-        action_prediction_mean = tf.reshape(action_prediction_mean, [-1, self.num_modal, self.action_dim])
-        action_prediction_sigma = tf.reshape(action_prediction_sigma, [-1, self.num_modal, self.action_dim])
-        action_prediction_alpha = tf.reshape(action_prediction_alpha, [-1, self.num_modal, 1])
+        assert (self.num_modal == 1)
 
-        # scale mean to env. action domain
-        action_prediction_mean = tf.multiply(action_prediction_mean, self.action_max)
+        # pi_mu = tf.reshape(pi_mu, [-1, self.num_modal, self.action_dim])
+        # pi_logstd = tf.reshape(pi_logstd, [-1, self.num_modal, self.action_dim])
+        # pi_alpha = tf.reshape(pi_alpha, [-1, self.num_modal, 1])
 
-        # exp. sigma
-        # action_prediction_sigma = tf.exp(tf.scalar_mul(self.sigma_scale, action_prediction_sigma))
-        log_std = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (action_prediction_sigma + 1)
-        action_prediction_sigma = tf.exp(log_std)
+        pi_mu = tf.reshape(pi_mu, [-1, self.action_dim])
+        pi_logstd = tf.reshape(pi_logstd, [-1, self.action_dim])
+        pi_alpha = tf.reshape(pi_alpha, [-1, 1])
 
-        # mean: [None, num_modal, action_dim]  : [None, 1]
-        # sigma: [None, num_modal, action_dim] : [None, 1]
-        # alpha: [None, num_modal, 1]              : [None, 1]
+        # exponentiate logstd
+        # pi_std = tf.exp(tf.scalar_mul(self.sigma_scale, pi_logstd))
+        pi_std = tf.exp(self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (pi_logstd + 1))
 
+        # construct MultivariateNormalDiag dist.
+        # mvn = MultivariateNormalDiag(
+        #     loc=pi_mu,
+        #     scale_diag=pi_std
+        # )
+        mvn = Normal(
+            loc=pi_mu,
+            scale=pi_std
+        )
+
+        # TODO: Check dimensions
+        pi_samples = mvn.sample([-1, num_samples])
+        pi_samples_logprob = mvn.log_prob(pi_samples)
+
+        pre_action2 = action / self.action_max
+        pre_action1 = tf.atanh(pre_action2)
+        pi_actions_logprob = mvn.log_prob(pre_action1)
+
+        # pass mu, pi, logp_pi
+        pi_mu = tf.tanh(pi_mu)
+        pi_samples = tf.tanh(pi_samples)
+
+        pi_samples_logprob -= tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_samples ** 2, l=0, u=1) + 1e-6), axis=1)
+        pi_actions_logprob -= tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pre_action2 ** 2, l=0, u=1) + 1e-6), axis=1)
+
+        pi_mu = tf.multiply(pi_mu, self.action_max)
+        pi_samples = tf.multiply(pi_mu, self.action_max)
+
+        # TODO: Remove alpha
         # compute softmax prob. of alpha
-        max_alpha = tf.reduce_max(action_prediction_alpha, axis=1, keepdims=True)
-        action_prediction_alpha = tf.subtract(action_prediction_alpha, max_alpha)
-        action_prediction_alpha = tf.exp(action_prediction_alpha)
+        max_alpha = tf.reduce_max(pi_alpha, axis=1, keepdims=True)
+        pi_alpha = tf.subtract(pi_alpha, max_alpha)
+        pi_alpha = tf.exp(pi_alpha)
 
-        normalize_alpha = tf.reciprocal(tf.reduce_sum(action_prediction_alpha, axis=1, keepdims=True))
-        action_prediction_alpha = tf.multiply(normalize_alpha, action_prediction_alpha)
+        normalize_alpha = tf.reciprocal(tf.reduce_sum(pi_alpha, axis=1, keepdims=True))
+        pi_alpha = tf.multiply(normalize_alpha, pi_alpha)
 
         # Q branch
         q_net = tf.contrib.layers.fully_connected(tf.concat([shared_net, action], 1), self.critic_layer_dim,
@@ -197,230 +233,166 @@ class ActorCritic_Network(BaseNetwork):
                                                          weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
                                                          biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
 
-        return action_prediction_mean, action_prediction_sigma, action_prediction_alpha, q_prediction
+        return pi_alpha, pi_mu, pi_std, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction
 
-    def tf_normal(self, y, mu, sigma):
+    def clip_but_pass_gradient(self, x, l=-1., u=1.):
+        clip_up = tf.cast(x > u, tf.float32)
+        clip_low = tf.cast(x < l, tf.float32)
 
-        # y: batch x action_dim
-        # mu: batch x num_modal x action_dim
-        # sigma: batch x num_modal x action_dim
+        return x + tf.stop_gradient((u - x) * clip_up + (l - x) * clip_low)
 
-        # stacked y: batch x num_modal x action_dim
-        stacked_y = tf.expand_dims(y, 1)
-        stacked_y = tf.tile(stacked_y, [1, self.num_modal, 1])
+    # def tf_normal(self, y, mu, sigma):
+    #
+    #     # y: batch x action_dim
+    #     # mu: batch x num_modal x action_dim
+    #     # sigma: batch x num_modal x action_dim
+    #
+    #     # stacked y: batch x num_modal x action_dim
+    #     stacked_y = tf.expand_dims(y, 1)
+    #     stacked_y = tf.tile(stacked_y, [1, self.num_modal, 1])
+    #
+    #     return tf.reduce_prod(
+    #         tf.sqrt(1.0 / (2 * np.pi * tf.square(sigma))) * tf.exp(-tf.square(stacked_y - mu) / (2 * tf.square(sigma))), axis=2)
 
-        return tf.reduce_prod(
-            tf.sqrt(1.0 / (2 * np.pi * tf.square(sigma))) * tf.exp(-tf.square(stacked_y - mu) / (2 * tf.square(sigma))), axis=2)
+    # def get_policyfunc(self):
+    #
+    #     alpha = tf.placeholder(tf.float32, shape=(None, self.num_modal, 1), name='temp_alpha')
+    #     mean = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_mean')
+    #     sigma = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_sigma')
+    #     action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name='temp_action')
+    #
+    #     result = self.tf_normal(action, mean, sigma)
+    #     result = tf.multiply(result, tf.squeeze(alpha, axis=2))
+    #     result = tf.reduce_sum(result, 1, keepdims=True)
+    #
+    #     return alpha, mean, sigma, action, result
 
-    def get_policyfunc(self):
+    def get_actor_loss_ll(self, pi_actions_logprob, q_val, entropy):
 
-        alpha = tf.placeholder(tf.float32, shape=(None, self.num_modal, 1), name='temp_alpha')
-        mean = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_mean')
-        sigma = tf.placeholder(tf.float32, shape=(None, self.num_modal, self.action_dim), name='temp_sigma')
-        action = tf.placeholder(tf.float32, shape=(None, self.action_dim), name='temp_action')
+        neg_ll = -pi_actions_logprob
+        loss = tf.multiply(neg_ll, q_val - entropy)
 
-        result = self.tf_normal(action, mean, sigma)
-        result = tf.multiply(result, tf.squeeze(alpha, axis=2))
-        result = tf.reduce_sum(result, 1, keepdims=True)
+        return tf.reduce_mean(loss)
 
-        return alpha, mean, sigma, action, result
+    def get_actor_loss_cem(self, pi_actions_logprob):
 
-    def get_lossfunc_ll(self, alpha, sigma, mu, y, q_val, entropy):
-        # alpha: batch x num_modal x 1
-        # sigma: batch x num_modal x action_dim
-        # mu: batch x num_modal x action_dim
-        # y: batch x action_dim
-        # q_val: batch x 1
+        neg_ll = -pi_actions_logprob
+        loss = neg_ll
 
-        result = self.tf_normal(y, mu, sigma)
-
-        # Modified to do equal weighting
-        if self.equal_modal_selection:
-            result = tf.scalar_mul(1.0 / self.num_modal, result)
-        else:
-            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
-
-        result = tf.reduce_sum(result, 1, keepdims=True)
-        neg_ll = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
-        result = tf.multiply(neg_ll, tf.add(q_val, -entropy))
-
-        return tf.reduce_mean(result)
-
-    def get_lossfunc_cem(self, alpha, sigma, mean, action):
-        # alpha: batch x num_modal x 1
-        # sigma: batch x num_modal x action_dim
-        # mean: batch x num_modal x action_dim
-        # action: batch x action_dim
-        result = self.tf_normal(action, mean, sigma)
-
-        # Modified to do equal weighting
-        if self.equal_modal_selection:
-            result = tf.scalar_mul(1.0 / self.num_modal, result)
-        else:
-            result = tf.multiply(result, tf.squeeze(alpha, axis=2))
-
-        result = tf.reduce_sum(result, 1, keepdims=True)
-        result = -tf.log(tf.clip_by_value(result, 1e-30, 1e30))
-
-        return tf.reduce_mean(result)
+        return tf.reduce_mean(loss)
 
     def get_loglikelihood(self, state_batch, action_batch):
 
-        alpha_batch, mean_batch, sigma_batch = self.sess.run(
-            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                self.inputs: state_batch,
-                self.phase: True
-            })
-
-        # Assuming it's unimodal
-        assert(np.shape(alpha_batch)[1] == 1)
-        mean_batch = np.squeeze(mean_batch, axis=2)
-        sigma_batch = np.squeeze(sigma_batch, axis=2)
-
-        # shape: (batch_size, 1)
-        norm_pdf = [scipy.stats.norm(mean, sigma).pdf(action) for mean, sigma, action in zip(mean_batch, sigma_batch, action_batch)]
-
-        return np.array(norm_pdf)
-
-
-    def policy_action_gradients(self, alpha, mean, sigma, action):
-
-        return self.sess.run(self.policy_action_grads, feed_dict={
-            self.temp_alpha: alpha,
-            self.temp_mean: mean,
-            self.temp_sigma: sigma,
-            self.temp_action: action
+        pi_actions_logprob_batch = self.sess.run(self.pi_actions_logprob, feed_dict={
+            self.state_ph: state_batch,
+            self.action_ph: action_batch,
+            self.phase_ph: True
         })
 
-    def train_critic(self, *args):
-        # args (inputs, action, q_target)
+        return pi_actions_logprob_batch
+
+    # def policy_action_gradients(self, alpha, mean, sigma, action):
+    #
+    #     return self.sess.run(self.policy_action_grads, feed_dict={
+    #         self.temp_alpha: alpha,
+    #         self.temp_mean: mean,
+    #         self.temp_sigma: sigma,
+    #         self.temp_action: action
+    #     })
+
+    def train_critic(self, state_batch, action_batch, q_target_batch):
         return self.sess.run([self.q_prediction, self.critic_optimize], feed_dict={
-            self.inputs: args[0],
-            self.action: args[1],
-            self.q_target: args[2],
-            self.phase: True
+            self.state_ph: state_batch,
+            self.action_ph: action_batch,
+            self.q_target_ph: q_target_batch,
+            self.phase_ph: True
         })
 
-    def train_actor_ll(self, *args):
-        # args [inputs, actions, phase]
+    def train_actor_ll(self, state_batch, action_batch, q_val, entropy):
+
         return self.sess.run(self.actor_optimize_ll, feed_dict={
-            self.inputs: args[0],
-            self.actions: args[1],
-            self.q_val: args[2],
-            self.entropy: args[3],
-            self.phase: True
+            self.state_ph: state_batch,
+            self.action_ph: action_batch,
+            self.phase_ph: True,
+            self.q_val_ph: q_val,
+            self.entropy_ph: entropy
+            # self.n_samples_ph: 1,
+            # self.state_val: q_val_mean
         })
 
-    def train_actor_cem(self, *args):
+    def train_actor_cem(self, state_batch, action_batch):
         # args [inputs, actions, phase]
         return self.sess.run(self.actor_optimize_cem, feed_dict={
-            self.inputs: args[0],
-            self.actions: args[1],
-            self.phase: True
+            self.state_ph: state_batch,
+            self.action_ph: action_batch,
+            self.phase_ph: True
         })
 
-    def predict_q(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
+    def predict_q(self, state_batch, action_batch, phase):
 
         return self.sess.run(self.q_prediction, feed_dict={
-            self.inputs: inputs,
-            self.action: action,
-            self.phase: phase
+            self.state_ph: state_batch,
+            self.action_ph: action_batch,
+            self.phase_ph: phase
         })
 
-    def predict_q_target(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
-        phase = args[2]
+    def predict_q_target(self, state_batch, action_batch, phase):
 
         return self.sess.run(self.target_q_prediction, feed_dict={
-            self.target_inputs: inputs,
-            self.target_action: action,
-            self.target_phase: phase
+            self.target_state_ph: state_batch,
+            self.target_action_ph: action_batch,
+            self.target_phase_ph: phase
         })
 
-    def predict_true_q(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        action = args[1]
+    # bandit setting
+    def predict_true_q(self, inputs, action):
 
         return [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
 
-    def predict_random_q_target(self, *args):
-        # args  (inputs, action, phase)
-        inputs = args[0]
-        actions = args[1]
-        phase = args[2]
-
-        random_action_samples = np.randomu
-
-        return self.sess.run(self.target_q_prediction, feed_dict={
-            self.target_inputs: inputs,
-            self.target_action: actions,
-            self.target_phase: phase
-        })
-
     # return sampled actions
-    def sample_action(self, inputs, phase, is_single_sample):
-
-        # batchsize x action_dim
-        alpha, mean, sigma = self.sess.run(
-            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                self.inputs: inputs,
-                self.phase: phase
-            })
-
-        alpha = np.squeeze(alpha, axis=2)
-
-        # self.setModalStats(alpha[0], mean[0], sigma[0])
-
+    def sample_action(self, state_batch, phase, is_single_sample):
         if is_single_sample:
-            num_samples = None
+            n_samples = 1
         else:
-            num_samples = self.num_samples
+            n_samples = self.num_samples
 
-        if self.equal_modal_selection:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples) for _ in alpha]
-        else:
-            modal_idx_list = [self.rng.choice(self.num_modal, size=num_samples, p=prob) for prob in alpha]
-
-        sampled_actions = [np.clip(self.rng.normal(m[idx], s[idx]), self.action_min, self.action_max) for idx, m, s
-                          in zip(modal_idx_list, mean, sigma)]
+        sampled_actions = self.sess.run(
+            self.pi_samples, feed_dict={
+                self.state_ph: state_batch,
+                self.phase_ph: phase,
+                self.n_samples_ph: n_samples
+            })
 
         return sampled_actions
 
     # return uniformly sampled actions (batchsize x num_samples x action_dim)
-    def sample_uniform_action(self, batchsize):
-        return self.rng.uniform(self.action_min, self.action_max, size=(batchsize, self.num_samples, self.action_dim))
+    def sample_uniform_action(self, batch_size):
+        return self.rng.uniform(self.action_min, self.action_max, size=(batch_size, self.num_samples, self.action_dim))
 
-    def predict_action(self, *args):
-        inputs = args[0]
-        phase = args[1]
+    def predict_action(self, state_batch, phase):
 
         # alpha: batchsize x num_modal x 1
         # mean: batchsize x num_modal x action_dim
-        alpha, mean, sigma = self.sess.run(
-            [self.action_prediction_alpha, self.action_prediction_mean, self.action_prediction_sigma], feed_dict={
-                self.inputs: inputs,
-                self.phase: phase
+        pi_alpha, pi_mu, pi_std = self.sess.run(
+            [self.pi_alpha, self.pi_mu, self.pi_std], feed_dict={
+                self.state_ph: state_batch,
+                self.phase_ph: phase
             })
 
-        alpha = np.squeeze(alpha, axis=2)
+        assert(np.shape(pi_mu) == (np.shape(state_batch)[0], self.action_dim))
 
-        self.setModalStats(alpha[0], mean[0], sigma[0])
+        self.setModalStats(pi_alpha[0], pi_mu[0], pi_std[0])
 
-        if self.equal_modal_selection:
-            max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
-        else:
-            max_idx = np.argmax(alpha, axis=1)
+        # assuming unimodal
+        # alpha = np.squeeze(alpha, axis=2)
+        # if self.equal_modal_selection:
+        #     max_idx = self.rng.randint(0, self.num_modal, size=len(mean))
+        # else:
+        #     max_idx = np.argmax(alpha, axis=1)
+        #
+        # best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
 
-        best_mean = [m[idx] for idx, m in zip(max_idx, mean)]
-
-        return best_mean
+        return pi_mu
 
     def init_target_network(self):
         self.sess.run(self.init_target_net_params)
@@ -429,9 +401,9 @@ class ActorCritic_Network(BaseNetwork):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
     def getQFunction(self, state):
-        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.inputs: np.expand_dims(state, 0),
-                                                                          self.action: np.expand_dims([action], 0),
-                                                                          self.phase: False})
+        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.state_ph: np.expand_dims(state, 0),
+                                                                          self.action_ph: np.expand_dims([action], 0),
+                                                                          self.phase_ph: False})
 
     def getTrueQFunction(self, state):
         return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))
@@ -439,8 +411,8 @@ class ActorCritic_Network(BaseNetwork):
     def getPolicyFunction(self, alpha, mean, sigma):
 
         # alpha = np.squeeze(alpha, axis=1)
-        mean = np.squeeze(mean, axis=1)
-        sigma = np.squeeze(sigma, axis=1)
+        # mean = np.squeeze(mean, axis=1)
+        # sigma = np.squeeze(sigma, axis=1)
 
         if self.equal_modal_selection:
             return lambda action: np.sum((np.ones(self.num_modal) * (1.0 / self.num_modal)) * np.multiply(
