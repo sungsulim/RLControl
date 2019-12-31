@@ -4,7 +4,8 @@ import numpy as np
 import environments.environments
 import scipy.stats
 from tensorflow.contrib.distributions import MultivariateNormalDiag  # as MultivariateNormalDiag
-from tensorflow.contrib.distributions import Normal
+# from tensorflow.contrib.distributions import Normal
+# import tensorflow_probability as tfp
 
 class ActorCritic_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
@@ -110,7 +111,6 @@ class ActorCritic_Network(BaseNetwork):
                 # tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min, self.state_max)
                 state_ph = self.input_norm.normalize(state_ph)
 
-
             pi_alpha, pi_mu, pi_std, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction = self.network(state_ph, action_ph, phase_ph, n_samples_ph)
 
         return pi_alpha, pi_mu, pi_std, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction
@@ -181,17 +181,20 @@ class ActorCritic_Network(BaseNetwork):
         pi_std = tf.exp(self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (pi_logstd + 1))
 
         # construct MultivariateNormalDiag dist.
-        # mvn = MultivariateNormalDiag(
-        #     loc=pi_mu,
-        #     scale_diag=pi_std
-        # )
-        mvn = Normal(
+        mvn = MultivariateNormalDiag(
             loc=pi_mu,
-            scale=pi_std
+            scale_diag=pi_std
         )
 
+        # mvn = Normal(
+        #     loc=pi_mu,
+        #     scale=pi_std
+        # )
+
         # TODO: Check dimensions
-        pi_samples = mvn.sample([-1, num_samples])
+        pi_samples = mvn.sample(num_samples)
+        pi_samples = tf.transpose(pi_samples, [1, 0, 2])
+
         pi_samples_logprob = mvn.log_prob(pi_samples)
 
         pre_action2 = action / self.action_max
@@ -202,11 +205,17 @@ class ActorCritic_Network(BaseNetwork):
         pi_mu = tf.tanh(pi_mu)
         pi_samples = tf.tanh(pi_samples)
 
+        pi_samples_logprob = tf.clip_by_value(pi_samples_logprob, -20, 20)
+        pi_actions_logprob = tf.clip_by_value(pi_actions_logprob, -20, 20)
+
         pi_samples_logprob -= tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_samples ** 2, l=0, u=1) + 1e-6), axis=1)
         pi_actions_logprob -= tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pre_action2 ** 2, l=0, u=1) + 1e-6), axis=1)
 
+        pi_samples_logprob = tf.clip_by_value(pi_samples_logprob, -20, 20)
+        pi_actions_logprob = tf.clip_by_value(pi_actions_logprob, -20, 20)
+
         pi_mu = tf.multiply(pi_mu, self.action_max)
-        pi_samples = tf.multiply(pi_mu, self.action_max)
+        pi_samples = tf.multiply(pi_samples, self.action_max)
 
         # TODO: Remove alpha
         # compute softmax prob. of alpha
@@ -363,6 +372,10 @@ class ActorCritic_Network(BaseNetwork):
                 self.n_samples_ph: n_samples
             })
 
+        # print()
+        # print('dist batch shape: {}, dist_event shape: {}, n_samples: {}'.format(dist_info[0], dist_info[1], n_samples))
+        # print('og sampled actions shape: {}'.format(np.shape(sampled_actions_og)))
+        # print('sampled actions shape: {}'.format(np.shape(sampled_actions)))
         return sampled_actions
 
     # return uniformly sampled actions (batchsize x num_samples x action_dim)

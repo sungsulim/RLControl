@@ -60,7 +60,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             else:
                 # single state so first idx
                 # single sample so first idx
-                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0]
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
             self.train_global_steps += 1
 
@@ -98,7 +98,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.sample_for_eval:
                 # single state so first idx
                 # single sample so first idx
-                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0]
+                chosen_action = self.hydra_network.sample_action(np.expand_dims(state, 0), False, is_single_sample=True)[0][0]
 
             else:
                 chosen_action = greedy_action
@@ -108,6 +108,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.write_log:
                 write_summary(self.writer, self.eval_global_steps, chosen_action[0], tag='eval/action_taken')
 
+        # print('chosen_action: {}'.format(chosen_action))
         return chosen_action
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
@@ -186,14 +187,26 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             selected_sampled_action_batch = np.array([a[0] for a in sampled_action_batch])
             selected_q_val_batch = np.array([b[0] for b in q_val_batch])
+            selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
+
 
             # get state val (baseline)
             q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
 
             if self.add_entropy:
                 entropy_batch = self.hydra_network.get_loglikelihood(state_batch, selected_sampled_action_batch)
+                entropy_batch = np.expand_dims(entropy_batch, -1)
             else:
                 entropy_batch = np.zeros((self.batch_size, 1))
+
+            # print('q_val_batch: {}, q_val_batch_reshaped: {}, selected_q_val_batch: {}, q_val_mean: {}'
+            #       .format(np.shape(q_val_batch), np.shape(q_val_batch_reshaped), np.shape(selected_q_val_batch), np.shape(q_val_mean)))
+
+            print(selected_sampled_action_batch)
+            print()
+            print(entropy_batch)
+            input()
+
 
             self.hydra_network.train_actor_ll(state_batch, selected_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
 
