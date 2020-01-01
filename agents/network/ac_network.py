@@ -331,11 +331,11 @@ class ActorCritic_Network(BaseNetwork):
             # self.state_val: q_val_mean
         })
 
-    def train_actor_cem(self, state_batch, action_batch):
+    def train_actor_cem(self, state_batch, raw_action_batch):
         # args [inputs, actions, phase]
         return self.sess.run(self.actor_optimize_cem, feed_dict={
             self.state_ph: state_batch,
-            self.q_action_ph: action_batch,
+            self.pi_raw_action_ph: raw_action_batch,
             self.phase_ph: True
         })
 

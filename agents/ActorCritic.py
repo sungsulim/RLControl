@@ -175,6 +175,8 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
         sampled_action_batch_reshaped = np.reshape(sampled_action_batch,
                                                    (self.batch_size * self.num_samples, self.action_dim))
+        raw_sampled_action_batch_reshaped = np.reshape(raw_sampled_action_batch,
+                                                   (self.batch_size * self.num_samples, self.action_dim))
 
         # get Q val
         stacked_state_batch = np.repeat(state_batch, self.num_samples, axis=0)
@@ -201,10 +203,6 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             else:
                 entropy_batch = np.zeros((self.batch_size, 1))
 
-            # print('q_val_batch: {}, q_val_batch_reshaped: {}, selected_q_val_batch: {}, q_val_mean: {}'
-            #       .format(np.shape(q_val_batch), np.shape(q_val_batch_reshaped), np.shape(selected_q_val_batch), np.shape(q_val_mean)))
-
-
             self.hydra_network.train_actor_ll(state_batch, selected_raw_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
 
         # CEM update
@@ -212,19 +210,23 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             # TODO: Update to use raw_sampled_action
             if self.add_entropy:
-                entropy_batch = self.hydra_network.get_loglikelihood(state_batch, sampled_action_batch)
-                entropy_batch = np.squeeze(entropy_batch, axis=2)
+                # (batch_size * num_samples, 1)
+                entropy_batch_reshaped = self.hydra_network.get_loglikelihood(stacked_state_batch, raw_sampled_action_batch_reshaped)
+                entropy_batch_reshaped = np.expand_dims(entropy_batch_reshaped, -1)
+                entropy_batch = np.reshape(entropy_batch_reshaped, (self.batch_size, self.num_samples))
             else:
                 entropy_batch = np.zeros((self.batch_size, self.num_samples))
+
+            # assert(np.shape(q_val_batch) == np.shape(entropy_batch))
 
             # Find threshold : top (1-rho) percentile
             selected_idxs = list(map(lambda x: x.argsort()[::-1][:int(self.num_samples * self.rho)], q_val_batch - self.entropy_scale * entropy_batch))
 
-            selected_sampled_action_batch = [actions[idxs] for actions, idxs in zip(sampled_action_batch, selected_idxs)]
-            selected_sampled_action_batch = np.reshape(selected_sampled_action_batch, (self.batch_size * int(self.num_samples * self.rho), self.action_dim))
+            selected_raw_sampled_action_batch = [actions[idxs] for actions, idxs in zip(raw_sampled_action_batch, selected_idxs)]
+            selected_raw_sampled_action_batch = np.reshape(selected_raw_sampled_action_batch, (self.batch_size * int(self.num_samples * self.rho), self.action_dim))
 
             rho_stacked_state_batch = np.repeat(state_batch, int(self.num_samples * self.rho), axis=0)
-            self.hydra_network.train_actor_cem(rho_stacked_state_batch, selected_sampled_action_batch)
+            self.hydra_network.train_actor_cem(rho_stacked_state_batch, selected_raw_sampled_action_batch)
 
         else:
             raise ValueError("Invalid  self.actor_update config")
