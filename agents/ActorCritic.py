@@ -22,7 +22,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         self.rho = config.rho
 
         self.critic_update = config.critic_update  # expected, sampled, mean(AE)
-        self.actor_update = config.actor_update  # cem, ll
+        self.actor_update = config.actor_update  # cem, ll, reparam
 
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
@@ -205,6 +205,31 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.hydra_network.train_actor_ll(state_batch, selected_raw_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
 
+        if self.actor_update == "ll_update_all":
+            # taken from raw_sampled_action_batch
+            # selected_raw_sampled_action_batch = np.array([a[0] for a in raw_sampled_action_batch])
+
+            # selected_q_val_batch = np.array([b[0] for b in q_val_batch])
+            # selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
+
+            # get state val (baseline)
+            q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
+
+            stacked_q_val_mean = np.repeat(q_val_mean, self.num_samples, axis=0)
+
+            # (batch_size * num_samples, state/action_dim)
+            # stacked_state_batch, raw_sampled_action_batch_reshaped, q_val_batch_reshaped,
+
+
+            if self.add_entropy:
+                entropy_batch = self.hydra_network.get_loglikelihood(stacked_state_batch, raw_sampled_action_batch_reshaped)
+                entropy_batch = np.expand_dims(entropy_batch, -1)
+            else:
+                entropy_batch = np.zeros((self.batch_size * self.num_samples, 1))
+
+            self.hydra_network.train_actor_ll(stacked_state_batch, raw_sampled_action_batch_reshaped, q_val_batch_reshaped - stacked_q_val_mean, self.entropy_scale * entropy_batch)
+
+
         # CEM update
         elif self.actor_update == "cem":
 
@@ -227,6 +252,26 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             rho_stacked_state_batch = np.repeat(state_batch, int(self.num_samples * self.rho), axis=0)
             self.hydra_network.train_actor_cem(rho_stacked_state_batch, selected_raw_sampled_action_batch)
+
+        elif self.actor_update == "reparam":
+
+            raise NotImplementedError
+
+            # taken from raw_sampled_action_batch
+            selected_raw_sampled_action_batch = np.array([a[0] for a in raw_sampled_action_batch])
+            selected_q_val_batch = np.array([b[0] for b in q_val_batch])
+            selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
+
+            # get state val (baseline)
+            q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
+
+            if self.add_entropy:
+                entropy_batch = self.hydra_network.get_loglikelihood(state_batch, selected_raw_sampled_action_batch)
+                entropy_batch = np.expand_dims(entropy_batch, -1)
+            else:
+                entropy_batch = np.zeros((self.batch_size, 1))
+
+            self.hydra_network.train_actor_ll(state_batch, selected_raw_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
 
         else:
             raise ValueError("Invalid  self.actor_update config")

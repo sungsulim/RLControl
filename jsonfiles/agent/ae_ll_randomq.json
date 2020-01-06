@@ -2,7 +2,7 @@
     "agent": "ActorCritic",
     "sweeps": {
         "critic_update": ["random_q"],
-        "actor_update": ["ll", "cem"],
+        "actor_update": ["ll_update_all", "cem"],
 
         "norm_type": ["input_norm"],
 
