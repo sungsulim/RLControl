@@ -205,21 +205,11 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.hydra_network.train_actor_ll(state_batch, selected_raw_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
 
-        if self.actor_update == "ll_update_all":
-            # taken from raw_sampled_action_batch
-            # selected_raw_sampled_action_batch = np.array([a[0] for a in raw_sampled_action_batch])
-
-            # selected_q_val_batch = np.array([b[0] for b in q_val_batch])
-            # selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
+        elif self.actor_update == "ll_update_all":
 
             # get state val (baseline)
             q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
-
             stacked_q_val_mean = np.repeat(q_val_mean, self.num_samples, axis=0)
-
-            # (batch_size * num_samples, state/action_dim)
-            # stacked_state_batch, raw_sampled_action_batch_reshaped, q_val_batch_reshaped,
-
 
             if self.add_entropy:
                 entropy_batch = self.hydra_network.get_loglikelihood(stacked_state_batch, raw_sampled_action_batch_reshaped)
@@ -233,7 +223,6 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         # CEM update
         elif self.actor_update == "cem":
 
-            # TODO: Update to use raw_sampled_action
             if self.add_entropy:
                 # (batch_size * num_samples, 1)
                 entropy_batch_reshaped = self.hydra_network.get_loglikelihood(stacked_state_batch, raw_sampled_action_batch_reshaped)

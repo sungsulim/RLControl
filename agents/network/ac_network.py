@@ -358,7 +358,8 @@ class ActorCritic_Network(BaseNetwork):
     # bandit setting
     def predict_true_q(self, inputs, action):
 
-        return [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
+        q_val_batch = [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
+        return np.expand_dims(q_val_batch, -1)
 
     # return sampled actions
     def sample_action(self, state_batch, phase, is_single_sample):
