@@ -336,7 +336,7 @@ class ActorCritic_Network(BaseNetwork):
     def get_actor_loss_reparam(self, pi_samples_logprob, q_pi_val):
 
         # pi_loss = tf.reduce_mean(self.q_pi - self.entropy_scale * self.logp_pi)
-        return tf.reduce_mean(q_pi_val - self.entropy_scale * pi_samples_logprob)
+        return tf.reduce_mean(self.entropy_scale * pi_samples_logprob - self.q_pi_val)
 
     def gaussian_loglikelihood(self, x, mu, log_std):
         pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + EPS)) ** 2 + 2 * log_std + np.log(2 * np.pi))
