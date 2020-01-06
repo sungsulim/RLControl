@@ -7,6 +7,8 @@ from tensorflow.contrib.distributions import MultivariateNormalDiag  # as Multiv
 # from tensorflow.contrib.distributions import Normal
 # import tensorflow_probability as tfp
 
+EPS = 1e-6
+
 class ActorCritic_Network(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ActorCritic_Network, self).__init__(sess, config, [config.actor_lr, config.critic_lr])
@@ -28,6 +30,7 @@ class ActorCritic_Network(BaseNetwork):
         self.num_samples = config.num_samples
         self.actor_output_dim = self.num_modal * (1 + 2 * self.action_dim)
 
+        self.entropy_scale = config.entropy_scale
         # self.sigma_scale = 1.0  # config.sigma_scale
         self.LOG_STD_MIN = -20
         self.LOG_STD_MAX = 2
@@ -55,11 +58,11 @@ class ActorCritic_Network(BaseNetwork):
         self.entropy_ph = tf.placeholder(tf.float32, shape=(None, 1))
 
         # original network
-        self.pi_alpha, self.pi_mu, self.pi_std, self.pi_raw_samples, self.pi_samples, self.pi_samples_logprob, self.pi_actions_logprob, self.q_prediction = self.build_network(self.state_ph, self.pi_raw_action_ph, self.q_action_ph, self.phase_ph, self.n_samples_ph, scope_name='actorcritic')
+        self.pi_alpha, self.pi_mu, self.pi_std, self.pi_raw_samples, self.pi_samples, self.pi_samples_logprob, self.pi_actions_logprob, self.q_samples_prediction, self.q_actions_prediction = self.build_network(self.state_ph, self.pi_raw_action_ph, self.q_action_ph, self.phase_ph, self.n_samples_ph, scope_name='actorcritic')
         self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='actorcritic')
 
         # Target network
-        _, _, _, _, _, _, _, self.target_q_prediction = self.build_network(self.target_state_ph, self.target_pi_raw_action_ph, self.target_q_action_ph, self.target_phase_ph, self.target_n_samples_ph, scope_name='target_actorcritic')
+        _, _, _, _, _, _, _, _, self.target_q_actions_prediction = self.build_network(self.target_state_ph, self.target_pi_raw_action_ph, self.target_q_action_ph, self.target_phase_ph, self.target_n_samples_ph, scope_name='target_actorcritic')
         self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target_actorcritic')
 
         # Op for periodically updating target network with online network weights
@@ -85,7 +88,7 @@ class ActorCritic_Network(BaseNetwork):
             # TODO: Update loss
 
             # critic Update
-            self.critic_loss = tf.reduce_mean(tf.squared_difference(self.q_target_ph, self.q_prediction))
+            self.critic_loss = tf.reduce_mean(tf.squared_difference(self.q_target_ph, self.q_actions_prediction))
             self.critic_optimize = tf.train.AdamOptimizer(self.learning_rate[1]).minimize(self.critic_loss)
 
             # Actor update
@@ -96,6 +99,10 @@ class ActorCritic_Network(BaseNetwork):
             # CEM
             self.actor_loss_cem = self.get_actor_loss_cem(self.pi_actions_logprob)
             self.actor_optimize_cem = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_cem)
+
+            # Reparam
+            self.actor_loss_reparam = self.get_actor_loss_reparam(self.pi_samples_logprob, self.q_samples_prediction)
+            self.actor_optimize_reparam = tf.train.AdamOptimizer(self.learning_rate[0]).minimize(self.actor_loss_reparam)
 
         # # # Get the gradient of the policy w.r.t. the action
         # self.temp_alpha, self.temp_mean, self.temp_sigma, self.temp_action, self.policy_func = self.get_policyfunc()
@@ -110,9 +117,9 @@ class ActorCritic_Network(BaseNetwork):
                 # tf.clip_by_value(self.input_norm.normalize(state_ph), self.state_min, self.state_max)
                 state_ph = self.input_norm.normalize(state_ph)
 
-            pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction = self.network(state_ph, pi_raw_action_ph, q_action_ph, phase_ph, n_samples_ph)
+            pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_samples_prediction, q_actions_prediction = self.network(state_ph, pi_raw_action_ph, q_action_ph, phase_ph, n_samples_ph)
 
-        return pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction
+        return pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_samples_prediction, q_actions_prediction
 
     def network(self, inputs, pi_raw_action, q_action, phase, num_samples):
         # TODO: Remove alpha (not using multimodal)
@@ -185,36 +192,54 @@ class ActorCritic_Network(BaseNetwork):
             scale_diag=pi_std
         )
 
-        # mvn = Normal(
-        #     loc=pi_mu,
-        #     scale=pi_std
-        # )
+        if self.actor_update == "reparam":
+            # pi = mu + tf.random_normal(tf.shape(mu)) * std
+            # logp_pi = self.gaussian_likelihood(pi, mu, log_std)
 
-        # TODO: Check dimensions
-        pi_raw_samples = mvn.sample(num_samples)
-        pi_raw_samples = tf.transpose(pi_raw_samples, [1, 0, 2])
+            # pi_mu: (batch_size, action_dim)
 
-        # get raw logprob
-        pi_raw_samples_logprob = mvn.log_prob(pi_raw_samples)
-        pi_raw_actions_logprob = mvn.log_prob(pi_raw_action)
+            # (batch_size x num_samples, action_dim)
+            # If updating multiple samples
+            stacked_pi_mu = tf.expand_dims(pi_mu, 1)
+            stacked_pi_mu = tf.tile(stacked_pi_mu, [1, num_samples, 1])
+            stacked_pi_mu = tf.reshape(stacked_pi_mu, (-1, self.action_dim))
+
+            stacked_pi_std = tf.expand_dims(pi_std, 1)
+            stacked_pi_std = tf.tile(stacked_pi_std, [1, num_samples, 1])
+            stacked_pi_std = tf.reshape(stacked_pi_std, (-1, self.action_dim))
+
+            noise = tf.random_normal(tf.shape(stacked_pi_mu))
+
+            # (batch_size * num_samples, action_dim)
+            pi_raw_samples = stacked_pi_mu + noise * stacked_pi_std
+            pi_raw_samples_logprob = self.gaussian_loglikelihood(pi_raw_samples, stacked_pi_mu, stacked_pi_std)
+
+            pi_raw_samples = tf.reshape(pi_raw_samples, (-1, num_samples, self.action_dim))
+            pi_raw_samples_logprob = tf.reshape(pi_raw_samples_logprob, (-1, num_samples, self.action_dim))
+
+        else:
+            pi_raw_samples_og = mvn.sample(num_samples)
+
+            # dim: (batch_size, num_samples, action_dim)
+            pi_raw_samples = tf.transpose(pi_raw_samples_og, [1, 0, 2])
+
+            # get raw logprob
+            pi_raw_samples_logprob_og = mvn.log_prob(pi_raw_samples_og)
+            pi_raw_samples_logprob = tf.transpose(pi_raw_samples_logprob_og, [1, 0, 2])
 
         # apply tanh
         pi_mu = tf.tanh(pi_mu)
         pi_samples = tf.tanh(pi_raw_samples)
-        pi_action = tf.tanh(pi_raw_action)
-
-        # pi_samples_logprob = tf.clip_by_value(pi_samples_logprob, -20, 20)
-        # pi_actions_logprob = tf.clip_by_value(pi_actions_logprob, -20, 20)
 
         pi_samples_logprob = pi_raw_samples_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_samples ** 2, l=0, u=1) + 1e-6), axis=1)
-        pi_actions_logprob = pi_raw_actions_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_action ** 2, l=0, u=1) + 1e-6), axis=1)
-
-        # pi_samples_logprob = tf.clip_by_value(pi_samples_logprob, -20, 20)
-        # pi_actions_logprob = tf.clip_by_value(pi_actions_logprob, -20, 20)
 
         pi_mu = tf.multiply(pi_mu, self.action_max)
         pi_samples = tf.multiply(pi_samples, self.action_max)
-        # pi_action = tf.multiply(pi_action, self.action_max)
+
+        # compute logprob for input action
+        pi_raw_actions_logprob = mvn.log_prob(pi_raw_action)
+        pi_action = tf.tanh(pi_raw_action)
+        pi_actions_logprob = pi_raw_actions_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_action ** 2, l=0, u=1) + 1e-6), axis=1)
 
         # TODO: Remove alpha
         # compute softmax prob. of alpha
@@ -226,7 +251,24 @@ class ActorCritic_Network(BaseNetwork):
         pi_alpha = tf.multiply(normalize_alpha, pi_alpha)
 
         # Q branch
-        q_net = tf.contrib.layers.fully_connected(tf.concat([shared_net, q_action], 1), self.critic_layer_dim,
+        with tf.variable_scope('qf'):
+            q_actions_prediction = self.q_network(shared_net, q_action, phase)
+        with tf.variable_scope('qf', reuse=True):
+            # if len(tf.shape(pi_samples)) == 3:
+            pi_samples_reshaped = tf.reshape(pi_samples, (self.batch_size * num_samples, self.action_dim))
+            # else:
+            #     assert(len(tf.shape(pi_samples)) == 2)
+            #     pi_samples_reshaped = pi_samples
+            q_samples_prediction = self.q_network(shared_net, pi_samples_reshaped, phase)
+
+        # print(pi_raw_action, pi_action)
+        # print(pi_raw_actions_logprob, pi_raw_actions_logprob)
+        # print(pi_action, pi_actions_logprob)
+
+        return pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_samples_prediction, q_actions_prediction
+
+    def q_network(self, qnet_layer, qnet_action, phase):
+        q_net = tf.contrib.layers.fully_connected(tf.concat([qnet_layer, qnet_action], 1), self.critic_layer_dim,
                                                   activation_fn=None,
                                                   weights_initializer=tf.contrib.layers.variance_scaling_initializer(
                                                       factor=1.0, mode="FAN_IN", uniform=True),
@@ -236,12 +278,14 @@ class ActorCritic_Network(BaseNetwork):
                                                       factor=1.0, mode="FAN_IN", uniform=True))
 
         q_net = self.apply_norm(q_net, activation_fn=tf.nn.relu, phase=phase, layer_num=3)
-        q_prediction = tf.contrib.layers.fully_connected(q_net, 1, activation_fn=None,
-                                                         weights_initializer=tf.random_uniform_initializer(-3e-3, 3e-3),
-                                                         weights_regularizer=tf.contrib.layers.l2_regularizer(0.01),
-                                                         biases_initializer=tf.random_uniform_initializer(-3e-3, 3e-3))
-
-        return pi_alpha, pi_mu, pi_std, pi_raw_samples, pi_samples, pi_samples_logprob, pi_actions_logprob, q_prediction
+        qnet_prediction = tf.contrib.layers.fully_connected(q_net, 1, activation_fn=None,
+                                                                 weights_initializer=tf.random_uniform_initializer(
+                                                                     -3e-3, 3e-3),
+                                                                 weights_regularizer=tf.contrib.layers.l2_regularizer(
+                                                                     0.01),
+                                                                 biases_initializer=tf.random_uniform_initializer(-3e-3,
+                                                                                                                  3e-3))
+        return qnet_prediction
 
     def clip_but_pass_gradient(self, x, l=-1., u=1.):
         clip_up = tf.cast(x > u, tf.float32)
@@ -289,6 +333,16 @@ class ActorCritic_Network(BaseNetwork):
 
         return tf.reduce_mean(loss)
 
+    def get_actor_loss_reparam(self, pi_samples_logprob, q_pi_val):
+
+        # pi_loss = tf.reduce_mean(self.q_pi - self.entropy_scale * self.logp_pi)
+        return tf.reduce_mean(q_pi_val - self.entropy_scale * pi_samples_logprob)
+
+    def gaussian_loglikelihood(self, x, mu, log_std):
+        pre_sum = -0.5 * (((x - mu) / (tf.exp(log_std) + EPS)) ** 2 + 2 * log_std + np.log(2 * np.pi))
+
+        return tf.reduce_sum(pre_sum, axis=1)
+
     def get_loglikelihood(self, state_batch, raw_action_batch):
 
         action_ll_batch = self.sess.run(self.pi_actions_logprob, feed_dict={
@@ -312,7 +366,7 @@ class ActorCritic_Network(BaseNetwork):
     #     })
 
     def train_critic(self, state_batch, action_batch, q_target_batch):
-        return self.sess.run([self.q_prediction, self.critic_optimize], feed_dict={
+        return self.sess.run([self.q_actions_prediction, self.critic_optimize], feed_dict={
             self.state_ph: state_batch,
             self.q_action_ph: action_batch,
             self.q_target_ph: q_target_batch,
@@ -339,9 +393,17 @@ class ActorCritic_Network(BaseNetwork):
             self.phase_ph: True
         })
 
+    def train_actor_reparam(self, state_batch):
+        # args [inputs, actions, phase]
+        return self.sess.run(self.actor_optimize_reparam, feed_dict={
+            self.state_ph: state_batch,
+            self.phase_ph: True,
+            self.n_samples_ph: 1
+        })
+
     def predict_q(self, state_batch, action_batch, phase):
 
-        return self.sess.run(self.q_prediction, feed_dict={
+        return self.sess.run(self.q_actions_prediction, feed_dict={
             self.state_ph: state_batch,
             self.q_action_ph: action_batch,
             self.phase_ph: phase
@@ -349,7 +411,7 @@ class ActorCritic_Network(BaseNetwork):
 
     def predict_q_target(self, state_batch, action_batch, phase):
 
-        return self.sess.run(self.target_q_prediction, feed_dict={
+        return self.sess.run(self.target_q_actions_prediction, feed_dict={
             self.target_state_ph: state_batch,
             self.target_q_action_ph: action_batch,
             self.target_phase_ph: phase
@@ -368,6 +430,7 @@ class ActorCritic_Network(BaseNetwork):
         else:
             n_samples = self.num_samples
 
+        # print("num_samples: {}".format(n_samples))
         raw_sampled_actions, sampled_actions = self.sess.run(
             [self.pi_raw_samples, self.pi_samples], feed_dict={
                 self.state_ph: state_batch,
@@ -417,9 +480,9 @@ class ActorCritic_Network(BaseNetwork):
         self.sess.run([self.update_target_net_params, self.update_target_batchnorm_params])
 
     def getQFunction(self, state):
-        return lambda action: self.sess.run(self.q_prediction, feed_dict={self.state_ph: np.expand_dims(state, 0),
-                                                                          self.q_action_ph: np.expand_dims([action], 0),
-                                                                          self.phase_ph: False})
+        return lambda action: self.sess.run(self.q_actions_prediction, feed_dict={self.state_ph: np.expand_dims(state, 0),
+                                                                                  self.q_action_ph: np.expand_dims([action], 0),
+                                                                                  self.phase_ph: False})
 
     def getTrueQFunction(self, state):
         return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))

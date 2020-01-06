@@ -173,9 +173,10 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
         # sample actions
         raw_sampled_action_batch, sampled_action_batch = self.hydra_network.sample_action(state_batch, True, is_single_sample=False)
 
-        sampled_action_batch_reshaped = np.reshape(sampled_action_batch,
-                                                   (self.batch_size * self.num_samples, self.action_dim))
+        # reshape
         raw_sampled_action_batch_reshaped = np.reshape(raw_sampled_action_batch,
+                                                       (self.batch_size * self.num_samples, self.action_dim))
+        sampled_action_batch_reshaped = np.reshape(sampled_action_batch,
                                                    (self.batch_size * self.num_samples, self.action_dim))
 
         # get Q val
@@ -184,7 +185,19 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             q_val_batch_reshaped = self.hydra_network.predict_true_q(stacked_state_batch, sampled_action_batch_reshaped)
         else:
             q_val_batch_reshaped = self.hydra_network.predict_q(stacked_state_batch, sampled_action_batch_reshaped, True)
+
         q_val_batch = np.reshape(q_val_batch_reshaped, (self.batch_size, self.num_samples))
+
+        # Batch Dimensions
+        #
+        # raw_sampled_action_batch: (batch_size, num_samples, action_dim)
+        # sampled_action_batch: (batch_size, num_samples, action_dim)
+        # stacked_state_batch: (batch_size, num_samples, action_dim)
+        # q_val_batch: (batch_size, num_samples)
+
+        # raw_sampled_action_batch_reshaped: (batch_size * num_samples, action_dim)
+        # sampled_action_batch_reshaped: (batch_size * num_samples, action_dim)
+        # q_val_batch_reshaped(
 
         # LogLikelihood update
         if self.actor_update == "ll":
@@ -243,24 +256,7 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             self.hydra_network.train_actor_cem(rho_stacked_state_batch, selected_raw_sampled_action_batch)
 
         elif self.actor_update == "reparam":
-
-            raise NotImplementedError
-
-            # taken from raw_sampled_action_batch
-            selected_raw_sampled_action_batch = np.array([a[0] for a in raw_sampled_action_batch])
-            selected_q_val_batch = np.array([b[0] for b in q_val_batch])
-            selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
-
-            # get state val (baseline)
-            q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
-
-            if self.add_entropy:
-                entropy_batch = self.hydra_network.get_loglikelihood(state_batch, selected_raw_sampled_action_batch)
-                entropy_batch = np.expand_dims(entropy_batch, -1)
-            else:
-                entropy_batch = np.zeros((self.batch_size, 1))
-
-            self.hydra_network.train_actor_ll(state_batch, selected_raw_sampled_action_batch, selected_q_val_batch - q_val_mean, self.entropy_scale * entropy_batch)
+            self.hydra_network.train_actor_reparam(state_batch)
 
         else:
             raise ValueError("Invalid  self.actor_update config")
