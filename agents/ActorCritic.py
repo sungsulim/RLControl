@@ -206,7 +206,6 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
             selected_q_val_batch = np.array([b[0] for b in q_val_batch])
             selected_q_val_batch = np.expand_dims(selected_q_val_batch, -1)
 
-
             # get state val (baseline)
             q_val_mean = np.mean(q_val_batch, axis=1, keepdims=True)
 
@@ -231,7 +230,6 @@ class ActorCritic_Network_Manager(BaseNetwork_Manager):
                 entropy_batch = np.zeros((self.batch_size * self.num_samples, 1))
 
             self.hydra_network.train_actor_ll(stacked_state_batch, raw_sampled_action_batch_reshaped, q_val_batch_reshaped - stacked_q_val_mean, self.entropy_scale * entropy_batch)
-
 
         # CEM update
         elif self.actor_update == "cem":

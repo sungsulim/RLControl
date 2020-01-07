@@ -202,11 +202,11 @@ class ActorCritic_Network(BaseNetwork):
             # If updating multiple samples
             stacked_pi_mu = tf.expand_dims(pi_mu, 1)
             stacked_pi_mu = tf.tile(stacked_pi_mu, [1, num_samples, 1])
-            stacked_pi_mu = tf.reshape(stacked_pi_mu, (-1, self.action_dim))
+            stacked_pi_mu = tf.reshape(stacked_pi_mu, (-1, self.action_dim))  # (batch_size * num_samples, action_dim)
 
             stacked_pi_std = tf.expand_dims(pi_std, 1)
             stacked_pi_std = tf.tile(stacked_pi_std, [1, num_samples, 1])
-            stacked_pi_std = tf.reshape(stacked_pi_std, (-1, self.action_dim))
+            stacked_pi_std = tf.reshape(stacked_pi_std, (-1, self.action_dim))  # (batch_size * num_samples, action_dim)
 
             noise = tf.random_normal(tf.shape(stacked_pi_mu))
 
@@ -231,7 +231,7 @@ class ActorCritic_Network(BaseNetwork):
         pi_mu = tf.tanh(pi_mu)
         pi_samples = tf.tanh(pi_raw_samples)
 
-        pi_samples_logprob = pi_raw_samples_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_samples ** 2, l=0, u=1) + 1e-6), axis=1)
+        pi_samples_logprob = pi_raw_samples_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_samples ** 2, l=0, u=1) + 1e-6), axis=-1)
 
         pi_mu = tf.multiply(pi_mu, self.action_max)
         pi_samples = tf.multiply(pi_samples, self.action_max)
@@ -239,7 +239,7 @@ class ActorCritic_Network(BaseNetwork):
         # compute logprob for input action
         pi_raw_actions_logprob = mvn.log_prob(pi_raw_action)
         pi_action = tf.tanh(pi_raw_action)
-        pi_actions_logprob = pi_raw_actions_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_action ** 2, l=0, u=1) + 1e-6), axis=1)
+        pi_actions_logprob = pi_raw_actions_logprob - tf.reduce_sum(tf.log(self.clip_but_pass_gradient(1 - pi_action ** 2, l=0, u=1) + 1e-6), axis=-1)
 
         # TODO: Remove alpha
         # compute softmax prob. of alpha
@@ -334,8 +334,6 @@ class ActorCritic_Network(BaseNetwork):
         return tf.reduce_mean(loss)
 
     def get_actor_loss_reparam(self, pi_samples_logprob, q_pi_val):
-
-        # pi_loss = tf.reduce_mean(self.q_pi - self.entropy_scale * self.logp_pi)
         return tf.reduce_mean(self.entropy_scale * pi_samples_logprob - q_pi_val)
 
     def gaussian_loglikelihood(self, x, mu, log_std):

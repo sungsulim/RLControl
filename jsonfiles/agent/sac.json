@@ -14,10 +14,9 @@
         "pi_lr": [0.01, 0.001, 0.0001, 0.00001],
         "qf_vf_lr": [1, 0.1, 0.01, 0.001],
 
-        "reward_scale": [1, 10, 100, 1000],
-
         "sample_for_eval": ["False"],
-
-        "use_true_q": ["False"]
+        "use_true_q": ["False"],
+        
+        "entropy_scale": [1, 0.1, 0.01, 0.001]
     }
 }

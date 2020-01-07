@@ -32,8 +32,8 @@ class SoftActorCriticNetwork(BaseNetwork):
         self.LOG_STD_MIN = -20
         self.LOG_STD_MAX = 2
 
-        # self.entropy_scale = config.entropy_scale
-        self.reward_scale = config.reward_scale
+        self.entropy_scale = config.entropy_scale
+        # self.reward_scale = config.reward_scale
 
         # self.reparameterize = False
         # if config.reparameterize == "True":
@@ -96,15 +96,15 @@ class SoftActorCriticNetwork(BaseNetwork):
             with tf.control_dependencies(self.batchnorm_ops):
 
                 # Targets for Q and V regression
-                # q_backup = tf.stop_gradient(self.r_ph + self.g_ph * self.v_targ)
-                q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
+                q_backup = tf.stop_gradient(self.r_ph + self.g_ph * self.v_targ)
+                # q_backup = tf.stop_gradient(self.reward_scale * self.r_ph + self.g_ph * self.v_targ)
 
-                # v_backup = tf.stop_gradient(self.q_pi - self.entropy_scale * self.logp_pi)
-                v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
+                v_backup = tf.stop_gradient(self.q_pi - self.entropy_scale * self.logp_pi)
+                # v_backup = tf.stop_gradient(self.q_pi - self.logp_pi)
 
                 # Soft actor-critic losses
-                # pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
-                pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
+                pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
+                # pi_loss = tf.reduce_mean(self.logp_pi - self.q_pi)
 
                 q_loss = 0.5 * tf.reduce_mean((q_backup - self.q) ** 2)
 
