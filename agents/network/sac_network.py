@@ -83,7 +83,7 @@ class SoftActorCriticNetwork(BaseNetwork):
 
                 # TODO: override self.v_targ, self.q_pi, self.q, self.v
                 # Soft actor-critic losses
-                pi_loss = tf.reduce_mean(self.logp_pi - self.true_q_pi_ph)
+                pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.true_q_pi_ph)
 
                 # Policy train op
                 # (has to be separate from value train op, because q1_pi appears in pi_loss)
