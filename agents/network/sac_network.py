@@ -51,7 +51,7 @@ class SoftActorCriticNetwork(BaseNetwork):
         self.g_ph = tf.placeholder(tf.float32, shape=(None, 1))
 
         # for self.use_true_q
-        self.true_q_pi_ph = tf.placeholder(tf.float32, shape=(None, 1))
+        # self.true_q_pi_ph = tf.placeholder(tf.float32, shape=(None, 1))
 
         self.phase_ph = tf.placeholder(tf.bool)
 
@@ -60,6 +60,10 @@ class SoftActorCriticNetwork(BaseNetwork):
 
         with tf.variable_scope('target'):
             _, _, _, _, _, _, self.v_targ = self.build_networks(self.x2_ph, self.a_ph, self.phase_ph)
+
+        self.net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='main')
+        self.target_net_params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope='target')
+
 
         # Op for periodically updating target network with online network weights
         self.update_target_net_params = tf.group([tf.assign(v_targ, (1 - self.tau) * v_targ + self.tau * v_main)
@@ -83,7 +87,8 @@ class SoftActorCriticNetwork(BaseNetwork):
 
                 # TODO: override self.v_targ, self.q_pi, self.q, self.v
                 # Soft actor-critic losses
-                pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.true_q_pi_ph)
+                # pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.true_q_pi_ph)
+                pi_loss = tf.reduce_mean(self.entropy_scale * self.logp_pi - self.q_pi)
 
                 # Policy train op
                 # (has to be separate from value train op, because q1_pi appears in pi_loss)
@@ -129,6 +134,17 @@ class SoftActorCriticNetwork(BaseNetwork):
 
     def get_vars(self, scope):
         return [x for x in tf.global_variables() if scope in x.name]
+
+    def get_variables_to_restore(self, variables, saved_var_list):
+        variables_to_restore = []
+        for v in variables:
+            # one can do include or exclude operations here.
+            if v.name.split(':')[0] in saved_var_list:
+                print("Variables restored: %s" % v.name)
+                variables_to_restore.append(v)
+
+        return variables_to_restore
+
 
     def build_networks(self, state_ph, action_ph, phase_ph):
 

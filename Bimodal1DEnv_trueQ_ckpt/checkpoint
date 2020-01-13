@@ -1,0 +1,2 @@
+model_checkpoint_path: "Bimodal1DEnv_uneq_var2_trueQ_learned"
+all_model_checkpoint_paths: "Bimodal1DEnv_uneq_var2_trueQ_learned"

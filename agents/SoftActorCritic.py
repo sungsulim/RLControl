@@ -9,6 +9,7 @@ from agents.network import sac_network
 from experiment import write_summary
 import utils.plot_utils
 # from spinup.utils.logx import EpochLogger
+from tensorflow.python.tools.inspect_checkpoint import print_tensors_in_checkpoint_file
 
 
 class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
@@ -28,6 +29,20 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.network = sac_network.SoftActorCriticNetwork(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
+
+            if config.use_true_q:
+                # load learned model
+                ckpt_name = './Bimodal1DEnv_trueQ_ckpt/{}_trueQ_learned'.format(config.env_name)
+                raw_vars_list = tf.train.list_variables(ckpt_name)
+
+                vars_list = []
+                for item in raw_vars_list:
+                    if 'main/qf' in item[0]:
+                        vars_list.append(item[0])
+
+                variables_to_restore = self.network.get_variables_to_restore(tf.global_variables(), vars_list)
+                restorer = tf.train.Saver(variables_to_restore)
+                restorer.restore(self.sess, ckpt_name)
 
             self.network.init_target_network()
 
@@ -58,7 +73,9 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
             if self.write_plot:
 
                 if self.use_true_q:
-                    q_func = self.network.getTrueQFunction(state)
+                    # Loaded almost True Q
+                    q_func = self.network.getQFunction(state)
+                    # q_func = self.network.getTrueQFunction(state)
                     # raise NotImplementedError
                 else:
                     q_func = self.network.getQFunction(state)
@@ -94,7 +111,8 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
         if self.use_true_q:
-            outs = self.network.update_network_true_q(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+            # outs = self.network.update_network_true_q(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+            outs = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
         else:
             # Policy Update, Qf and Vf Update
             outs = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
