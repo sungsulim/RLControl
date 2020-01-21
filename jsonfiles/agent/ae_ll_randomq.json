@@ -1,8 +1,8 @@
 {
     "agent": "ActorCritic",
     "sweeps": {
-        "critic_update": ["random_q"],
-        "actor_update": ["reparam"],
+        "critic_update": ["random_q", "sampled", "mean"],
+        "actor_update": ["ll", "cem"],
 
         "norm_type": ["input_norm"],
 
@@ -12,8 +12,8 @@
         "actor_l2_dim": [200],
         "critic_l2_dim": [200],
 
-        "actor_lr": [0.01, 0.001, 0.0001, 0.00001],
-        "critic_lr": [1, 0.1, 0.01, 0.001],
+        "actor_lr": [1e-3, 1e-4, 1e-5],
+        "critic_lr": [1e-2, 1e-3, 1e-4],
 
         "rho": [0.05],
         "num_samples": [120],
