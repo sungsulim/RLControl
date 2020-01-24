@@ -23,6 +23,10 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
         if config.sample_for_eval == "True":
             self.sample_for_eval = True
 
+        self.use_true_q = False
+        if config.use_true_q == "True":
+            self.use_true_q = True
+
         with self.graph.as_default():
             tf.set_random_seed(config.random_seed)
             self.sess = tf.Session()
@@ -30,7 +34,7 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
             self.network = sac_network.SoftActorCriticNetwork(self.sess, self.input_norm, config)
             self.sess.run(tf.global_variables_initializer())
 
-            if config.use_true_q:
+            if self.use_true_q:
                 # load learned model
                 ckpt_name = './Bimodal1DEnv_trueQ_ckpt/{}_trueQ_learned'.format(config.env_name)
                 raw_vars_list = tf.train.list_variables(ckpt_name)
@@ -46,9 +50,7 @@ class SoftActorCritic_Network_Manager(BaseNetwork_Manager):
 
             self.network.init_target_network()
 
-        self.use_true_q = False
-        if config.use_true_q == "True":
-            self.use_true_q = True
+
 
     def take_action(self, state, is_train, is_start):
 
