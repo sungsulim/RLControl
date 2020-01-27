@@ -27,7 +27,7 @@ class ReverseKL_Network_Manager(BaseNetwork_Manager):
             self.use_true_q = True
 
         # define network
-        self.network = reversekl_network.ReverseKLNetwork()
+        self.network = reversekl_network.ReverseKLNetwork(None, self.input_norm, config)
 
     def take_action(self, state, is_train, is_start):
 
@@ -48,7 +48,17 @@ class ReverseKL_Network_Manager(BaseNetwork_Manager):
                 raise NotImplementedError
 
             if self.write_plot:
-                raise NotImplementedError
+                q_func = self.network.getQFunction(state)
+                pi_func = self.network.getPolicyFunction(state)
+                greedy_action = self.network.predict_action(np.expand_dims(state, 0))[0]
+
+                utils.plot_utils.plotFunction("SoftActorCritic", [q_func, pi_func], state,
+                                              greedy_action, chosen_action,
+                                              self.action_min, self.action_max,
+                                              display_title='Reverse KL, steps: ' + str(self.train_global_steps),
+                                              save_title='steps_' + str(self.train_global_steps),
+                                              save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
+                                              show=False)
 
         # Eval
         else:

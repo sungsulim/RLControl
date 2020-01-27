@@ -31,7 +31,7 @@ class ReverseKLNetwork(BaseNetwork):
         self.entropy_scale = config.entropy_scale
 
         # create network
-        self.pi_net = PolicyNetwork(self.state_dim, self.action_dim, config.actor_l1_dim, config.actor_l2_dim)
+        self.pi_net = PolicyNetwork(self.state_dim, self.action_dim, config.actor_l1_dim, config.actor_l2_dim, self.action_max[0])
         self.q_net = SoftQNetwork(self.state_dim, self.action_dim, config.critic_l1_dim, config.critic_l2_dim)
 
         self.v_net = ValueNetwork(self.state_dim, config.critic_l1_dim, config.critic_l2_dim)
@@ -54,22 +54,20 @@ class ReverseKLNetwork(BaseNetwork):
 
         action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        return action
+        # print("sample action: {}".format(action.detach().numpy()))
+        return action.detach().numpy()
 
     def predict_action(self, state_batch):
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
 
-        mean, log_std = self.pi_net(state_batch)
+        # mean, log_std = self.pi_net(state_batch)
+        _, _, _, mean, log_std = self.pi_net.evaluate(state_batch)
+        # print("predict action: {}".format(mean.detach().numpy()))
 
-        return mean
+        return mean.detach().numpy()
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
-
-        # hyperparams
-        mean_lambda = 1  # 1e-3
-        std_lambda = 1  # 1e-3
-        z_lambda = 0.0
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         action_batch = torch.FloatTensor(action_batch).to(self.device)
@@ -77,26 +75,37 @@ class ReverseKLNetwork(BaseNetwork):
         reward_batch = torch.FloatTensor(reward_batch).to(self.device)
         gamma_batch = torch.FloatTensor(gamma_batch).to(self.device)
 
+        reward_batch.unsqueeze_(-1)
+        gamma_batch.unsqueeze_(-1)
         expected_q_val = self.q_net(state_batch, action_batch)
         expected_v_val = self.v_net(state_batch)
         new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
         target_value = self.target_v_net(next_state_batch)
         next_q_value = reward_batch + gamma_batch * target_value
-        q_value_loss = nn.MSELoss(expected_q_val, next_q_value.detach())
+        q_value_loss = nn.MSELoss()(expected_q_val, next_q_value.detach())
 
         expected_new_q_val = self.q_net(state_batch, new_action)
-        next_value = expected_new_q_val - log_prob
-        value_loss = nn.MSELoss(expected_v_val, next_value.detach())
+        next_value = expected_new_q_val - self.entropy_scale * log_prob
+        value_loss = nn.MSELoss()(expected_v_val, next_value.detach())
 
         log_prob_target = expected_new_q_val - expected_v_val
-        policy_loss = (log_prob * (log_prob - log_prob_target).detach()).mean()
 
-        mean_loss = mean_lambda * mean.pow(2).mean()
-        std_loss = std_lambda * log_std.pow(2).mean()
-        z_loss = z_lambda * z.pow(2).sum(1).mean()
+        # loglikelihood update
+        policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
 
-        policy_loss += mean_loss + std_loss + z_loss
+        # reparam update
+        # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
+
+        # mean_lambda = 1  # 1e-3
+        # std_lambda = 1  # 1e-3
+        # z_lambda = 0.0
+
+        # mean_loss = mean_lambda * mean.pow(2).mean()
+        # std_loss = std_lambda * log_std.pow(2).mean()
+        # z_loss = z_lambda * z.pow(2).sum(1).mean()
+
+        # policy_loss += mean_loss + std_loss + z_loss
 
         self.q_optimizer.zero_grad()
         q_value_loss.backward()
@@ -116,6 +125,17 @@ class ReverseKLNetwork(BaseNetwork):
                 target_param.data * (1.0 - self.tau) + param.data * self.tau
             )
 
+    def getQFunction(self, state):
+        return lambda action: (self.q_net(torch.FloatTensor(state).to(self.device).unsqueeze(-1),
+                                         torch.FloatTensor([action]).to(self.device).unsqueeze(-1))).detach().numpy()
+
+    def getPolicyFunction(self, state):
+
+        # mean, logstd = self.pi_net(torch.FloatTensor(state).to(self.device).unsqueeze(-1))
+        _, _, _, mean, log_std = self.pi_net.evaluate(torch.FloatTensor(state).to(self.device).unsqueeze(-1))
+        mean = mean.detach().numpy()
+        std = (log_std.exp()).detach().numpy()
+        return lambda action: 1/(std * np.sqrt(2 * np.pi)) * np.exp(- (action - mean)**2 / (2 * std**2))
 
 class ValueNetwork(nn.Module):
     def __init__(self, state_dim, l1_dim, l2_dim, init_w=3e-3):
@@ -159,7 +179,7 @@ class SoftQNetwork(nn.Module):
 
 
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_dim, action_dim, l1_dim, l2_dim, init_w=3e-3, log_std_min=-20, log_std_max=2):
+    def __init__(self, state_dim, action_dim, l1_dim, l2_dim, action_scale, init_w=3e-3, log_std_min=-20, log_std_max=2):
         super(PolicyNetwork, self).__init__()
 
         self.log_std_min = log_std_min
@@ -176,6 +196,7 @@ class PolicyNetwork(nn.Module):
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
+        self.action_scale = action_scale
         self.device = torch.device("cpu")
 
     def forward(self, state):
@@ -198,6 +219,12 @@ class PolicyNetwork(nn.Module):
 
         log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon)
         log_prob = log_prob.sum(-1, keepdim=True)
+
+        # scale to correct range
+        action *= self.action_scale
+
+        mean = torch.tanh(mean)
+        mean *= self.action_scale
 
         return action, log_prob, z, mean, log_std
 
