@@ -221,7 +221,9 @@ class PolicyNetwork(nn.Module):
         log_prob = log_prob.sum(-1, keepdim=True)
 
         # scale to correct range
+        # print(action, self.action_scale)
         action *= self.action_scale
+        # exit()
 
         mean = torch.tanh(mean)
         mean *= self.action_scale

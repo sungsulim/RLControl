@@ -1,11 +1,10 @@
 from __future__ import print_function
-import random
+
 import numpy as np
-# import tensorflow as tf
 
 from agents.base_agent import BaseAgent
 from agents.network.base_network_manager import BaseNetwork_Manager
-# from agents.network import sac_network
+
 from agents.network import reversekl_network
 from experiment import write_summary
 import utils.plot_utils
