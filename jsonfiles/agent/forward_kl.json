@@ -1,5 +1,5 @@
 {
-    "agent": "ReverseKL",
+    "agent": "ForwardKL",
     "sweeps": {
         "norm_type": ["input_norm"],
 
@@ -16,11 +16,6 @@
         "sample_for_eval": ["False"],
         "use_true_q": ["False"],
 
-        "entropy_scale": [0.1, 0.01, 0.001],
-
-        "l_param": [3],
-        "N_param": [256],
-
-        "optim_type": ["intg", "ll"]
+        "entropy_scale": [0.1, 0.01, 0.001]
     }
 }

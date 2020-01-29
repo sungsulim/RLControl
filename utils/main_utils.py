@@ -69,6 +69,10 @@ def create_agent(agent_string, config):
         from agents.ReverseKL import ReverseKL
         return ReverseKL(config)
 
+    elif agent_string == 'ForwardKL':
+        from agents.ForwardKL import ForwardKL
+        return ForwardKL(config)
+
     # elif agent_string == "AE_CCEM_separate":
     #     from agents.AE_CCEM_separate import AE_CCEM_separate
     #     return AE_CCEM_separate(env, config, seed)
