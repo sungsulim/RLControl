@@ -9,6 +9,10 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Normal
 import quadpy
+import itertools
+
+from scipy.special import binom
+
 
 class ReverseKLNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
@@ -52,45 +56,47 @@ class ReverseKLNetwork(BaseNetwork):
 
         dtype = torch.float
 
-        self.l = 3  # 5
-        self.N = 256  # 1024
-
-        self.scheme = quadpy.line_segment.clenshaw_curtis(self.N)
         if self.action_dim == 1:
+            self.N = 256  # 1024
+
+            scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(self.scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
-            self.intgrl_weights = torch.tensor(self.scheme.weights[1:-1], dtype=dtype)
+            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
+            self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
+
+            self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
+
         else:
-            raise NotImplementedError("Only works for 1 dim action space")
+            self.l = 5  # 5
 
-            # n_points = [1]
-            # for i in range(1, self.l):
-            #     n_points.append(2 ** i + 1)
-            # # print(n_points)
-            # schemes = [quadpy.line_segment.clenshaw_curtis(n_points[i]) for i in range(1, self.l)]
-            # points = [np.array([0.])] + [scheme.points[1:-1] for scheme in schemes]
-            # # print(points)
-            # weights = [np.array([2.])] + [scheme.weights[1:-1] for scheme in schemes]
-            # # precalculate actions and weights
-            # self.intgrl_actions = []
-            # self.intgrl_weights = []
-            # for k in itertools.product(range(self.l), repeat=self.env.action_dim):
-            #     if (np.sum(k) + self.env.action_dim < self.l) or (
-            #             np.sum(k) + self.env.action_dim > self.l + self.env.action_dim - 1):
-            #         continue
-            #     coeff = (-1) ** (self.l + self.env.action_dim - np.sum(k) - self.env.action_dim + 1) * binom(
-            #         self.env.action_dim - 1, np.sum(k) + self.env.action_dim - self.l)
-            #     for j in itertools.product(*[range(len(points[ki])) for ki in k]):
-            #         self.intgrl_actions.append(
-            #             torch.tensor([points[k[i]][j[i]] for i in range(self.env.action_dim)], dtype=dtype))
-            #         self.intgrl_weights.append(
-            #             coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.env.action_dim)]))
-            # self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
-            # self.intgrl_actions = torch.stack(self.intgrl_actions)
+            n_points = [1]
+            for i in range(1, self.l):
+                n_points.append(2 ** i + 1)
 
-        # self.name = "CCAllActions_alr={}_clr={}_hidden={}_N={}".format(self.actor_lr, self.critic_lr, self.n_hidden,
-        #                                                                len(self.intgrl_actions))
+            schemes = [quadpy.line_segment.clenshaw_curtis(n_points[i]) for i in range(1, self.l)]
+            points = [np.array([0.])] + [scheme.points[1:-1] for scheme in schemes]
+            weights = [np.array([2.])] + [scheme.weights[1:-1] for scheme in schemes]
 
+            # precalculate actions and weights
+            self.intgrl_actions = []
+            self.intgrl_weights = []
+
+            for k in itertools.product(range(self.l), repeat=self.action_dim):
+                if (np.sum(k) + self.action_dim < self.l) or (
+                        np.sum(k) + self.action_dim > self.l + self.action_dim - 1):
+                    continue
+                coeff = (-1) ** (self.l + self.action_dim - np.sum(k) - self.action_dim + 1) * binom(
+                    self.action_dim - 1, np.sum(k) + self.action_dim - self.l)
+
+                for j in itertools.product(*[range(len(points[ki])) for ki in k]):
+                    self.intgrl_actions.append(
+                        torch.tensor([points[k[i]][j[i]] for i in range(self.action_dim)], dtype=dtype))
+                    self.intgrl_weights.append(
+                        coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
+            self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
+            self.intgrl_actions = torch.stack(self.intgrl_actions)
+
+            self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 
     def sample_action(self, state_batch):
 
@@ -143,21 +149,21 @@ class ReverseKLNetwork(BaseNetwork):
             policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
 
         elif self.optim_type == 'intg':
-            stacked_state_batch = state_batch.unsqueeze(1).repeat(1, (self.N-2), 1).reshape(-1, self.state_dim)
+            stacked_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, self.state_dim)
 
             tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
             stacked_intgrl_actions = tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
 
             intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
-            intgrl_v_val = v_val.unsqueeze(1).repeat(1, (self.N-2), 1).reshape(-1, 1)
+            intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
 
             # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
             intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
 
             integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
 
-            # policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
-            policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).mean()
+            policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
+            # policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).mean()
 
 
 

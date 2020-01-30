@@ -11,6 +11,7 @@ from torch.distributions import Normal
 import quadpy
 import itertools
 
+
 class ForwardKLNetwork(BaseNetwork):
     def __init__(self, sess, input_norm, config):
         super(ForwardKLNetwork, self).__init__(sess, config, [config.pi_lr, config.qf_vf_lr])
@@ -48,8 +49,6 @@ class ForwardKLNetwork(BaseNetwork):
         self.pi_optimizer = optim.Adam(self.pi_net.parameters(), lr=self.learning_rate[0])
         self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.learning_rate[1])
         self.v_optimizer = optim.Adam(self.v_net.parameters(), lr=self.learning_rate[1])
-
-
 
         #############
         dtype = torch.float
