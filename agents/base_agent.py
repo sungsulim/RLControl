@@ -53,13 +53,21 @@ class BaseAgent(object):
     
     def update(self, state, next_state, reward, action, is_terminal, is_truncated):
         if not is_truncated:
+
+            # state = np.expand_dims(state, 0)
+            # next_state = np.expand_dims(next_state, 0)
+            # action = np.expand_dims(action, 0)
+            # reward = np.expand_dims(reward, 0)
+
             if not is_terminal:
                 self.replay_buffer.add(state, action, reward, next_state, self.gamma)
+                # self.network_manager.update_network(state, action, next_state, reward, [self.gamma])
             else:
                 self.replay_buffer.add(state, action, reward, next_state, 0.0)
+                # self.network_manager.update_network(state, action, next_state, reward, [0.0])
 
         if self.norm_type != 'none':
-            self.network_manager.input_norm.update(np.array([state]))
+            self.network_manager.input_norm.update(state)
         self.learn()
 
     def learn(self):
