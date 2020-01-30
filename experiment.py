@@ -18,7 +18,8 @@ class Experiment(object):
         self.test_environment = test_environment # copy.deepcopy(environment) # this didn't work for Box2D env
         self.test_environment.set_random_seed(seed)
 
-        self.train_rewards_per_episode = []        
+        self.train_rewards_per_episode = []
+        self.train_cum_steps = []
         self.eval_mean_rewards_per_episode = []
         self.eval_std_rewards_per_episode = []
 
@@ -59,6 +60,7 @@ class Experiment(object):
 
             if not force_terminated: 
                 self.train_rewards_per_episode.append(episode_reward)
+                self.train_cum_steps.append(self.total_step_count)
 
             # write tf summary
             if not self.total_step_count == self.train_environment.TOTAL_STEPS_LIMIT:
@@ -76,7 +78,7 @@ class Experiment(object):
         print("Training Time: " + time.strftime("%H:%M:%S", time.gmtime(self.cum_train_time)))
         print("Evaluation Time: " + time.strftime("%H:%M:%S", time.gmtime(self.cum_eval_time)))
 
-        return self.train_rewards_per_episode, self.eval_mean_rewards_per_episode, self.eval_std_rewards_per_episode
+        return self.train_rewards_per_episode, self.eval_mean_rewards_per_episode, self.eval_std_rewards_per_episode, self.train_cum_steps
 
     # Runs a single episode (TRAIN)
     def run_episode_train(self, is_train):

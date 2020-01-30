@@ -106,7 +106,7 @@ def main():
                             writer=writer, write_log=args.write_log, write_plot=args.write_plot)
     
     # run experiment
-    episode_rewards, eval_episode_mean_rewards, eval_episode_std_rewards = experiment.run()
+    episode_rewards, eval_episode_mean_rewards, eval_episode_std_rewards, train_episode_steps = experiment.run()
 
     # save to file
     prefix = save_dir + env_json['environment'] + '_'+agent_json['agent'] + '_setting_' + str(SETTING_NUM) + '_run_'+str(RUN_NUM)
@@ -119,6 +119,9 @@ def main():
 
     eval_std_rewards_filename = prefix + '_EvalEpisodeStdRewardsLC.txt'
     np.array(eval_episode_std_rewards).tofile(eval_std_rewards_filename, sep=',', format='%15.8f')
+
+    train_episode_steps_filename = prefix + '_EpisodeStepsLC.txt'
+    np.array(train_episode_steps).tofile(train_episode_steps_filename, sep=',', format='%15.8f')
 
     params = []
     # params_names = '_'
