@@ -58,7 +58,7 @@ class ReverseKLNetwork(BaseNetwork):
         dtype = torch.float
 
         if self.action_dim == 1:
-            self.N = 256  # 1024
+            self.N = config.N_param  # 1024
 
             scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
@@ -68,7 +68,7 @@ class ReverseKLNetwork(BaseNetwork):
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 
         else:
-            self.l = 5  # 5
+            self.l = config.l_param  # 5
 
             n_points = [1]
             for i in range(1, self.l):
