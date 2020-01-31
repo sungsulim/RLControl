@@ -62,7 +62,7 @@ class ReverseKLNetwork(BaseNetwork):
 
             scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
+            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
             self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
@@ -95,7 +95,7 @@ class ReverseKLNetwork(BaseNetwork):
                     self.intgrl_weights.append(
                         coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
             self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
-            self.intgrl_actions = torch.stack(self.intgrl_actions)
+            self.intgrl_actions = torch.stack(self.intgrl_actions) * self.action_max
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 

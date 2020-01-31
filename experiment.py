@@ -15,7 +15,7 @@ class Experiment(object):
         self.train_environment.set_random_seed(seed)
 
         # for eval purpose
-        self.test_environment = test_environment # copy.deepcopy(environment) # this didn't work for Box2D env
+        self.test_environment = test_environment  # copy.deepcopy(environment) # this didn't work for Box2D env
         self.test_environment.set_random_seed(seed)
 
         self.train_rewards_per_episode = []
