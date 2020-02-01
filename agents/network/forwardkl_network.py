@@ -147,24 +147,40 @@ class ForwardKLNetwork(BaseNetwork):
             # policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
 
         elif self.optim_type == 'intg':
-            stacked_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, self.state_dim)
+            tiled_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1)  # (32, 254, 3)
+            stacked_state_batch = tiled_state_batch.reshape(-1, self.state_dim)  # (8128, 3)
 
-            intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)
-            intgrl_q_val_reshaped = intgrl_q_val.reshape(-1, self.intgrl_actions_len)
+            intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
+            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)  # (32, 254)
+
+            # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+            # tiled_intgrl_v_val = intgrl_v_val.reshape(-1, self.intgrl_actions_len)
 
             # compute Z
-            constant_shift, _ = torch.max(intgrl_q_val_reshaped, -1, keepdim=True)
-            constant_shift = constant_shift.repeat(1, self.intgrl_actions_len)  # (32, 254)
-            intgrl_exp_q_val = torch.exp(intgrl_q_val_reshaped) - constant_shift
+            constant_shift, _ = torch.max(tiled_intgrl_q_val, -1, keepdim=True)
+            tiled_constant_shift = constant_shift.repeat(1, self.intgrl_actions_len)  # (32, 254)
 
-            z = (intgrl_exp_q_val * self.tiled_intgrl_weights).sum(-1)
-            tiled_z = z.unsqueeze(-1).repeat(1, self.intgrl_actions_len)
+            # intgrl_exp_q_val = torch.exp(tiled_intgrl_q_val)  # - constant_shift
+            intgrl_exp_q_val = torch.exp(tiled_intgrl_q_val - tiled_constant_shift).detach()  # (32, 254)
+
+            z = (intgrl_exp_q_val * self.tiled_intgrl_weights).sum(-1).detach()  # (32,)
+            tiled_z = z.unsqueeze(-1).repeat(1, self.intgrl_actions_len).detach()  # (32, 254)
 
             # print('softmax: {}, avg expq: {}, avg z: {}'.format((intgrl_exp_q_val/tiled_z).mean(), intgrl_exp_q_val.mean(), z.mean()))
 
-            intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
-            integrands = ((intgrl_exp_q_val / tiled_z).detach() * intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len))
-            policy_loss = -(integrands * self.tiled_intgrl_weights).sum(-1).mean(-1)
+            boltzmann_prob = intgrl_exp_q_val / tiled_z
+
+            # print("avg softmax: {}, avg numerator: {}, avg const shift: {}, avg denom: {}".format(boltzmann_prob.mean(), intgrl_exp_q_val.mean(), constant_shift.mean(), tiled_z.mean()))
+            intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)  # (32 * 254, 1)
+            tiled_intgrl_logprob = intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len)  # (32, 254)
+
+            # divide z later
+            # integrands = intgrl_exp_q_val * tiled_intgrl_logprob
+            # policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1) / z).mean(-1)
+
+            # divide z now
+            integrands = boltzmann_prob * tiled_intgrl_logprob
+            policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1)).mean(-1)
 
         # reparam update
         # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
@@ -314,7 +330,7 @@ class PolicyNetwork(nn.Module):
 
         log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
         stacked_log_prob = log_prob.permute(1, 0, 2).reshape(-1, 1)
-        return stacked_log_prob
+        return stacked_log_prob  # (32 * 254, 1)
 
     def get_distribution(self, mean, std):
         if self.action_dim == 1:
