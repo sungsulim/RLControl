@@ -62,7 +62,7 @@ class ForwardKLNetwork(BaseNetwork):
 
             scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
+            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
             self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
@@ -95,8 +95,12 @@ class ForwardKLNetwork(BaseNetwork):
                     self.intgrl_weights.append(
                         coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
             self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
-            self.intgrl_actions = torch.stack(self.intgrl_actions)
+            self.intgrl_actions = torch.stack(self.intgrl_actions) * self.action_max
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
+
+        self.tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
+        self.stacked_intgrl_actions = self.tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
+        self.tiled_intgrl_weights = self.intgrl_weights.unsqueeze(0).repeat(self.config.batch_size, 1)
 
     def sample_action(self, state_batch):
         state_batch = torch.FloatTensor(state_batch).to(self.device)
@@ -145,26 +149,22 @@ class ForwardKLNetwork(BaseNetwork):
         elif self.optim_type == 'intg':
             stacked_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, self.state_dim)
 
-            tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
-            stacked_intgrl_actions = tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
-
-            intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
-
-            intgrl_q_val_reshaped = intgrl_q_val.reshape(-1, self.intgrl_actions_len, 1)
+            intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)
+            intgrl_q_val_reshaped = intgrl_q_val.reshape(-1, self.intgrl_actions_len)
 
             # compute Z
-            torch.exp(intgrl_q_val_reshaped).squeeze() * self.intgrl_weights.repeat(self.config.batch_size)
+            constant_shift, _ = torch.max(intgrl_q_val_reshaped, -1, keepdim=True)
+            constant_shift = constant_shift.repeat(1, self.intgrl_actions_len)  # (32, 254)
+            intgrl_exp_q_val = torch.exp(intgrl_q_val_reshaped) - constant_shift
 
-            self.intgrl_weights.unsqueeze(0)
-            intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+            z = (intgrl_exp_q_val * self.tiled_intgrl_weights).sum(-1)
+            tiled_z = z.unsqueeze(-1).repeat(1, self.intgrl_actions_len)
 
-            # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
-            intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
+            # print('softmax: {}, avg expq: {}, avg z: {}'.format((intgrl_exp_q_val/tiled_z).mean(), intgrl_exp_q_val.mean(), z.mean()))
 
-            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
-
-            policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
-
+            intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
+            integrands = ((intgrl_exp_q_val / tiled_z).detach() * intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len))
+            policy_loss = -(integrands * self.tiled_intgrl_weights).sum(-1).mean(-1)
 
         # reparam update
         # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
@@ -198,6 +198,7 @@ class ForwardKLNetwork(BaseNetwork):
         mean = mean.detach().numpy()
         std = (log_std.exp()).detach().numpy()
         return lambda action: 1/(std * np.sqrt(2 * np.pi)) * np.exp(- (action - mean)**2 / (2 * std**2))
+
 
 class ValueNetwork(nn.Module):
     def __init__(self, state_dim, l1_dim, l2_dim, init_w=3e-3):
@@ -291,9 +292,7 @@ class PolicyNetwork(nn.Module):
 
         mean = torch.tanh(mean)
         mean *= self.action_scale
-
         return action, log_prob, z, mean, log_std
-
 
     def get_logprob(self, states, tiled_actions, epsilon=1e-6):
 
@@ -313,9 +312,8 @@ class PolicyNetwork(nn.Module):
         if len(log_prob.shape) == 2:
             log_prob.unsqueeze_(-1)
 
-        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1,keepdim=True)
+        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
         stacked_log_prob = log_prob.permute(1, 0, 2).reshape(-1, 1)
-
         return stacked_log_prob
 
     def get_distribution(self, mean, std):
@@ -323,10 +321,7 @@ class PolicyNetwork(nn.Module):
             normal = Normal(mean, std)
         else:
             normal = MultivariateNormal(mean, torch.diag_embed(std))
-
         return normal
-
-
 
     def atanh(self, x):
         return (torch.log(1 + x) - torch.log(1 - x)) / 2

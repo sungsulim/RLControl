@@ -21,6 +21,6 @@
         "l_param": [5],
         "N_param": [256],
 
-        "optim_type": ["intg", "ll"]
+        "optim_type": ["intg"]
     }
 }
