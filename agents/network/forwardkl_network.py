@@ -102,6 +102,8 @@ class ForwardKLNetwork(BaseNetwork):
         self.stacked_intgrl_actions = self.tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
         self.tiled_intgrl_weights = self.intgrl_weights.unsqueeze(0).repeat(self.config.batch_size, 1)
 
+        print("Num. Integration points: {}".format(self.intgrl_actions_len))
+
     def sample_action(self, state_batch):
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
