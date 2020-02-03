@@ -55,14 +55,16 @@ class ForwardKLNetwork(BaseNetwork):
         self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.learning_rate[1])
         self.v_optimizer = optim.Adam(self.v_net.parameters(), lr=self.learning_rate[1])
 
-        dtype = torch.float
+        dtype = torch.float32
 
         if self.action_dim == 1:
             self.N = config.N_param  # 1024
 
             scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
+            # self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
+            self.intgrl_actions = (torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max).to(
+                torch.float32)
             self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
