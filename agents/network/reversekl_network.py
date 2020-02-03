@@ -209,6 +209,9 @@ class ValueNetwork(nn.Module):
         self.linear2 = nn.Linear(l1_dim, l2_dim)
         self.linear3 = nn.Linear(l2_dim, 1)
 
+        self.linear3.weight.data.uniform_(-init_w, init_w)
+        self.linear3.bias.data.uniform_(-init_w, init_w)
+
         self.device = torch.device("cpu")
 
     def forward(self, state):
@@ -263,12 +266,12 @@ class PolicyNetwork(nn.Module):
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
-        self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        # self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        # self.mean_linear.bias.data.uniform_(-init_w, init_w)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
-        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
-        self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+        # self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
         self.action_dim = action_dim
         self.action_scale = action_scale
