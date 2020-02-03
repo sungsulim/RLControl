@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Normal
+from torch.distributions import MultivariateNormal
 import quadpy
 import itertools
 
@@ -54,20 +55,22 @@ class ReverseKLNetwork(BaseNetwork):
         self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.learning_rate[1])
         self.v_optimizer = optim.Adam(self.v_net.parameters(), lr=self.learning_rate[1])
 
-        dtype = torch.float
+        dtype = torch.float32
 
         if self.action_dim == 1:
-            self.N = 256  # 1024
+            self.N = config.N_param  # 1024
 
             scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
+            # self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
+            self.intgrl_actions = (torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max).to(
+                torch.float32)
             self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 
         else:
-            self.l = 5  # 5
+            self.l = config.l_param  # 5
 
             n_points = [1]
             for i in range(1, self.l):
@@ -94,7 +97,7 @@ class ReverseKLNetwork(BaseNetwork):
                     self.intgrl_weights.append(
                         coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
             self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
-            self.intgrl_actions = torch.stack(self.intgrl_actions)
+            self.intgrl_actions = torch.stack(self.intgrl_actions) * self.action_max
 
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 
@@ -163,8 +166,6 @@ class ReverseKLNetwork(BaseNetwork):
             integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
 
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
-            # policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).mean()
-
 
 
         # reparam update
@@ -273,6 +274,7 @@ class PolicyNetwork(nn.Module):
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
+        self.action_dim = action_dim
         self.action_scale = action_scale
         self.device = torch.device("cpu")
 
@@ -290,19 +292,18 @@ class PolicyNetwork(nn.Module):
         mean, log_std = self.forward(state)
         std = log_std.exp()
 
-        normal = Normal(mean, std)
+        normal = self.get_distribution(mean, std)
+
         z = normal.sample()
         action = torch.tanh(z)
+        log_prob = normal.log_prob(z)
 
-        # TODO: Double check
-        # log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon)
-        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon).sum(-1, keepdim=True)
-        # log_prob = log_prob.sum(-1, keepdim=True)
+        if len(log_prob.shape) == 1:
+            log_prob.unsqueeze_(-1)
+        log_prob -= torch.log(1 - action.pow(2) + epsilon).sum(-1, keepdim=True)
 
         # scale to correct range
-        # print(action, self.action_scale)
         action *= self.action_scale
-        # exit()
 
         mean = torch.tanh(mean)
         mean *= self.action_scale
@@ -315,39 +316,33 @@ class PolicyNetwork(nn.Module):
         # states; (32, 3)
         # tiled_actions: (32, 254, 1)
 
-        mean, log_std = self.forward(states)
-        std = log_std.exp()
-
-        normal = Normal(mean, std)
-
         normalized_actions = tiled_actions.permute(1, 0, 2) / self.action_scale  # (254, 32, 1)
         atanh_actions = self.atanh(normalized_actions)  # (254, 32, 1)
 
-        # pdf = torch.exp(normal.log_prob(atanh_actions)) / ((1 - normalized_actions.pow(2)).prod(dim=-1))
-        log_prob = normal.log_prob(atanh_actions) - torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
+        mean, log_std = self.forward(states)
+        std = log_std.exp()
 
+        normal = self.get_distribution(mean, std)
+
+        log_prob = normal.log_prob(atanh_actions)
+
+        if len(log_prob.shape) == 2:
+            log_prob.unsqueeze_(-1)
+
+        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1,keepdim=True)
         stacked_log_prob = log_prob.permute(1, 0, 2).reshape(-1, 1)
+
         return stacked_log_prob
 
-        # # assuming actions is already tanh transformed
-        # # states and actions should have same batch size
-        #
-        # # states: (32 * 254, 3)
-        # # actions: (32 * 254, 1)
-        #
-        # # TODO: Change so that you create less distributions, and then repeat it
-        # mean, log_std = self.forward(stacked_states)
-        # std = log_std.exp()
-        #
-        # normal = Normal(mean, std)
-        #
-        # normalized_actions = stacked_actions / self.action_scale
-        # atanh_actions = self.atanh(normalized_actions)
-        #
-        # # pdf = torch.exp(normal.log_prob(atanh_actions)) / ((1 - normalized_actions.pow(2)).prod(dim=-1))
-        # log_prob = normal.log_prob(atanh_actions) - torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
-        #
-        # return log_prob
+    def get_distribution(self, mean, std):
+        if self.action_dim == 1:
+            normal = Normal(mean, std)
+        else:
+            normal = MultivariateNormal(mean, torch.diag_embed(std))
+
+        return normal
+
+
 
     def atanh(self, x):
         return (torch.log(1 + x) - torch.log(1 - x)) / 2

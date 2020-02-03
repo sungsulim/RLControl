@@ -8,8 +8,11 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.distributions import Normal
+from torch.distributions import MultivariateNormal
 import quadpy
 import itertools
+
+from scipy.special import binom
 
 
 class ForwardKLNetwork(BaseNetwork):
@@ -17,6 +20,8 @@ class ForwardKLNetwork(BaseNetwork):
         super(ForwardKLNetwork, self).__init__(sess, config, [config.pi_lr, config.qf_vf_lr])
 
         self.config = config
+
+        self.optim_type = config.optim_type
 
         self.use_true_q = False
         if config.use_true_q == "True":
@@ -50,102 +55,67 @@ class ForwardKLNetwork(BaseNetwork):
         self.q_optimizer = optim.Adam(self.q_net.parameters(), lr=self.learning_rate[1])
         self.v_optimizer = optim.Adam(self.v_net.parameters(), lr=self.learning_rate[1])
 
-        #############
-        dtype = torch.float
+        dtype = torch.float32
 
-        self.l = 3  # 5
-        self.N = 256  # 1024
-
-        self.scheme = quadpy.line_segment.clenshaw_curtis(self.N)
         if self.action_dim == 1:
+            self.N = config.N_param  # 1024
+
+            scheme = quadpy.line_segment.clenshaw_curtis(self.N)
             # cut off endpoints since they should be zero but numerically might give nans
-            self.intgrl_actions = torch.tensor(self.scheme.points[1:-1], dtype=dtype).unsqueeze(-1)
-            self.intgrl_weights = torch.tensor(self.scheme.weights[1:-1], dtype=dtype)
+            # self.intgrl_actions = torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max
+            self.intgrl_actions = (torch.tensor(scheme.points[1:-1], dtype=dtype).unsqueeze(-1) * self.action_max).to(
+                torch.float32)
+            self.intgrl_weights = torch.tensor(scheme.weights[1:-1], dtype=dtype)
+
+            self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
+
         else:
-            raise NotImplementedError
+            self.l = config.l_param  # 5
 
-            # n_points = [1]
-            # for i in range(1, self.l):
-            #     n_points.append(2 ** i + 1)
-            # # print(n_points)
-            # schemes = [quadpy.line_segment.clenshaw_curtis(n_points[i]) for i in range(1, self.l)]
-            # points = [np.array([0.])] + [scheme.points[1:-1] for scheme in schemes]
-            # # print(points)
-            # weights = [np.array([2.])] + [scheme.weights[1:-1] for scheme in schemes]
-            # # precalculate actions and weights
-            # self.intgrl_actions = []
-            # self.intgrl_weights = []
-            # for k in itertools.product(range(self.l), repeat=self.env.action_dim):
-            #     if (np.sum(k) + self.env.action_dim < self.l) or (
-            #             np.sum(k) + self.env.action_dim > self.l + self.env.action_dim - 1):
-            #         continue
-            #     coeff = (-1) ** (self.l + self.env.action_dim - np.sum(k) - self.env.action_dim + 1) * binom(
-            #         self.env.action_dim - 1, np.sum(k) + self.env.action_dim - self.l)
-            #     for j in itertools.product(*[range(len(points[ki])) for ki in k]):
-            #         self.intgrl_actions.append(
-            #             torch.tensor([points[k[i]][j[i]] for i in range(self.env.action_dim)], dtype=dtype))
-            #         self.intgrl_weights.append(
-            #             coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.env.action_dim)]))
-            # self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
-            # self.intgrl_actions = torch.stack(self.intgrl_actions)
+            n_points = [1]
+            for i in range(1, self.l):
+                n_points.append(2 ** i + 1)
 
-        # self.name = "CCAllActions_alr={}_clr={}_hidden={}_N={}".format(self.actor_lr, self.critic_lr, self.n_hidden,
-        #                                                                len(self.intgrl_actions))
+            schemes = [quadpy.line_segment.clenshaw_curtis(n_points[i]) for i in range(1, self.l)]
+            points = [np.array([0.])] + [scheme.points[1:-1] for scheme in schemes]
+            weights = [np.array([2.])] + [scheme.weights[1:-1] for scheme in schemes]
 
-    def get_pdf(self, s, a):
-        # s is a single state
-        # a could be a batch of actions
-        mean, std = self.policy(s)
-        m = Normal(loc=mean, scale=std)
-        return torch.exp(m.log_prob(a).sum(dim=-1))
+            # precalculate actions and weights
+            self.intgrl_actions = []
+            self.intgrl_weights = []
 
-    def get_tanh_pdf(self, s, a):
-        # mean, std = self.policy(s)
-        # assuming a is already tanh transformed
-        pdf = self.get_pdf(s, self.atanh(a)) / ((1 - a.pow(2)).prod(dim = -1))
-        return pdf
+            for k in itertools.product(range(self.l), repeat=self.action_dim):
+                if (np.sum(k) + self.action_dim < self.l) or (
+                        np.sum(k) + self.action_dim > self.l + self.action_dim - 1):
+                    continue
+                coeff = (-1) ** (self.l + self.action_dim - np.sum(k) - self.action_dim + 1) * binom(
+                    self.action_dim - 1, np.sum(k) + self.action_dim - self.l)
 
-    def step(self, s, a, r, sp, done):
-        # update the critic
-        v_loss = torch.pow(r + (1. - done) * self.gamma * self.vcritic(sp).detach() - self.vcritic(s), 2)
-        # print(s.shape)
-        q_loss = torch.pow(r + (1. - done) * self.gamma * self.vcritic(sp).detach() - self.qcritic(torch.cat([s.squeeze(), torch.tensor(a, dtype = dtype)], dim = -1)), 2)
-        pdf = self.get_tanh_pdf(s, self.actions)
-        # q_arg = torch.cat([s.squeeze().repeat(len(self.actions), 1), self.actions.unsqueeze(-1)], dim = -1) # this type of broadcasting only makes sense with 1D actions
-        # print(pdf.shape, self.actions.shape)
-        q_arg = torch.cat([s.squeeze().repeat(self.actions.shape[0], 1), self.actions], dim = -1)
-        q_value = self.qcritic(q_arg).squeeze()
-        # print(q_value.shape, pdf.shape, q_arg.shape)
-        integrands = -pdf.squeeze() * ((q_value.squeeze() - self.vcritic(s)).detach())
-        # print(integrands.shape)
-        policy_loss = (integrands.squeeze() * self.weights.squeeze()).sum()
-        self.vcritic_optim.zero_grad()
-        self.qcritic_optim.zero_grad()
-        self.policy_optim.zero_grad()
-        (policy_loss + v_loss + q_loss).backward()
-        self.vcritic_optim.step()
-        self.qcritic_optim.step()
-        self.policy_optim.step()
+                for j in itertools.product(*[range(len(points[ki])) for ki in k]):
+                    self.intgrl_actions.append(
+                        torch.tensor([points[k[i]][j[i]] for i in range(self.action_dim)], dtype=dtype))
+                    self.intgrl_weights.append(
+                        coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
+            self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
+            self.intgrl_actions = torch.stack(self.intgrl_actions) * self.action_max
+            self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
 
-    def atanh(self, x):
-        return (torch.log(1 + x) - torch.log(1 - x)) / 2
+        self.tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
+        self.stacked_intgrl_actions = self.tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
+        self.tiled_intgrl_weights = self.intgrl_weights.unsqueeze(0).repeat(self.config.batch_size, 1)
+
+        print("Num. Integration points: {}".format(self.intgrl_actions_len))
 
     def sample_action(self, state_batch):
-
         state_batch = torch.FloatTensor(state_batch).to(self.device)
-
         action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        # print("sample action: {}".format(action.detach().numpy()))
         return action.detach().numpy()
 
     def predict_action(self, state_batch):
 
         state_batch = torch.FloatTensor(state_batch).to(self.device)
-
-        # mean, log_std = self.pi_net(state_batch)
         _, _, _, mean, log_std = self.pi_net.evaluate(state_batch)
-        # print("predict action: {}".format(mean.detach().numpy()))
 
         return mean.detach().numpy()
 
@@ -173,16 +143,48 @@ class ForwardKLNetwork(BaseNetwork):
         value_loss = nn.MSELoss()(v_val, target_v_val.detach())
 
         # pi_loss
-        stacked_state_batch = state_batch.unsqueeze(0).repeat(self.intgrl_actions.shape[0], 1, 1).permute(1,0,2).reshape(-1, self.state_dim)  # (254 x 32, 3)
-        stacked_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1).reshape(-1, self.action_dim)  # (254 x 32, 1)
+        if self.optim_type == 'll':
+            raise NotImplementedError
+            # log_prob_target = new_q_val - v_val
+            #
+            # # loglikelihood update
+            # policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
 
-        intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
+        elif self.optim_type == 'intg':
+            tiled_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1)  # (32, 254, 3)
+            stacked_state_batch = tiled_state_batch.reshape(-1, self.state_dim)  # (8128, 3)
 
+            intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
+            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)  # (32, 254)
 
-        log_prob_target = new_q_val - v_val
+            # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+            # tiled_intgrl_v_val = intgrl_v_val.reshape(-1, self.intgrl_actions_len)
 
-        # loglikelihood update
-        policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
+            # compute Z
+            constant_shift, _ = torch.max(tiled_intgrl_q_val, -1, keepdim=True)
+            tiled_constant_shift = constant_shift.repeat(1, self.intgrl_actions_len)  # (32, 254)
+
+            # intgrl_exp_q_val = torch.exp(tiled_intgrl_q_val)  # - constant_shift
+            intgrl_exp_q_val = torch.exp(tiled_intgrl_q_val - tiled_constant_shift).detach()  # (32, 254)
+
+            z = (intgrl_exp_q_val * self.tiled_intgrl_weights).sum(-1).detach()  # (32,)
+            tiled_z = z.unsqueeze(-1).repeat(1, self.intgrl_actions_len).detach()  # (32, 254)
+
+            # print('softmax: {}, avg expq: {}, avg z: {}'.format((intgrl_exp_q_val/tiled_z).mean(), intgrl_exp_q_val.mean(), z.mean()))
+
+            boltzmann_prob = intgrl_exp_q_val / tiled_z
+
+            # print("avg softmax: {}, avg numerator: {}, avg const shift: {}, avg denom: {}".format(boltzmann_prob.mean(), intgrl_exp_q_val.mean(), constant_shift.mean(), tiled_z.mean()))
+            intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)  # (32 * 254, 1)
+            tiled_intgrl_logprob = intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len)  # (32, 254)
+
+            # divide z later
+            # integrands = intgrl_exp_q_val * tiled_intgrl_logprob
+            # policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1) / z).mean(-1)
+
+            # divide z now
+            integrands = boltzmann_prob * tiled_intgrl_logprob
+            policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1)).mean(-1)
 
         # reparam update
         # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
@@ -216,6 +218,7 @@ class ForwardKLNetwork(BaseNetwork):
         mean = mean.detach().numpy()
         std = (log_std.exp()).detach().numpy()
         return lambda action: 1/(std * np.sqrt(2 * np.pi)) * np.exp(- (action - mean)**2 / (2 * std**2))
+
 
 class ValueNetwork(nn.Module):
     def __init__(self, state_dim, l1_dim, l2_dim, init_w=3e-3):
@@ -276,6 +279,7 @@ class PolicyNetwork(nn.Module):
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
+        self.action_dim = action_dim
         self.action_scale = action_scale
         self.device = torch.device("cpu")
 
@@ -293,46 +297,54 @@ class PolicyNetwork(nn.Module):
         mean, log_std = self.forward(state)
         std = log_std.exp()
 
-        normal = Normal(mean, std)
+        normal = self.get_distribution(mean, std)
+
         z = normal.sample()
         action = torch.tanh(z)
+        log_prob = normal.log_prob(z)
 
-        log_prob = normal.log_prob(z) - torch.log(1 - action.pow(2) + epsilon).sum(-1, keepdim=True)
-        # log_prob = log_prob.sum(-1, keepdim=True)
+        if len(log_prob.shape) == 1:
+            log_prob.unsqueeze_(-1)
+        log_prob -= torch.log(1 - action.pow(2) + epsilon).sum(-1, keepdim=True)
 
         # scale to correct range
         action *= self.action_scale
 
         mean = torch.tanh(mean)
         mean *= self.action_scale
-
         return action, log_prob, z, mean, log_std
 
-    def get_logprob(self, stacked_states, stacked_actions, epsilon=1e-6):
+    def get_logprob(self, states, tiled_actions, epsilon=1e-6):
 
-        # assuming actions is already tanh transformed
-        # states and actions should have same batch size
+        # states; (32, 3)
+        # tiled_actions: (32, 254, 1)
 
-        # states: (254 * 32, 3)
-        # actions: (254 * 32, 1)
+        normalized_actions = tiled_actions.permute(1, 0, 2) / self.action_scale  # (254, 32, 1)
+        atanh_actions = self.atanh(normalized_actions)  # (254, 32, 1)
 
-        mean, log_std = self.forward(stacked_states)
+        mean, log_std = self.forward(states)
         std = log_std.exp()
 
-        normal = Normal(mean, std)
+        normal = self.get_distribution(mean, std)
 
-        normalized_actions = stacked_actions / self.action_scale
-        atanh_actions = self.atanh(normalized_actions)
+        log_prob = normal.log_prob(atanh_actions)
 
-        # pdf = torch.exp(normal.log_prob(atanh_actions)) / ((1 - normalized_actions.pow(2)).prod(dim=-1))
-        log_prob = normal.log_prob(atanh_actions) - torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1)
+        if len(log_prob.shape) == 2:
+            log_prob.unsqueeze_(-1)
 
+        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
+        stacked_log_prob = log_prob.permute(1, 0, 2).reshape(-1, 1)
+        return stacked_log_prob  # (32 * 254, 1)
 
-        return log_prob
+    def get_distribution(self, mean, std):
+        if self.action_dim == 1:
+            normal = Normal(mean, std)
+        else:
+            normal = MultivariateNormal(mean, torch.diag_embed(std))
+        return normal
 
     def atanh(self, x):
         return (torch.log(1 + x) - torch.log(1 - x)) / 2
-
 
     def get_action(self, state):
         state = torch.FloatTensor(state).unsqueeze(0).to(self.device)

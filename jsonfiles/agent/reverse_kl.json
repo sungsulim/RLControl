@@ -18,9 +18,9 @@
 
         "entropy_scale": [0.1, 0.01, 0.001],
 
-        "l_param": [3],
+        "l_param": [7],
         "N_param": [256],
 
-        "optim_type": ["intg", "ll"]
+        "optim_type": ["intg"]
     }
 }

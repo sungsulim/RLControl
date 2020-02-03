@@ -54,7 +54,7 @@ class ForwardKL_Network_Manager(BaseNetwork_Manager):
                 utils.plot_utils.plotFunction("SoftActorCritic", [q_func, pi_func], state,
                                               greedy_action, chosen_action,
                                               self.action_min, self.action_max,
-                                              display_title='Reverse KL, steps: ' + str(self.train_global_steps),
+                                              display_title='Forward KL, steps: ' + str(self.train_global_steps),
                                               save_title='steps_' + str(self.train_global_steps),
                                               save_dir=self.writer.get_logdir(), ep_count=self.train_ep_count,
                                               show=False)
