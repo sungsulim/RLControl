@@ -228,9 +228,6 @@ class ValueNetwork(nn.Module):
         self.linear2 = nn.Linear(l1_dim, l2_dim)
         self.linear3 = nn.Linear(l2_dim, 1)
 
-        self.linear3.weight.data.uniform_(-init_w, init_w)
-        self.linear3.bias.data.uniform_(-init_w, init_w)
-
         self.device = torch.device("cpu")
 
     def forward(self, state):
@@ -251,6 +248,10 @@ class SoftQNetwork(nn.Module):
         self.linear3.weight.data.uniform_(-init_w, init_w)
         self.linear3.bias.data.uniform_(-init_w, init_w)
 
+        # self.linear1 = nn.Linear(state_dim + action_dim, 1)
+        # self.linear1.weight.data.uniform_(-init_w, init_w)
+        # self.linear1.bias.data.uniform_(-init_w, init_w)
+
         self.device = torch.device("cpu")
 
     def forward(self, state, action):
@@ -258,6 +259,7 @@ class SoftQNetwork(nn.Module):
         x = F.relu(self.linear1(x))
         x = F.relu(self.linear2(x))
         x = self.linear3(x)
+
         return x
 
 
@@ -268,14 +270,22 @@ class PolicyNetwork(nn.Module):
         self.log_std_min = log_std_min
         self.log_std_max = log_std_max
 
-        self.linear1 = nn.Linear(state_dim, l1_dim)
-        self.linear2 = nn.Linear(l1_dim, l2_dim)
+        # self.linear1 = nn.Linear(state_dim, l1_dim)
+        # self.linear2 = nn.Linear(l1_dim, l2_dim)
+        #
+        # self.mean_linear = nn.Linear(l2_dim, action_dim)
+        # self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        # self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        #
+        # self.log_std_linear = nn.Linear(l2_dim, action_dim)
+        # self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
-        self.mean_linear = nn.Linear(l2_dim, action_dim)
+        self.mean_linear = nn.Linear(state_dim, action_dim)
         self.mean_linear.weight.data.uniform_(-init_w, init_w)
         self.mean_linear.bias.data.uniform_(-init_w, init_w)
 
-        self.log_std_linear = nn.Linear(l2_dim, action_dim)
+        self.log_std_linear = nn.Linear(state_dim, action_dim)
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
@@ -284,11 +294,11 @@ class PolicyNetwork(nn.Module):
         self.device = torch.device("cpu")
 
     def forward(self, state):
-        x = F.relu(self.linear1(state))
-        x = F.relu(self.linear2(x))
+        # x = F.relu(self.linear1(state))
+        # x = F.relu(self.linear2(x))
 
-        mean = self.mean_linear(x)
-        log_std = self.log_std_linear(x)
+        mean = self.mean_linear(state)
+        log_std = self.log_std_linear(state)
         log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
 
         return mean, log_std
@@ -312,7 +322,9 @@ class PolicyNetwork(nn.Module):
 
         mean = torch.tanh(mean)
         mean *= self.action_scale
+
         return action, log_prob, z, mean, log_std
+
 
     def get_logprob(self, states, tiled_actions, epsilon=1e-6):
 
@@ -332,16 +344,20 @@ class PolicyNetwork(nn.Module):
         if len(log_prob.shape) == 2:
             log_prob.unsqueeze_(-1)
 
-        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1, keepdim=True)
+        log_prob -= torch.log(1 - normalized_actions.pow(2) + epsilon).sum(dim=-1,keepdim=True)
         stacked_log_prob = log_prob.permute(1, 0, 2).reshape(-1, 1)
-        return stacked_log_prob  # (32 * 254, 1)
+
+        return stacked_log_prob
 
     def get_distribution(self, mean, std):
         if self.action_dim == 1:
             normal = Normal(mean, std)
         else:
             normal = MultivariateNormal(mean, torch.diag_embed(std))
+
         return normal
+
+
 
     def atanh(self, x):
         return (torch.log(1 + x) - torch.log(1 - x)) / 2

@@ -205,20 +205,16 @@ class ValueNetwork(nn.Module):
     def __init__(self, state_dim, l1_dim, l2_dim, init_w=3e-3):
         super(ValueNetwork, self).__init__()
 
-        # self.linear1 = nn.Linear(state_dim, l1_dim)
-        # self.linear2 = nn.Linear(l1_dim, l2_dim)
-        # self.linear3 = nn.Linear(l2_dim, 1)
-
-        self.linear1 = nn.Linear(state_dim, 1)
-        self.linear1.weight.data.uniform_(-init_w, init_w)
-        self.linear1.bias.data.uniform_(-init_w, init_w)
+        self.linear1 = nn.Linear(state_dim, l1_dim)
+        self.linear2 = nn.Linear(l1_dim, l2_dim)
+        self.linear3 = nn.Linear(l2_dim, 1)
 
         self.device = torch.device("cpu")
 
     def forward(self, state):
-        # x = F.relu(self.linear1(state))
-        # x = F.relu(self.linear2(x))
-        x = self.linear1(state)
+        x = F.relu(self.linear1(state))
+        x = F.relu(self.linear2(x))
+        x = self.linear3(x)
         return x
 
 
@@ -226,24 +222,24 @@ class SoftQNetwork(nn.Module):
     def __init__(self, state_dim, action_dim, l1_dim, l2_dim, init_w=3e-3):
         super(SoftQNetwork, self).__init__()
 
-        # self.linear1 = nn.Linear(state_dim + action_dim, l1_dim)
-        # self.linear2 = nn.Linear(l1_dim, l2_dim)
-        # self.linear3 = nn.Linear(l2_dim, 1)
-        #
-        # self.linear3.weight.data.uniform_(-init_w, init_w)
-        # self.linear3.bias.data.uniform_(-init_w, init_w)
+        self.linear1 = nn.Linear(state_dim + action_dim, l1_dim)
+        self.linear2 = nn.Linear(l1_dim, l2_dim)
+        self.linear3 = nn.Linear(l2_dim, 1)
 
-        self.linear1 = nn.Linear(state_dim + action_dim, 1)
-        self.linear1.weight.data.uniform_(-init_w, init_w)
-        self.linear1.bias.data.uniform_(-init_w, init_w)
+        self.linear3.weight.data.uniform_(-init_w, init_w)
+        self.linear3.bias.data.uniform_(-init_w, init_w)
+
+        # self.linear1 = nn.Linear(state_dim + action_dim, 1)
+        # self.linear1.weight.data.uniform_(-init_w, init_w)
+        # self.linear1.bias.data.uniform_(-init_w, init_w)
 
         self.device = torch.device("cpu")
 
     def forward(self, state, action):
         x = torch.cat([state, action], 1)
-        # x = F.relu(self.linear1(x))
-        # x = F.relu(self.linear2(x))
-        x = self.linear1(x)
+        x = F.relu(self.linear1(x))
+        x = F.relu(self.linear2(x))
+        x = self.linear3(x)
 
         return x
 

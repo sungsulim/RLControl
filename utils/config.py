@@ -9,7 +9,7 @@ class Config:
         self.exploration_policy = None
 
         self.warmup_steps = 0
-        self.batch_size = 128
+        self.batch_size = 1
         self.buffer_size = 1e6
 
         self.tau = 0.01
