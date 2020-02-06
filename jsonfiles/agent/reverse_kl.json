@@ -16,10 +16,10 @@
         "sample_for_eval": ["False"],
         "use_true_q": ["False"],
 
-        "entropy_scale": [0.1, 0.01, 0.001],
+        "entropy_scale": [1, 0.1, 0.01, 0.001],
 
         "l_param": [7],
-        "N_param": [256],
-        "optim_type": ["ll", "hard_ll", "hard_intg"]
+        "N_param": [64],
+        "optim_type": ["intg"]
     }
 }
