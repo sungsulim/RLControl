@@ -20,6 +20,6 @@
 
         "l_param": [7],
         "N_param": [256],
-        "optim_type": ["intg", "ll", "hard_intg"]
+        "optim_type": ["ll", "hard_ll", "hard_intg"]
     }
 }

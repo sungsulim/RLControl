@@ -146,10 +146,14 @@ class ReverseKLNetwork(BaseNetwork):
         # pi_loss
 
         if self.optim_type == 'll':
-            log_prob_target = new_q_val # - v_val
+            log_prob_target = new_q_val - v_val
 
             # loglikelihood update
             policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
+
+        elif self.optim_type == 'hard_ll':
+            log_prob_target = new_q_val - v_val
+            policy_loss = (-log_prob * (log_prob_target).detach()).mean()
 
         elif self.optim_type == 'reparam':
             # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
@@ -162,13 +166,13 @@ class ReverseKLNetwork(BaseNetwork):
             stacked_intgrl_actions = tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
 
             intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
-            # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+            intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
 
             # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
             intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
 
-            # integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
-            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - intgrl_logprob.squeeze())
+            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
+            # integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - intgrl_logprob.squeeze())
 
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
 
@@ -179,14 +183,12 @@ class ReverseKLNetwork(BaseNetwork):
 
             intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
             intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
-            # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+            intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
 
-            # integrands = -torch.exp(intgrl_logprob.squeeze()) * (intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach()
-            integrands = -torch.exp(intgrl_logprob.squeeze()) * (intgrl_q_val.squeeze()).detach()
+            integrands = -torch.exp(intgrl_logprob.squeeze()) * (intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach()
+            # integrands = -torch.exp(intgrl_logprob.squeeze()) * (intgrl_q_val.squeeze()).detach()
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
-        elif self.optim_type == 'hard_ll':
 
-            pass
 
 
         self.q_optimizer.zero_grad()
