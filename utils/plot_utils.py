@@ -13,7 +13,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
     fig, ax = plt.subplots(2, sharex=True)
     # fig, ax = plt.subplots(figsize=(10, 5))
 
-    x = np.linspace(x_min, x_max, resolution)
+    x = np.linspace(x_min, x_max, int(resolution))
     y1 = []
     y2 = []
 
@@ -56,7 +56,7 @@ def plotFunction(agent_name, func_list, state, greedy_action, expl_action, x_min
                 mode_string += "{:.2f}".format(np.squeeze(greedy_action[i]))
 
             ax[0].set_title("Action-values, argmax Q(S,A): {:.2f}".format(max_point_x))
-            ax[1].set_title("Policy, greedy action: " + mode_string)
+            ax[1].set_title("Policy, mean: {}".format(mode_string))
         else:
             top_margin = 1.0
 

@@ -47,7 +47,11 @@ class ForwardKL_Network_Manager(BaseNetwork_Manager):
                 raise NotImplementedError
 
             if self.write_plot:
-                q_func = self.network.getQFunction(state)
+                if self.use_true_q:
+                    q_func = self.network.getTrueQFunction(state)
+                else:
+                    q_func = self.network.getQFunction(state)
+
                 pi_func = self.network.getPolicyFunction(state)
                 greedy_action = self.network.predict_action(np.expand_dims(state, 0))[0]
 
@@ -80,14 +84,11 @@ class ForwardKL_Network_Manager(BaseNetwork_Manager):
 
     def update_network(self, state_batch, action_batch, next_state_batch, reward_batch, gamma_batch):
 
-        if self.use_true_q:
-            raise NotImplementedError
-        else:
-            # Policy Update, Qf and Vf Update
-            _ = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
+        # Policy Update, Qf and Vf Update
+        _ = self.network.update_network(state_batch, action_batch, next_state_batch, reward_batch, gamma_batch)
 
-            # Update target networks
-            self.network.update_target_network()
+        # Update target networks
+        self.network.update_target_network()
 
 
 class ForwardKL(BaseAgent):

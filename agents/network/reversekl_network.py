@@ -98,8 +98,11 @@ class ReverseKLNetwork(BaseNetwork):
                         coeff * np.prod([weights[k[i]][j[i]].squeeze() for i in range(self.action_dim)]))
             self.intgrl_weights = torch.tensor(self.intgrl_weights, dtype=dtype)
             self.intgrl_actions = torch.stack(self.intgrl_actions) * self.action_max
-
             self.intgrl_actions_len = np.shape(self.intgrl_actions)[0]
+
+        self.tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
+        self.stacked_intgrl_actions = self.tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
+        self.tiled_intgrl_weights = self.intgrl_weights.unsqueeze(0).repeat(self.config.batch_size, 1)
 
     def sample_action(self, state_batch):
 
@@ -130,23 +133,30 @@ class ReverseKLNetwork(BaseNetwork):
 
         reward_batch.unsqueeze_(-1)
         gamma_batch.unsqueeze_(-1)
-        q_val = self.q_net(state_batch, action_batch)
-        v_val = self.v_net(state_batch)
-        new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        # q_loss, v_loss
-        target_next_v_val = self.target_v_net(next_state_batch)
-        target_q_val = reward_batch + gamma_batch * target_next_v_val
-        q_value_loss = nn.MSELoss()(q_val, target_q_val.detach())
+        if not self.use_true_q:
+            q_val = self.q_net(state_batch, action_batch)
+            v_val = self.v_net(state_batch)
+            new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        new_q_val = self.q_net(state_batch, new_action)
-        target_v_val = new_q_val - self.entropy_scale * log_prob
-        value_loss = nn.MSELoss()(v_val, target_v_val.detach())
+            # q_loss, v_loss
+            target_next_v_val = self.target_v_net(next_state_batch)
+            target_q_val = reward_batch + gamma_batch * target_next_v_val
+            q_value_loss = nn.MSELoss()(q_val, target_q_val.detach())
+
+            new_q_val = self.q_net(state_batch, new_action)
+            target_v_val = new_q_val - self.entropy_scale * log_prob
+            value_loss = nn.MSELoss()(v_val, target_v_val.detach())
 
         # pi_loss
 
         if self.optim_type == 'll':
-            log_prob_target = new_q_val - v_val
+
+            if self.use_true_q:
+                new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
+                new_q_val = torch.from_numpy(self.predict_true_q(state_batch, new_action))
+
+            log_prob_target = new_q_val # - v_val
 
             # loglikelihood update
             policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
@@ -154,30 +164,35 @@ class ReverseKLNetwork(BaseNetwork):
         elif self.optim_type == 'intg':
             stacked_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, self.state_dim)
 
-            tiled_intgrl_actions = self.intgrl_actions.unsqueeze(0).repeat(self.config.batch_size, 1, 1)
-            stacked_intgrl_actions = tiled_intgrl_actions.reshape(-1, self.action_dim)  # (32 x 254, 1)
+            if self.use_true_q:
+                intgrl_q_val = torch.from_numpy(self.predict_true_q(stacked_state_batch, self.stacked_intgrl_actions))
 
-            intgrl_q_val = self.q_net(stacked_state_batch, stacked_intgrl_actions)
-            intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
+                # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
+                intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
 
-            # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
-            intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
+                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - intgrl_logprob.squeeze())
+            else:
+                intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)
+                intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
 
-            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
+                # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
+                intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
+
+                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
 
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
-
 
         # reparam update
         # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
 
-        self.q_optimizer.zero_grad()
-        q_value_loss.backward()
-        self.q_optimizer.step()
+        if not self.use_true_q:
+            self.q_optimizer.zero_grad()
+            q_value_loss.backward()
+            self.q_optimizer.step()
 
-        self.v_optimizer.zero_grad()
-        value_loss.backward()
-        self.v_optimizer.step()
+            self.v_optimizer.zero_grad()
+            value_loss.backward()
+            self.v_optimizer.step()
 
         self.pi_optimizer.zero_grad()
         policy_loss.backward()
@@ -192,6 +207,14 @@ class ReverseKLNetwork(BaseNetwork):
     def getQFunction(self, state):
         return lambda action: (self.q_net(torch.FloatTensor(state).to(self.device).unsqueeze(-1),
                                          torch.FloatTensor([action]).to(self.device).unsqueeze(-1))).detach().numpy()
+
+    def getTrueQFunction(self, state):
+        return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))
+
+    # bandit setting
+    def predict_true_q(self, inputs, action):
+        q_val_batch = [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
+        return np.expand_dims(q_val_batch, -1)
 
     def getPolicyFunction(self, state):
 
@@ -270,8 +293,9 @@ class PolicyNetwork(nn.Module):
         # self.mean_linear.bias.data.uniform_(-init_w, init_w)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
-        # self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+        self.log_std_linear.bias.data.uniform_(-0.5, -0.5)
 
         self.action_dim = action_dim
         self.action_scale = action_scale

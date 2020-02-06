@@ -129,18 +129,20 @@ class ForwardKLNetwork(BaseNetwork):
 
         reward_batch.unsqueeze_(-1)
         gamma_batch.unsqueeze_(-1)
-        q_val = self.q_net(state_batch, action_batch)
-        v_val = self.v_net(state_batch)
-        new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        # q_loss, v_loss
-        target_next_v_val = self.target_v_net(next_state_batch)
-        target_q_val = reward_batch + gamma_batch * target_next_v_val
-        q_value_loss = nn.MSELoss()(q_val, target_q_val.detach())
+        if not self.use_true_q:
+            q_val = self.q_net(state_batch, action_batch)
+            v_val = self.v_net(state_batch)
+            new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
 
-        new_q_val = self.q_net(state_batch, new_action)
-        target_v_val = new_q_val - self.entropy_scale * log_prob
-        value_loss = nn.MSELoss()(v_val, target_v_val.detach())
+            # q_loss, v_loss
+            target_next_v_val = self.target_v_net(next_state_batch)
+            target_q_val = reward_batch + gamma_batch * target_next_v_val
+            q_value_loss = nn.MSELoss()(q_val, target_q_val.detach())
+
+            new_q_val = self.q_net(state_batch, new_action)
+            target_v_val = new_q_val - self.entropy_scale * log_prob
+            value_loss = nn.MSELoss()(v_val, target_v_val.detach())
 
         # pi_loss
         if self.optim_type == 'll':
@@ -154,7 +156,11 @@ class ForwardKLNetwork(BaseNetwork):
             tiled_state_batch = state_batch.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1)  # (32, 254, 3)
             stacked_state_batch = tiled_state_batch.reshape(-1, self.state_dim)  # (8128, 3)
 
-            intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
+            if self.use_true_q:
+                # predict_true_q
+                intgrl_q_val = torch.from_numpy(self.predict_true_q(stacked_state_batch, self.stacked_intgrl_actions))
+            else:
+                intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
             tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)  # (32, 254)
 
             # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
@@ -170,17 +176,10 @@ class ForwardKLNetwork(BaseNetwork):
             z = (intgrl_exp_q_val * self.tiled_intgrl_weights).sum(-1).detach()  # (32,)
             tiled_z = z.unsqueeze(-1).repeat(1, self.intgrl_actions_len).detach()  # (32, 254)
 
-            # print('softmax: {}, avg expq: {}, avg z: {}'.format((intgrl_exp_q_val/tiled_z).mean(), intgrl_exp_q_val.mean(), z.mean()))
-
             boltzmann_prob = intgrl_exp_q_val / tiled_z
 
-            # print("avg softmax: {}, avg numerator: {}, avg const shift: {}, avg denom: {}".format(boltzmann_prob.mean(), intgrl_exp_q_val.mean(), constant_shift.mean(), tiled_z.mean()))
             intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)  # (32 * 254, 1)
             tiled_intgrl_logprob = intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len)  # (32, 254)
-
-            # divide z later
-            # integrands = intgrl_exp_q_val * tiled_intgrl_logprob
-            # policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1) / z).mean(-1)
 
             # divide z now
             integrands = boltzmann_prob * tiled_intgrl_logprob
@@ -189,13 +188,14 @@ class ForwardKLNetwork(BaseNetwork):
         # reparam update
         # policy_loss = - (expected_new_q_val - self.entropy_scale * log_prob).mean()
 
-        self.q_optimizer.zero_grad()
-        q_value_loss.backward()
-        self.q_optimizer.step()
+        if not self.use_true_q:
+            self.q_optimizer.zero_grad()
+            q_value_loss.backward()
+            self.q_optimizer.step()
 
-        self.v_optimizer.zero_grad()
-        value_loss.backward()
-        self.v_optimizer.step()
+            self.v_optimizer.zero_grad()
+            value_loss.backward()
+            self.v_optimizer.step()
 
         self.pi_optimizer.zero_grad()
         policy_loss.backward()
@@ -210,6 +210,14 @@ class ForwardKLNetwork(BaseNetwork):
     def getQFunction(self, state):
         return lambda action: (self.q_net(torch.FloatTensor(state).to(self.device).unsqueeze(-1),
                                          torch.FloatTensor([action]).to(self.device).unsqueeze(-1))).detach().numpy()
+
+    def getTrueQFunction(self, state):
+        return lambda action: self.predict_true_q(np.expand_dims(state, 0), np.expand_dims([action], 0))
+
+    # bandit setting
+    def predict_true_q(self, inputs, action):
+        q_val_batch = [getattr(environments.environments, self.config.env_name).reward_func(a[0]) for a in action]
+        return np.expand_dims(q_val_batch, -1)
 
     def getPolicyFunction(self, state):
 
@@ -282,12 +290,13 @@ class PolicyNetwork(nn.Module):
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
-        self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        # self.mean_linear.weight.data.uniform_(-init_w, init_w)
+        # self.mean_linear.bias.data.uniform_(-init_w, init_w)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
-        self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+        # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
+        self.log_std_linear.bias.data.uniform_(-0.5, -0.5)
 
         self.action_dim = action_dim
         self.action_scale = action_scale
