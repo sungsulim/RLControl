@@ -1,6 +1,6 @@
 {
     "agent": "ReverseKL",
-    "sweeps": {
+   "sweeps": {
         "norm_type": ["input_norm"],
 
         "exploration_policy": ["none"],
@@ -20,7 +20,6 @@
 
         "l_param": [7],
         "N_param": [256],
-
-        "optim_type": ["intg"]
+        "optim_type": ["intg", "ll", "hard_intg"]
     }
 }
