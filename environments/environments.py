@@ -233,7 +233,7 @@ class Bimodal1DEnvironment(object):
         # Reward function.
         # Two gaussian functions.
         modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev)**2)
-        modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev)**2)
+        modal2 = 1. * math.exp(-0.5 * ((action - maxima2) / stddev)**2)
 
         return modal1 + modal2
 
@@ -314,12 +314,12 @@ class Bimodal1DEnv_uneq_var1(object):
         maxima1 = -1.0
         maxima2 = 1.0
 
-        stddev1 = 0.4
+        stddev1 = 0.2
         stddev2 = 0.2
 
         # Reward function.
         # Two gaussian functions.
-        modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
+        modal1 = 0.25 * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
         modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
 
         return modal1 + modal2
@@ -754,8 +754,8 @@ class Bimodal1DEnv_eq_var3(object):
 
         # Reward function.
         # Two gaussian functions.
-        modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
-        modal2 = 1. * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
+        modal1 = 1.0 * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
+        modal2 = 1.0 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
 
         return modal1 + modal2
 

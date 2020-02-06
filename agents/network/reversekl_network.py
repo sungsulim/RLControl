@@ -170,7 +170,7 @@ class ReverseKLNetwork(BaseNetwork):
                 # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
                 intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
 
-                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - intgrl_logprob.squeeze())
+                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - self.entropy_scale * intgrl_logprob.squeeze())
             else:
                 intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)
                 intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
@@ -178,7 +178,7 @@ class ReverseKLNetwork(BaseNetwork):
                 # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
                 intgrl_logprob = self.pi_net.get_logprob(state_batch, self.tiled_intgrl_actions)
 
-                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
+                integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - self.entropy_scale * intgrl_logprob.squeeze())
 
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
 
@@ -290,10 +290,10 @@ class PolicyNetwork(nn.Module):
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
         # self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        # self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        self.mean_linear.bias.data.uniform_(-1.5, 1.5)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
-        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
+        # self.log_std_linear.weight.data.uniform_(-1, -1)
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
         self.log_std_linear.bias.data.uniform_(-0.5, -0.5)
 

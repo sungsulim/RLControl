@@ -10,17 +10,17 @@
         "critic_l1_dim": [200],
         "critic_l2_dim": [200],
 
-        "pi_lr": [1e-3, 1e-4, 1e-5],
-        "qf_vf_lr": [1e-2, 1e-3, 1e-4],
+        "pi_lr": [1e-1],
+        "qf_vf_lr": [1e-2],
 
         "sample_for_eval": ["False"],
-        "use_true_q": ["False"],
+        "use_true_q": ["True"],
 
-        "entropy_scale": [0.1, 0.01, 0.001],
+        "entropy_scale": [0.01],
 
         "l_param": [7],
-        "N_param": [256],
-
-        "optim_type": ["intg"]
+        "N_param": [64],
+        "batch_size": [1],
+        "optim_type": ["intg", "ll"]
     }
 }
