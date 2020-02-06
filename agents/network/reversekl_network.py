@@ -171,7 +171,7 @@ class ReverseKLNetwork(BaseNetwork):
             # intgrl_logprob = self.pi_net.get_logprob(stacked_state_batch, stacked_intgrl_actions)
             intgrl_logprob = self.pi_net.get_logprob(state_batch, tiled_intgrl_actions)
 
-            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - intgrl_logprob.squeeze())
+            integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze() - intgrl_v_val.squeeze()).detach() - self.entropy_scale * intgrl_logprob.squeeze())
             # integrands = - torch.exp(intgrl_logprob.squeeze()) * ((intgrl_q_val.squeeze()).detach() - intgrl_logprob.squeeze())
 
             policy_loss = (integrands * self.intgrl_weights.repeat(self.config.batch_size)).reshape(self.config.batch_size, -1).sum(-1).mean(-1)
