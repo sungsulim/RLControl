@@ -155,7 +155,7 @@ class ForwardKLNetwork(BaseNetwork):
             stacked_state_batch = tiled_state_batch.reshape(-1, self.state_dim)  # (8128, 3)
 
             intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
-            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)  # (32, 254)
+            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len) / self.entropy_scale  # (32, 254)
 
             # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
             # tiled_intgrl_v_val = intgrl_v_val.reshape(-1, self.intgrl_actions_len)
