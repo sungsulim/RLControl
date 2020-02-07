@@ -291,7 +291,7 @@ class PolicyNetwork(nn.Module):
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
         # self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        # self.mean_linear.bias.data.uniform_(-init_w, init_w)
+        self.mean_linear.bias.data.uniform_(-1, -1)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)

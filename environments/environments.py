@@ -319,8 +319,8 @@ class Bimodal1DEnv_uneq_var1(object):
 
         # Reward function.
         # Two gaussian functions.
-        modal1 = 0.25 * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
-        modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
+        modal1 = 1.0 * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
+        modal2 = 1.1 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
 
         return modal1 + modal2
 
