@@ -161,7 +161,7 @@ class ForwardKLNetwork(BaseNetwork):
                 intgrl_q_val = torch.from_numpy(self.predict_true_q(stacked_state_batch, self.stacked_intgrl_actions))
             else:
                 intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
-            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)  # (32, 254)
+            tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)/self.entropy_scale  # (32, 254)
 
             # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
             # tiled_intgrl_v_val = intgrl_v_val.reshape(-1, self.intgrl_actions_len)
