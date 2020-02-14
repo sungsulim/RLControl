@@ -5,3 +5,4 @@ results/
 .idea/misc.xml
 .idea/vcs.xml
 /venv
+run_scripts/**

@@ -163,6 +163,7 @@ class ForwardKLNetwork(BaseNetwork):
                 intgrl_q_val = self.q_net(stacked_state_batch, self.stacked_intgrl_actions)  # (8128, 1)
             tiled_intgrl_q_val = intgrl_q_val.reshape(-1, self.intgrl_actions_len)/self.entropy_scale  # (32, 254)
 
+
             # intgrl_v_val = v_val.unsqueeze(1).repeat(1, self.intgrl_actions_len, 1).reshape(-1, 1)
             # tiled_intgrl_v_val = intgrl_v_val.reshape(-1, self.intgrl_actions_len)
 
@@ -182,7 +183,7 @@ class ForwardKLNetwork(BaseNetwork):
             tiled_intgrl_logprob = intgrl_logprob.reshape(self.config.batch_size, self.intgrl_actions_len)  # (32, 254)
 
             # divide z now
-            integrands = boltzmann_prob * tiled_intgrl_logprob
+            integrands = boltzmann_prob.detach() * tiled_intgrl_logprob
             policy_loss = (-(integrands * self.tiled_intgrl_weights).sum(-1)).mean(-1)
 
         # reparam update
@@ -291,12 +292,12 @@ class PolicyNetwork(nn.Module):
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
         # self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        self.mean_linear.bias.data.uniform_(-1, -1)
+        self.mean_linear.bias.data.uniform_(-1.3, -0.7)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
         self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
-        self.log_std_linear.bias.data.uniform_(-0.5, -0.5)
+        self.log_std_linear.bias.data.uniform_(-1., -1.)
 
         self.action_dim = action_dim
         self.action_scale = action_scale

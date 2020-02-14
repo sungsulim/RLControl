@@ -190,7 +190,7 @@ for idx, item in enumerate(train_mean_rewards):
 print("max train median length: ", max_median_length)
 # print(train_mean_rewards[0])
 # print(eval_mean_rewards[0])
-# print(np.shape(train_mean_rewards), np.shape(eval_mean_rewards))
+print("train shape: {}, eval shape: {}".format(np.shape(train_mean_rewards), np.shape(eval_mean_rewards)))
 # input()
 eval_mean_rewards = np.array(eval_mean_rewards)
 eval_std_rewards = np.array(eval_std_rewards)

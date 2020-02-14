@@ -152,11 +152,15 @@ class ReverseKLNetwork(BaseNetwork):
 
         if self.optim_type == 'll':
 
+
             if self.use_true_q:
                 new_action, log_prob, z, mean, log_std = self.pi_net.evaluate(state_batch)
                 new_q_val = torch.from_numpy(self.predict_true_q(state_batch, new_action))
 
-            log_prob_target = new_q_val # - v_val
+                log_prob_target = new_q_val
+
+            else:
+                log_prob_target = new_q_val - v_val
 
             # loglikelihood update
             policy_loss = (-log_prob * (log_prob_target - self.entropy_scale * log_prob).detach()).mean()
@@ -290,12 +294,12 @@ class PolicyNetwork(nn.Module):
 
         self.mean_linear = nn.Linear(state_dim, action_dim)
         # self.mean_linear.weight.data.uniform_(-init_w, init_w)
-        self.mean_linear.bias.data.uniform_(-1.5, 1.5)
+        self.mean_linear.bias.data.uniform_(-1.3, -0.7)
 
         self.log_std_linear = nn.Linear(state_dim, action_dim)
-        # self.log_std_linear.weight.data.uniform_(-1, -1)
+        self.log_std_linear.weight.data.uniform_(-init_w, init_w)
         # self.log_std_linear.bias.data.uniform_(-init_w, init_w)
-        self.log_std_linear.bias.data.uniform_(-0.5, -0.5)
+        self.log_std_linear.bias.data.uniform_(-1., -1.)
 
         self.action_dim = action_dim
         self.action_scale = action_scale

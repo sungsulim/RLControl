@@ -30,20 +30,19 @@ import json
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-eval_last_N = True
+eval_last_N = False
 last_N = 50
 
 selected_idx = [] # range(0 ,392, 1) # range(392,784, 1) # range(49,98,1) # #
 selected_type = selected_idx[:] # ['ae_sep bimodal', 'ae_sep unimodal', 'ae_sep bimodal w uniform', 'ae_sep unimodal w uniform'] #
 
 
-cutoff= 16
+cutoff= 8
 # ['mean, mean', 'ga, mean', 'mean, ga', 'ga, ga']#
 # ['Q-learning: x, Evaluation: x', 'Q-learning: o, Evaluation: x', 'Q-learning: x, Evaluation: o', 'Q-learning: o, Evaluation: o']
 
-
-truncate_train_ep = 2000
-# Example: selected_type = ['NAF', 'Wire_fitting']
+# truncate training ep not being used
+# truncate_train_ep = 2000
 ##############################
 
 
@@ -101,11 +100,11 @@ def get_xyrange(envname):
 
     elif envname == 'Swimmer-v2':
         ymin = [20, 20]
-        ymax = [120, 120]
+        ymax = [40, 40]
 
     elif envname == 'Reacher-v2':
-        ymin = [-50, -20]
-        ymax = [0, 0]
+        ymin = [-45, -10]
+        ymax = [-30, -3]
 
     elif envname == 'Humanoid-v2':
         ymin = [0, 0]
@@ -126,7 +125,7 @@ def get_xyrange(envname):
     elif envname == 'Pendulum-v0':
         ymin = [-1400, -1400]
         ymax = [-100, -100]
-        xmax = 72
+        # xmax = 72
 
     elif envname == 'InvertedPendulum-v2':
         ymin = [0, 0]
@@ -219,8 +218,8 @@ if __name__ == "__main__":
 
         if result == 'TrainEpisode':
             xmax = np.shape(lc)[-1]
-            if xmax > truncate_train_ep:
-                xmax = truncate_train_ep
+            # if xmax > truncate_train_ep:
+            #     xmax = truncate_train_ep
             print(xmax)
 
             plt.xlabel('Episodes')
@@ -234,6 +233,7 @@ if __name__ == "__main__":
             if xmax is None:
                 xmax = np.shape(lc)[-1] # int(max_length)
 
+            # xmax=12
             opt_range = range(0, xmax) 
             xlimt = (0, xmax-1)
 
@@ -396,6 +396,7 @@ if __name__ == "__main__":
 
             legends = [agent + ', ' + str(num_runs) + ' runs']
 
+            print(len(opt_range), len(bestlc), len(lcse))
             plt.fill_between(opt_range, bestlc - lcse, bestlc + lcse, alpha = 0.2)#, facecolor=colors[0])
             #plt.plot(opt_range, bestlc, colors[0], linewidth=1.0, label=legends)
             plt.plot(opt_range, bestlc, linewidth=1.0, label=legends)

@@ -18,18 +18,21 @@ import os
 # This will sweep through all environments, and save/print best settings for that sweep.
 ######################
 
-
 ### CONFIG BEFORE RUNNING ###
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-parse_type = 'actor_update'
+parse_type = 'entropy_scale' #'actor_update'
 show_plot = False
+
+print("################################")
+print("PARSE TYPE: {}".format(parse_type))
+print("################################")
 
 plot_each_runs = True
 
 eval_last_N = True
-last_N_ratio = 0.2
+last_N_ratio = 1.0
 
 ##############################
 
