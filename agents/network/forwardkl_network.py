@@ -139,7 +139,13 @@ class ForwardKLNetwork(BaseNetwork):
         q_value_loss = nn.MSELoss()(q_val, target_q_val.detach())
 
         new_q_val = self.q_net(state_batch, new_action)
-        target_v_val = new_q_val - self.entropy_scale * log_prob
+        if self.config.q_update_type == 'sac':
+            target_v_val = new_q_val - self.entropy_scale * log_prob
+
+        elif self.config.q_update_type == 'non_sac':
+            target_v_val = (reward_batch - self.entropy_scale * log_prob) + gamma_batch * target_next_v_val
+        else:
+            raise ValueError("invalid config.q_update_type")
         value_loss = nn.MSELoss()(v_val, target_v_val.detach())
 
         # pi_loss
