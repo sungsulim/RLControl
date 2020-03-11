@@ -572,8 +572,8 @@ class Bimodal1DEnv_eq_var1(object):
     @staticmethod
     def reward_func(action):
 
-        maxima1 = -0.6
-        maxima2 = 0.6
+        maxima1 = -1.0
+        maxima2 = 1.0
 
         stddev1 = 0.2
         stddev2 = 0.2
@@ -581,7 +581,7 @@ class Bimodal1DEnv_eq_var1(object):
         # Reward function.
         # Two gaussian functions.
         modal1 = 1. * math.exp(-0.5 * ((action - maxima1) / stddev1) ** 2)
-        modal2 = 1. * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
+        modal2 = 1.5 * math.exp(-0.5 * ((action - maxima2) / stddev2) ** 2)
 
         return modal1 + modal2
 
