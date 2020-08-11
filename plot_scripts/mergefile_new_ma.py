@@ -17,6 +17,8 @@ import statistics
 # example: python3 ../plot_scripts/mergefile.py ../jsonfile/environment/LunarLanderContinuous-v2.json LunarLanderContinuous-v2results 9 5 NAF 
 # This will generate mergedRESULT Directory (i.e. mergedLunarLanderContinuous-v2results)
 
+window_length = 10
+
 def movingaverage (values, window):
     weights = np.repeat(1.0, window)/window
     sma = np.convolve(values, weights, 'valid')
@@ -69,7 +71,7 @@ params_fn = None
 
 
 eval_lc_length = int(TOTAL_MIL_STEPS / EVAL_INTERVAL_MIL_STEPS) + 1
-eval_lc_length = eval_lc_length - 9 # for ma
+eval_lc_length = eval_lc_length - (window_length-1) # for ma
 max_median_length = 1
 
 # for each setting
@@ -97,7 +99,7 @@ for setting_num in range(NUM_SETTINGS):
             train_lc_arr.append(lc_0)
             eval_mean_lc_arr.append(lc_1)
 
-            print(' setting ' + train_rewards_filename + ' does not exist')
+            print(' @@ setting ' + train_rewards_filename + ' does not exist')
             missingindexes.append(NUM_SETTINGS*run_num+setting_num)
             continue
 
@@ -105,8 +107,8 @@ for setting_num in range(NUM_SETTINGS):
         lc_1 = np.loadtxt(eval_mean_rewards_filename, delimiter=',') # [:eval_lc_length+9] temporary solution for Pendulum-v0
 
         # compute moving window 
-        lc_0 = movingaverage(lc_0, 10)
-        lc_1 = movingaverage(lc_1, 10)
+        lc_0 = movingaverage(lc_0, window_length)
+        lc_1 = movingaverage(lc_1, window_length)
 
 
         train_lc_arr.append(lc_0)
@@ -140,7 +142,7 @@ for setting_num in range(NUM_SETTINGS):
 
 
     if run_non_count == NUM_RUNS:
-        print('setting ' + str(setting_num) + ' does not exist')
+        print('@@ setting ' + str(setting_num) + ' does not exist')
         print(np.shape(train_lc_arr), train_lc_arr)
         print(np.shape(eval_mean_lc_arr), eval_mean_lc_arr)
         # exit() ## Perhaps continue?? TODO
@@ -148,7 +150,6 @@ for setting_num in range(NUM_SETTINGS):
     #### Need to have same size
     train_mean_rewards.append(np.nanmean(train_lc_arr, axis=0))
     train_std_rewards.append(np.nanstd(train_lc_arr, axis=0))
-    
 
 
     # TODO: process eval_mean_lc_arr, eval_std_lc together and append to eval_mean_rewards, eval_std_rewards

@@ -23,13 +23,13 @@ import os
 # Use if you want to plot specific settings, put the idx of the setting below.
 # You can also see *_Params.txt to see the idx for each setting.
 
-parse_type = 'actor_update'
+parse_type = 'entropy_scale'
 show_plot = False
 
 plot_each_runs = True
 
 eval_last_N = True
-last_N_ratio = 0.2
+last_N_ratio = 0.5
 
 ##############################
 
@@ -40,6 +40,14 @@ def get_xyrange(envname):
     if envname.startswith('Bimodal1DEnv'):
         ymin = [-0.5, -0.5]
         ymax = [2.0, 2.0]
+
+    elif envname == "Swimmer-v2":
+        ymin = [20, 20]
+        ymax = [120, 120]
+
+    elif envname == "Pendulum-v0":
+        ymin = [-1600, -1600]
+        ymax = [-100, -100]
 
     else:
         raise ValueError("Invalid environment name")
@@ -109,7 +117,7 @@ if __name__ == "__main__":
     EVAL_EPISODES = env_json['EvalEpisodes']
 
      # Plot type
-    result_type = ['EvalEpisode']
+    result_type = ['TrainEpisode']
 
     title = "%s, %s: %s (%d runs)" % (env_name, agent_name, custom_save_name, num_runs)
 
@@ -134,17 +142,17 @@ if __name__ == "__main__":
 
         # default xmax
         xmax = np.shape(lc)[-1]
-
         xmax_override, ymin, ymax = get_xyrange(env_name)
+
         if xmax_override is not None:
             xmax = xmax_override
 
         last_N = int(last_N_ratio * xmax)
-        if result == 'TrainEpisode':
-            raise NotImplementedError
-
-        elif result == 'EvalEpisode':
-            plt.xlabel('Training Steps (per 1000 steps)')
+        # if result == 'TrainEpisode':
+        #     plt.xlabel('Training Steps (per 1000 steps)')
+        #
+        # elif result == 'EvalEpisode':
+        plt.xlabel('Training Steps (per 1000 steps)')
 
         h = plt.ylabel("Cum. Reward per episode")
         h.set_rotation(90)

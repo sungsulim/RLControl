@@ -31,6 +31,7 @@ import json
 # You can also see *_Params.txt to see the idx for each setting.
 
 eval_last_N = True
+last_N_ratio = 0.5
 last_N = 50
 
 selected_idx = [] # range(0 ,392, 1) # range(392,784, 1) # range(49,98,1) # #
@@ -100,8 +101,8 @@ def get_xyrange(envname):
         ymax = [2000, 4000]
 
     elif envname == 'Swimmer-v2':
-        ymin = [20, 20]
-        ymax = [120, 120]
+        ymin = [0, 0]
+        ymax = [60, 60]
 
     elif envname == 'Reacher-v2':
         ymin = [-50, -20]
@@ -219,9 +220,13 @@ if __name__ == "__main__":
 
         if result == 'TrainEpisode':
             xmax = np.shape(lc)[-1]
+
+            print('original train ep length: {}'.format(xmax))
             if xmax > truncate_train_ep:
+
+                print('truncated to: {}'.format(truncate_train_ep))
                 xmax = truncate_train_ep
-            print(xmax)
+                raise ValueError("Shouldn't truncate train result")
 
             plt.xlabel('Episodes')
             opt_range = range(0, xmax)
@@ -285,6 +290,8 @@ if __name__ == "__main__":
         plt.ylim(ylimt)
         plt.xlim(xlimt)
 
+        # set last_N according to AUC ratio
+        last_N = int(xmax * last_N_ratio)
 
         # Plot selected idx
         if len(selected_idx) != 0 :

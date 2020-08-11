@@ -36,25 +36,8 @@ custom_save_name = str(sys.argv[6])
 
 
 #### Plot Settings #####
-# opt_range = range(1, 150+1) 
-# xlimt = (1, 150)
-
-
-xmax = int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1
-print('xmax', xmax)
-# xmax = 501
-opt_range = range(0, xmax) 
-xlimt = (0, xmax-1)
-
-ylimt = (-0.2, 1.8) # Bimodal1DEnv
-# ylimt = (-1400, -100) # Pendulum
-#ylimt = (0,3000)
-# ylimt =(0,4000)
 
 plt.figure(figsize=(12,6))
-
-plt.ylim(ylimt)
-plt.xlim(xlimt)
 
 if show_label:
 
@@ -73,10 +56,10 @@ tick_interval = 50
 # plt.xticks(loc, labels)
 
 if show_label:
-    plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
-    #plt.yticks([0,0.5,1,1.5], [0.0, 0.5, 1.0, 1.5])
+    # plt.xticks(opt_range[::50], np.linspace(0.0, float(EVAL_INTERVAL_MIL_STEPS * 1e3 * (xmax-1)), int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1)[::50])
+    pass
 else:
-    plt.xticks(opt_range[::50], [])
+    # plt.xticks(opt_range[::50], [])
     plt.yticks([0,0.5,1,1.5], [])
 
 #####
@@ -91,12 +74,13 @@ for i in range(NUM_RUNS):
     eval_rewards_arr = []
 
     # Filenames
-    eval_rewards_filename = DIR + '/' + ENV_NAME + '_' + AGENT_NAME + '_setting_' + str(SETTING_NUM) + '_run_' + str(i) + '_EvalEpisodeMeanRewardsLC.txt' 
+    eval_rewards_filename = DIR + '/' + ENV_NAME + '_' + AGENT_NAME + '_setting_' + str(SETTING_NUM) + '_run_' + str(i) + '_EpisodeRewardsLC.txt'
     #eval_action_filename = DIR + '/' + ENV_NAME + '_' + AGENT_NAME + '_setting_' + str(SETTING_NUM) + '_run_' + str(i) + '_EvalActionTaken.txt' 
     #train_sigma_filename = DIR + '/' + ENV_NAME + '_' + AGENT_NAME + '_setting_' + str(SETTING_NUM) + '_run_' + str(i) + '_Sigma1.txt' 
 
-    eval_rewards_arr = np.loadtxt(eval_rewards_filename, delimiter=',')[:xmax]
-    eval_rewards_arr = eval_rewards_arr
+    eval_rewards_arr = np.loadtxt(eval_rewards_filename, delimiter=',')
+    xmax = len(eval_rewards_arr)
+
     plt.plot(eval_rewards_arr, color='b',alpha=0.1)
     eval_rewards_total_arr.append(eval_rewards_arr)
     #eval_action_total_arr.append(np.loadtxt(eval_action_filename, delimiter=','))
@@ -106,9 +90,20 @@ for i in range(NUM_RUNS):
     # print(eval_rewards_arr)
     # input()
 
+eval_rewards_mean = np.nanmean(eval_rewards_total_arr, axis=0)
 
+# xmax = int(TOTAL_MIL_STEPS/EVAL_INTERVAL_MIL_STEPS)+1
+print('xmax', xmax)
+# xmax = 501
+opt_range = range(0, xmax)
+xlimt = (0, xmax-1)
 
-eval_rewards_mean = np.nanmean(eval_rewards_total_arr, axis=0)[:xmax]
+# ylimt = (-0.2, 1.8) # Bimodal1DEnv
+ylimt = (-1600, -100) # Pendulum
+
+plt.xlim(xlimt)
+plt.ylim(ylimt)
+
 plt.plot(opt_range, eval_rewards_mean, color='b', linewidth=1.5)
 
 if show_plot:
