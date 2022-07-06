@@ -11,7 +11,7 @@ gast==0.2.2
 glfw==1.7.1
 grpcio==1.19.0
 gym==0.12.1
-html5lib==0.9999999
+html5lib==0.999999999
 idna==2.8
 imageio==2.5.0
 kiwisolver==1.0.1
